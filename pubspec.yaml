@@ -1,0 +1,38 @@
+name: bbc_api_tool
+description: "An application that hosts our most used API calls"
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Core packages
+  http: ^1.1.0
+  firebase_core: ^2.30.0
+  fluttertoast: ^8.2.1
+  shared_preferences: ^2.1.1
+  uuid: ^4.3.0
+  path_provider: ^2.0.15
+  cloud_firestore: ^4.7.1
+  firebase_auth: ^4.19.0
+  url_launcher: ^6.3.0
+  cupertino_icons: ^1.0.8
+  cloud_functions: ^4.7.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - lib/assets/BBC_Request.postman_collection.json
+    - lib/assets/backgound_asset.png
+    - lib/assets/logo.png

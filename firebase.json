@@ -1,0 +1,90 @@
+{
+  "hosting": {
+    "public": "build/web",
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "function": "api"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ],
+    "predeploy": [
+      "node scripts/predeploy.js"
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "bbc-api-tool",
+          "appId": "1:259169067995:android:9df42272f819de9e98fdfe",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "bbc-api-tool",
+          "configurations": {
+            "android": "1:259169067995:android:9df42272f819de9e98fdfe",
+            "ios": "1:259169067995:ios:21039dda2d978e8e98fdfe",
+            "macos": "1:259169067995:ios:21039dda2d978e8e98fdfe",
+            "web": "1:259169067995:web:c46914fa0822888a98fdfe",
+            "windows": "1:259169067995:web:49b36decedc7584e98fdfe"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "source": "functions"
+    },
+    {
+      "source": "bbc-api-tool",
+      "codebase": "bbc-api-tool",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}
