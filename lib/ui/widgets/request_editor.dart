@@ -6,6 +6,7 @@ import '../../models/api_preset.dart';
 
 class RequestEditor extends StatefulWidget {
   final ApiPreset preset;
+
   const RequestEditor({Key? key, required this.preset}) : super(key: key);
 
   @override
@@ -27,12 +28,14 @@ class _RequestEditorState extends State<RequestEditor> {
   @override
   void initState() {
     super.initState();
-    headers = widget.preset.headers.entries
-        .map((e) => {'key': e.key, 'value': e.value})
-        .toList();
-    params = widget.preset.params.entries
-        .map((e) => {'key': e.key, 'value': e.value})
-        .toList();
+    headers =
+        widget.preset.headers.entries
+            .map((e) => {'key': e.key, 'value': e.value})
+            .toList();
+    params =
+        widget.preset.params.entries
+            .map((e) => {'key': e.key, 'value': e.value})
+            .toList();
     editableBody = widget.preset.body ?? '';
     bodyController = TextEditingController(text: editableBody);
     tokenController = TextEditingController();
@@ -51,20 +54,22 @@ class _RequestEditorState extends State<RequestEditor> {
   @override
   void didUpdateWidget(covariant RequestEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.preset.id != oldWidget.preset.id) {
+    if (!identical(widget.preset, oldWidget.preset)) {
       bodyController.dispose();
       tokenController.dispose();
       _urlControllers.forEach((_, controller) => controller.dispose());
       _urlControllers.clear();
 
       setState(() {
-        headers = widget.preset.headers.entries
-            .map((e) => {'key': e.key, 'value': e.value})
-            .toList();
+        headers =
+            widget.preset.headers.entries
+                .map((e) => {'key': e.key, 'value': e.value})
+                .toList();
 
-        params = widget.preset.params.entries
-            .map((e) => {'key': e.key, 'value': e.value})
-            .toList();
+        params =
+            widget.preset.params.entries
+                .map((e) => {'key': e.key, 'value': e.value})
+                .toList();
 
         editableBody = widget.preset.body ?? '';
         bodyController = TextEditingController(text: editableBody);
@@ -137,11 +142,13 @@ class _RequestEditorState extends State<RequestEditor> {
             bool hasRealData = false;
             if (parameters['body'] is List) {
               final bodyList = parameters['body'] as List;
-              hasRealData = bodyList.any((item) =>
-              item is String &&
-                  item.trim().isNotEmpty &&
-                  !item.contains('[') &&
-                  !item.contains(']'));
+              hasRealData = bodyList.any(
+                (item) =>
+                    item is String &&
+                    item.trim().isNotEmpty &&
+                    !item.contains('[') &&
+                    !item.contains(']'),
+              );
             }
 
             if (!hasRealData) {
@@ -229,7 +236,9 @@ class _RequestEditorState extends State<RequestEditor> {
   }
 
   bool _hasEditableParams() {
-    return widget.preset.params.values.any((v) => v.contains('[') && v.contains(']'));
+    return widget.preset.params.values.any(
+      (v) => v.contains('[') && v.contains(']'),
+    );
   }
 
   Widget _keyValueEditor(String title, List<Map<String, String>> list) {
@@ -244,11 +253,14 @@ class _RequestEditorState extends State<RequestEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Color(0xFF003366))),
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Color(0xFF003366),
+            ),
+          ),
           const SizedBox(height: 8),
           for (int i = 0; i < list.length; i++)
             if ((list[i]['value'] ?? '').contains('['))
@@ -266,7 +278,9 @@ class _RequestEditorState extends State<RequestEditor> {
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFD8E2ED)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFD8E2ED),
+                            ),
                           ),
                         ),
                       ),
@@ -274,19 +288,24 @@ class _RequestEditorState extends State<RequestEditor> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
-                        controller:
-                        TextEditingController(text: list[i]['value']),
+                        controller: TextEditingController(
+                          text: list[i]['value'],
+                        ),
                         decoration: InputDecoration(
                           isDense: true,
                           filled: true,
                           fillColor: Colors.white,
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF80CFFF)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF80CFFF),
+                            ),
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFD8E2ED)),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFD8E2ED),
+                            ),
                           ),
                         ),
                         onChanged: (v) => list[i]['value'] = v,
@@ -324,7 +343,10 @@ class _RequestEditorState extends State<RequestEditor> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: sectionText,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 textStyle: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
@@ -347,9 +369,13 @@ class _RequestEditorState extends State<RequestEditor> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Authorization",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
+                        const Text(
+                          "Authorization",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         TextField(
                           controller: tokenController,
@@ -375,11 +401,14 @@ class _RequestEditorState extends State<RequestEditor> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("URL Variables",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: sectionText)),
+                        const Text(
+                          "URL Variables",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: sectionText,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         for (var v in widget.preset.urlVariables)
                           Padding(
@@ -389,8 +418,10 @@ class _RequestEditorState extends State<RequestEditor> {
                               decoration: InputDecoration(
                                 labelText: v,
                                 border: const OutlineInputBorder(
-                                  borderSide:
-                                  BorderSide(color: focusColor, width: 2),
+                                  borderSide: BorderSide(
+                                    color: focusColor,
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                             ),
@@ -415,25 +446,26 @@ class _RequestEditorState extends State<RequestEditor> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  ...RegExp(r'\[(.*?)\]')
-                      .allMatches(widget.preset.body!)
-                      .map((match) {
+                  ...RegExp(r'\[(.*?)\]').allMatches(widget.preset.body!).map((
+                    match,
+                  ) {
                     final placeholder = match.group(1)!.trim();
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: TextFormField(
+                        key: ValueKey(
+                          '${widget.preset.id}_${widget.preset.hashCode}_$placeholder',
+                        ),
                         decoration: InputDecoration(
                           labelText: placeholder,
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
-                            borderSide:
-                            const BorderSide(color: borderColor),
+                            borderSide: const BorderSide(color: borderColor),
                           ),
                           focusedBorder: const OutlineInputBorder(
-                            borderSide:
-                            BorderSide(color: focusColor, width: 2),
+                            borderSide: BorderSide(color: focusColor, width: 2),
                           ),
                         ),
                         onChanged: (value) {
@@ -474,19 +506,22 @@ class _RequestEditorState extends State<RequestEditor> {
                             if (statusCode != null)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: statusCode! >= 200 &&
-                                      statusCode! < 300
-                                      ? successColor
-                                      : errorColor,
+                                  color:
+                                      statusCode! >= 200 && statusCode! < 300
+                                          ? successColor
+                                          : errorColor,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
                                   "$statusCode",
                                   style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                           ],
@@ -520,4 +555,3 @@ class _RequestEditorState extends State<RequestEditor> {
     );
   }
 }
-

@@ -17,7 +17,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "[ Access Token ]",
+									"value": "[Access Token]",
 									"type": "string"
 								}
 							]
@@ -43,7 +43,7 @@
 							],
 							"path": [
 								"v19.0",
-								"[ Phone number ID ]",
+								"[Phone number ID]",
 								"whatsapp_business_profile"
 							]
 						}
@@ -63,7 +63,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "[ WA Number Access Token ]",
+									"value": "[WA Number Access Token]",
 									"type": "string"
 								}
 							]
@@ -72,12 +72,12 @@
 						"header": [
 							{
 								"key": "api_account_id",
-								"value": "[ Account ID ]",
+								"value": "[Account ID]",
 								"type": "text"
 							},
 							{
 								"key": "api_access_token",
-								"value": "[ User Access Token ]",
+								"value": "[User Access Token]",
 								"type": "text"
 							}
 						],
@@ -116,7 +116,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "[ WA Number Access Token ]",
+									"value": "[WA Number Access Token]",
 									"type": "string"
 								}
 							]
@@ -125,12 +125,12 @@
 						"header": [
 							{
 								"key": "api_account_id",
-								"value": "[ Account ID ]",
+								"value": "[Account ID]",
 								"type": "text"
 							},
 							{
 								"key": "api_access_token",
-								"value": "[ User Access Token ]",
+								"value": "[User Access Token]",
 								"type": "text"
 							}
 						],
@@ -169,7 +169,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "[ WA Number Access Token ]",
+									"value": "[WA Number Access Token]",
 									"type": "string"
 								}
 							]
@@ -177,13 +177,13 @@
 						"method": "POST",
 						"header": [
 							{
-								"key": "api_access_token",
-								"value": "[ User Access Token ]",
+								"key": "api_account_id",
+								"value": "[Account ID]",
 								"type": "text"
 							},
 							{
-								"key": "api_account_id",
-								"value": "Account ID",
+								"key": "api_access_token",
+								"value": "[User Access Token]",
 								"type": "text"
 							}
 						],
@@ -227,7 +227,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "[ Access Token ]",
+									"value": "[Access Token]",
 									"type": "string"
 								}
 							]
@@ -244,7 +244,7 @@
 							],
 							"path": [
 								"v20.0",
-								"[ Phone Number ID ]",
+								"[Phone Number ID]",
 								"register"
 							],
 							"query": [
@@ -269,7 +269,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "[ Access token ]",
+									"value": "[Access token]",
 									"type": "string"
 								}
 							]
@@ -286,7 +286,7 @@
 							],
 							"path": [
 								"v17.0",
-								"[ WABA ID ]",
+								"[WABA ID]",
 								"phone_numbers"
 							]
 						}
@@ -301,7 +301,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "[ Access Token ]",
+									"value": "[Access Token]",
 									"type": "string"
 								}
 							]
@@ -327,7 +327,7 @@
 							],
 							"path": [
 								"v17.0",
-								"[ Phone Number ID ]",
+								"[Phone Number ID]",
 								"request_code"
 							]
 						}
@@ -342,7 +342,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "[ Access Token ]",
+									"value": "[Access Token]",
 									"type": "string"
 								}
 							]
@@ -368,7 +368,7 @@
 							],
 							"path": [
 								"v17.0",
-								"[ Phone number ID ]",
+								"[Phone number ID]",
 								"verify_code"
 							]
 						}
@@ -383,7 +383,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "[ ACCESS_TOKEN ]",
+									"value": "[ACCESS_TOKEN]",
 									"type": "string"
 								}
 							]
@@ -409,7 +409,7 @@
 							],
 							"path": [
 								"v21.0",
-								"[ PHONE_NUMBER_ID ]"
+								"[PHONE_NUMBER_ID]"
 							]
 						}
 					},
