@@ -196,7 +196,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
   /// ✏️ Edit user
   Future<void> _showEditUserDialog(Map<String, dynamic> user) async {
     final emailCtrl = TextEditingController(text: user['email'] ?? '');
-    final nameCtrl = TextEditingController(text: user['displayName'] ?? '');
     final passCtrl = TextEditingController();
     bool superadmin = user['superadmin'] ?? false;
 
@@ -214,12 +213,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                       TextField(
                         controller: emailCtrl,
                         decoration: const InputDecoration(labelText: 'Email'),
-                      ),
-                      TextField(
-                        controller: nameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Display Name',
-                        ),
                       ),
                       TextField(
                         controller: passCtrl,
@@ -260,7 +253,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                         await updateUser({
                           'uid': user['uid'],
                           'email': emailCtrl.text.trim(),
-                          'displayName': nameCtrl.text.trim(),
                           if (passCtrl.text.trim().isNotEmpty)
                             'password': passCtrl.text.trim(),
                         });
@@ -466,26 +458,32 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                         children: [
                           Expanded(
                             flex: 4,
-                            child: Text(
-                              'Email',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                            child: Center(
+                              child: Text(
+                                'Email',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
                           Expanded(
                             flex: 2,
-                            child: Text(
-                              'Super Admin',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                            child: Center(
+                              child: Text(
+                                'Super Admin',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
                           Expanded(
                             flex: 3,
-                            child: Text(
-                              'Actions',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                            child: Center(
+                              child: Text(
+                                'Actions',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
-                        ],
+                      ],
                       ),
                     ),
                   ),
