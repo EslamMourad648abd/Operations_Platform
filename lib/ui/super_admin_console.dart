@@ -109,7 +109,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
   Future<void> _showAddUserDialog() async {
     final emailCtrl = TextEditingController();
     final passCtrl = TextEditingController();
-    final nameCtrl = TextEditingController();
     bool superadmin = false;
 
     await showDialog(
@@ -132,12 +131,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                         obscureText: true,
                         decoration: const InputDecoration(
                           labelText: 'Password',
-                        ),
-                      ),
-                      TextField(
-                        controller: nameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Display Name',
                         ),
                       ),
                       Row(
@@ -172,7 +165,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                         await callable({
                           'email': emailCtrl.text.trim(),
                           'password': passCtrl.text.trim(),
-                          'displayName': nameCtrl.text.trim(),
                           'superadmin': superadmin,
                         });
                         Navigator.pop(context);
@@ -406,6 +398,28 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                               vertical: 10,
                             ),
                           ),
+                          onPressed: _showAddUserDialog,
+                          icon: const Icon(
+                            Icons.person_add_alt_1,
+                            color: Colors.white,
+                          ),
+                          label: const Text(
+                            "Add User",
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF001C38),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
                           onPressed: () async {
                             await FirebaseAuth.instance.signOut();
                             if (context.mounted) {
@@ -454,13 +468,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                             flex: 4,
                             child: Text(
                               'Email',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              'Display Name',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -518,16 +525,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                                   flex: 4,
                                   child: Text(
                                     u['email'] ?? '—',
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 3,
-                                  child: Text(
-                                    u['displayName']?.toString().isNotEmpty ==
-                                            true
-                                        ? u['displayName']
-                                        : '—',
                                     style: const TextStyle(fontSize: 14),
                                   ),
                                 ),
@@ -590,13 +587,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                   ),
                 ],
               ),
-
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF001C38),
-        tooltip: 'Add New User',
-        onPressed: _showAddUserDialog,
-        child: const Icon(Icons.person_add_alt_1),
-      ),
     );
   }
 }
