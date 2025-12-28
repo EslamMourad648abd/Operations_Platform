@@ -16,22 +16,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscure = true;
   bool _isSubmitting = false;
 
-  // ✅ Layer 1 — Only specific users allowed to log in
-  final List<String> allowedEmails = [
-    'ahmed.ramadan@bevatel.com',
-    'hadeer.othman@bevatel.com',
-    'tarek.abdelraouf@bevatel.com',
-    'mohamed.matwly@bevatel.com',
-    'karim.nour@bevatel.com',
-    'nouran.alsayed@bevatel.com',
-    'asmaa.hamdy@bevatel.com',
-    'kholoud.hussien@bevatel.com',
-    'Hager.Hassan@bevatel.com',
-    'mohamed.hamed@bevatel.com',
-    'amira.elzeiny@bevatel.com',
-    'omar.mostafa@bevatel.com',
-    'eslam.mourad@bevatel.com',
-  ];
 
   void _togglePassword() => setState(() => _obscure = !_obscure);
 
@@ -74,12 +58,12 @@ class _LoginPageState extends State<LoginPage> {
       final email = _emailCtrl.text.trim();
 
       // ✅ Step 1: Restrict login to allowed emails only
-      if (!allowedEmails.map((e) => e.toLowerCase()).contains(email.toLowerCase())) {
-        throw FirebaseAuthException(
-          code: 'access-denied',
-          message: 'This account is not authorized to use the tool.',
-        );
-      }
+      // if (!allowedEmails.map((e) => e.toLowerCase()).contains(email.toLowerCase())) {
+      //   throw FirebaseAuthException(
+      //     code: 'access-denied',
+      //     message: 'This account is not authorized to use the tool.',
+      //   );
+      // }
 
       // ✅ Step 2: Authenticate with Firebase
       await FirebaseAuth.instance.signInWithEmailAndPassword(
