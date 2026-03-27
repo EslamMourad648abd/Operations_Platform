@@ -33,6 +33,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - lib/assets/BBC_Request.postman_collection.json
-    - lib/assets/backgound_asset.png
-    - lib/assets/logo.png
+    - assets/BBC_Request.postman_collection.json
+    - assets/backgound_asset.png
+    - assets/logo.png
+    - assets/ramadan/
+    - assets/ramadan/islamic-lantern-svgrepo-com (1).png

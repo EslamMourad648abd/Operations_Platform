@@ -1,3 +1,5 @@
+import 'package:bbc_api_tool/ui/widgets/ramadan_appbar.dart';
+import 'package:bbc_api_tool/ui/widgets/ramadan_color_pallete.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -57,14 +59,6 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final email = _emailCtrl.text.trim();
 
-      // ✅ Step 1: Restrict login to allowed emails only
-      // if (!allowedEmails.map((e) => e.toLowerCase()).contains(email.toLowerCase())) {
-      //   throw FirebaseAuthException(
-      //     code: 'access-denied',
-      //     message: 'This account is not authorized to use the tool.',
-      //   );
-      // }
-
       // ✅ Step 2: Authenticate with Firebase
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
@@ -102,7 +96,10 @@ class _LoginPageState extends State<LoginPage> {
     const gradientEnd = Color(0xFF80CFFF);
 
     return Scaffold(
+        // appBar: const RamadanAppBar(height: 70),
+
       body: Container(
+
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
@@ -117,7 +114,7 @@ class _LoginPageState extends State<LoginPage> {
             constraints: const BoxConstraints(maxWidth: 520, minWidth: 320),
             child: Card(
               elevation: 20,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16),side: BorderSide(color: ramadanGold, width: 6)),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
                 child: Column(
@@ -126,7 +123,7 @@ class _LoginPageState extends State<LoginPage> {
                     // logo + heading
                     Column(
                       children: [
-                        Image.asset('lib/assets/logo.png', height: 150, fit: BoxFit.contain),
+                        Image.asset('assets/logo.png', height: 150, fit: BoxFit.contain),
                         const SizedBox(height: 5),
                         const Text(
                           'Sign in to BBC API Tool',
@@ -207,9 +204,11 @@ class _LoginPageState extends State<LoginPage> {
                               backgroundColor: const Color(0xFF80CFFF),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
+                                  borderRadius: BorderRadius.circular(8),),
+
                               elevation: 6,
                             ),
+
                             child: _isSubmitting
                                 ? const SizedBox(
                                 height: 18,

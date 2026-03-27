@@ -1,4 +1,5 @@
 // lib/ui/super_admin_console.dart
+import 'package:bbc_api_tool/ui/widgets/ramadan_appbar.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -328,6 +329,8 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
     final visibleUsers = searchQuery.isEmpty ? users : filteredUsers;
 
     return Scaffold(
+      // appBar: const RamadanAppBar(height: 50),
+
       backgroundColor: const Color(0xFFF5F2F7),
       body:
           loading

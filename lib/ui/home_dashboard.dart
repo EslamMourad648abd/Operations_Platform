@@ -361,6 +361,7 @@
 // }
 import 'package:bbc_api_tool/models/api_preset.dart';
 import 'package:bbc_api_tool/models/api_prest_group.dart';
+import 'package:bbc_api_tool/ui/widgets/ramadan_appbar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -421,7 +422,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   Future<void> _loadCollection() async {
     try {
       final loadedGroups = await PostmanLoader.loadFromAssets(
-        'lib/assets/BBC_Request.postman_collection.json',
+        'assets/BBC_Request.postman_collection.json',
       );
       if (!_disposed && mounted) {
         setState(() {
@@ -472,6 +473,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
     }
 
     return Scaffold(
+      // appBar: const RamadanAppBar(height: 50),
+
       backgroundColor: mainBgColor,
       body: Row(
         children: [
@@ -499,7 +502,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Image.asset(
-                              'lib/assets/logo.png',
+                              'assets/logo.png',
                               height: 70,
                               fit: BoxFit.contain,
                             ),
@@ -657,7 +660,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Image.asset(
-                              'lib/assets/backgound_asset.png',
+                              'assets/backgound_asset.png',
                               height: 130,
                               fit: BoxFit.contain,
                             ),

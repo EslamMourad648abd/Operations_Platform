@@ -23,7 +23,6 @@ Future<void> main() async {
 
   runApp(const ApiTesterApp());
 }
-
 class ApiTesterApp extends StatelessWidget {
   const ApiTesterApp({super.key});
 
