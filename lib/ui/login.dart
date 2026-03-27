@@ -114,7 +114,7 @@ class _LoginPageState extends State<LoginPage> {
             constraints: const BoxConstraints(maxWidth: 520, minWidth: 320),
             child: Card(
               elevation: 20,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16),side: BorderSide(color: ramadanGold, width: 6)),
+              // shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16),side: BorderSide(color: ramadanGold, width: 6)),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
                 child: Column(
