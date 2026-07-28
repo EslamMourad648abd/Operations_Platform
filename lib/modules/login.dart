@@ -1,7 +1,6 @@
-import 'package:bbc_api_tool/ui/widgets/ramadan_appbar.dart';
-import 'package:bbc_api_tool/ui/widgets/ramadan_color_pallete.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   static const routeName = '/login';
@@ -60,12 +59,26 @@ class _LoginPageState extends State<LoginPage> {
       final email = _emailCtrl.text.trim();
 
       // ✅ Step 2: Authenticate with Firebase
+      final credential =
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: _passwordCtrl.text.trim(),
       );
 
-      // ✅ Step 3: Navigate to dashboard
+// Force refresh the ID token
+      await credential.user!.getIdToken(true);
+
+// Load the role
+      await AuthService.loadUserRole();
+
+// Temporary debugging
+      final token = await credential.user!.getIdTokenResult(true);
+
+      debugPrint("========== FIREBASE CLAIMS ==========");
+      debugPrint(token.claims.toString());
+      debugPrint("Role from AuthService: ${AuthService.role}");
+      debugPrint("=====================================");
+
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/home');
       }

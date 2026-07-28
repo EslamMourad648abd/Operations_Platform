@@ -1,18 +1,16 @@
-// lib/ui/super_admin_console.dart
-import 'package:bbc_api_tool/ui/widgets/ramadan_appbar.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-class SuperAdminConsole extends StatefulWidget {
-  const SuperAdminConsole({Key? key}) : super(key: key);
+class PlatformAdminConsole extends StatefulWidget {
+  const PlatformAdminConsole({Key? key}) : super(key: key);
 
   @override
-  State<SuperAdminConsole> createState() => _SuperAdminConsoleState();
+  State<PlatformAdminConsole> createState() => _PlatformAdminConsoleState();
 }
 
-class _SuperAdminConsoleState extends State<SuperAdminConsole> {
+class _PlatformAdminConsoleState extends State<PlatformAdminConsole> {
   FirebaseFunctions? _functions;
   List<Map<String, dynamic>> users = [];
   List<Map<String, dynamic>> filteredUsers = [];
@@ -108,10 +106,10 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
 
   /// ➕ Add new user
   Future<void> _showAddUserDialog() async {
+    final usernameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final passCtrl = TextEditingController();
-    bool superadmin = false;
-
+    String selectedRole = "agent";
     await showDialog(
       context: context,
       builder: (context) {
@@ -124,6 +122,10 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextField(
+                        controller: usernameCtrl,
+                        decoration: const InputDecoration(labelText: 'User Name'),
+                      ),
+                      TextField(
                         controller: emailCtrl,
                         decoration: const InputDecoration(labelText: 'Email'),
                       ),
@@ -134,17 +136,40 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                           labelText: 'Password',
                         ),
                       ),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: superadmin,
-                            onChanged:
-                                (v) => setStateDialog(
-                                  () => superadmin = v ?? false,
-                                ),
+                      DropdownButtonFormField<String>(
+                        value: selectedRole,
+
+                        decoration: const InputDecoration(
+                          labelText: "Role",
+                        ),
+
+                        items: const [
+
+                          DropdownMenuItem(
+                            value: "agent",
+                            child: Text("Agent"),
                           ),
-                          const Text('Grant Superadmin Role'),
+
+                          DropdownMenuItem(
+                            value: "trainee",
+                            child: Text("Trainee"),
+                          ),
+
+                          DropdownMenuItem(
+                            value: "superadmin",
+                            child: Text("Super Admin"),
+                          ),
+
                         ],
+
+
+                        onChanged: (value){
+
+                          setStateDialog(() {
+                            selectedRole = value!;
+                          });
+
+                        },
                       ),
                     ],
                   ),
@@ -164,9 +189,10 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                           'createUser',
                         );
                         await callable({
+                          'displayName': usernameCtrl.text.trim(),
                           'email': emailCtrl.text.trim(),
                           'password': passCtrl.text.trim(),
-                          'superadmin': superadmin,
+                          'role': selectedRole,
                         });
                         Navigator.pop(context);
                         _loadUsers();
@@ -196,10 +222,10 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
 
   /// ✏️ Edit user
   Future<void> _showEditUserDialog(Map<String, dynamic> user) async {
+    final usernameCtrl = TextEditingController(text: user['displayName'] ?? '',);
     final emailCtrl = TextEditingController(text: user['email'] ?? '');
     final passCtrl = TextEditingController();
-    bool superadmin = user['superadmin'] ?? false;
-
+    String selectedRole = user['role'] ?? "agent";
     await showDialog(
       context: context,
       builder: (context) {
@@ -212,6 +238,10 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextField(
+                        controller: usernameCtrl,
+                        decoration: const InputDecoration(labelText: 'User Name'),
+                      ),
+                      TextField(
                         controller: emailCtrl,
                         decoration: const InputDecoration(labelText: 'Email'),
                       ),
@@ -222,17 +252,40 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                           labelText: 'New Password (leave blank to keep)',
                         ),
                       ),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: superadmin,
-                            onChanged:
-                                (v) => setStateDialog(
-                                  () => superadmin = v ?? false,
-                                ),
+                      DropdownButtonFormField<String>(
+                        value: selectedRole,
+
+                        decoration: const InputDecoration(
+                          labelText: "Role",
+                        ),
+
+                        items: const [
+
+                          DropdownMenuItem(
+                            value: "agent",
+                            child: Text("Agent"),
                           ),
-                          const Text('Superadmin Role'),
+
+                          DropdownMenuItem(
+                            value: "trainee",
+                            child: Text("Trainee"),
+                          ),
+
+                          DropdownMenuItem(
+                            value: "superadmin",
+                            child: Text("Super Admin"),
+                          ),
+
                         ],
+
+
+                        onChanged: (value){
+
+                          setStateDialog(() {
+                            selectedRole = value!;
+                          });
+
+                        },
                       ),
                     ],
                   ),
@@ -253,17 +306,20 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                         );
                         await updateUser({
                           'uid': user['uid'],
+                          'displayName': usernameCtrl.text.trim(),
                           'email': emailCtrl.text.trim(),
                           if (passCtrl.text.trim().isNotEmpty)
                             'password': passCtrl.text.trim(),
                         });
 
-                        final setRole = _functions!.httpsCallable(
-                          'setUserRole',
-                        );
-                        await setRole({
+                        await updateUser({
                           'uid': user['uid'],
-                          'superadmin': superadmin,
+                          'displayName': usernameCtrl.text.trim(),
+                          'email': emailCtrl.text.trim(),
+                          'role': selectedRole,
+
+                          if (passCtrl.text.trim().isNotEmpty)
+                            'password': passCtrl.text.trim(),
                         });
 
                         Navigator.pop(context);
@@ -472,7 +528,7 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                             flex: 2,
                             child: Center(
                               child: Text(
-                                'Super Admin',
+                                'Role',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ),
@@ -532,14 +588,14 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                                 Expanded(
                                   flex: 2,
                                   child: Center(
-                                    child: Icon(
-                                      u['superadmin']
-                                          ? Icons.check_circle
-                                          : Icons.remove_circle,
-                                      color:
-                                          u['superadmin']
-                                              ? Colors.green
-                                              : Colors.redAccent,
+                                    child: Text(
+                                      (u['role'] ?? 'agent')
+                                          .toString()
+                                          .toUpperCase(),
+
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -555,18 +611,6 @@ class _SuperAdminConsoleState extends State<SuperAdminConsole> {
                                           color: Color(0xFF1F5B8A),
                                         ),
                                         onPressed: () => _showEditUserDialog(u),
-                                      ),
-                                      IconButton(
-                                        tooltip: 'Toggle SuperAdmin',
-                                        icon: const Icon(
-                                          Icons.admin_panel_settings_rounded,
-                                          color: Color(0xFF001C38),
-                                        ),
-                                        onPressed:
-                                            () => _toggleSuperAdmin(
-                                              u['uid'],
-                                              u['superadmin'],
-                                            ),
                                       ),
                                       IconButton(
                                         tooltip: 'Delete User',

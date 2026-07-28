@@ -1,12 +1,12 @@
 // main.dart
-import 'package:bbc_api_tool/ui/super_admin_console.dart';
-import 'package:bbc_api_tool/ui/home_dashboard.dart';
-import 'package:bbc_api_tool/ui/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:cloud_functions/cloud_functions.dart'; // ✅ must be imported
+import 'services/auth_service.dart';
+import 'platform/dashboard.dart';
+import 'modules/login.dart';
+import 'admin/super_admin_console.dart'; // ✅ must be imported
 
 
 Future<void> main() async {
@@ -40,9 +40,9 @@ class ApiTesterApp extends StatelessWidget {
 
         // Handle routes
         if (uri.path == '/admin-console') {
-          return MaterialPageRoute(builder: (_) => const SuperAdminConsole());
+          return MaterialPageRoute(builder: (_) => const PlatformAdminConsole());
         } else if (uri.path == '/home') {
-          return MaterialPageRoute(builder: (_) => const HomeDashboard());
+          return MaterialPageRoute(builder: (_) => const PlatformDashboard());
         } else {
           return MaterialPageRoute(builder: (_) => const LoginPage());
         }
@@ -63,10 +63,38 @@ class ApiTesterApp extends StatelessWidget {
           debugPrint("🌐 Current URL: $currentUrl");
 
           if (snapshot.hasData) {
-            if (currentUrl.contains('/admin-console')) {
-              return const SuperAdminConsole();
-            }
-            return const HomeDashboard();
+
+            return FutureBuilder(
+              future: AuthService.loadUserRole(),
+
+              builder: (context, roleSnapshot) {
+
+                if (roleSnapshot.connectionState ==
+                    ConnectionState.waiting) {
+
+                  return const Scaffold(
+                    body: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+
+
+                if (currentUrl.contains('/admin-console')) {
+
+                  if (AuthService.isSuperAdmin) {
+                    return const PlatformAdminConsole();
+                  }
+
+                  // Non admins cannot access this URL
+                  return const PlatformDashboard();
+                }
+
+
+                return const PlatformDashboard();
+
+              },
+            );
           }
 
           // Not logged in

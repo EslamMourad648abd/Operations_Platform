@@ -1,4 +1,4 @@
-import 'package:bbc_api_tool/ui/widgets/ramadan_color_pallete.dart';
+import 'package:bbc_api_tool/widgets/ramadan_color_pallete.dart';
 import 'package:flutter/material.dart';
 
 class RamadanAppBar extends StatefulWidget implements PreferredSizeWidget {
