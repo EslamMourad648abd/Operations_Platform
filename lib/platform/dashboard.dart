@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../modules/Training/screens/training_dashboard.dart';
 import '../widgets/platform_card.dart';
 import '../modules/bbc_api.dart';
 import '../services/auth_service.dart';
@@ -22,6 +23,7 @@ class PlatformDashboard extends StatelessWidget {
   }
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
       backgroundColor: const Color(0xffF5F8FC),
 
@@ -102,10 +104,11 @@ class PlatformDashboard extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-
-                              const Text(
-                                "firebase.displayName",
-                                style: TextStyle(
+                              Text(
+                                user?.displayName?.isNotEmpty == true
+                                    ? user!.displayName!
+                                    : (user?.email ?? 'Unknown User'),
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -185,14 +188,13 @@ class PlatformDashboard extends StatelessWidget {
                                 ? 1.45
                                 : 1.25,
 
+
                         children: [
 
-                          // Available for everyone
-                          if (
-                          AuthService.isSuperAdmin ||
+                          // BBC API Tool
+                          if (AuthService.isSuperAdmin ||
                               AuthService.isAgent ||
-                              AuthService.isTrainee
-                          )
+                              AuthService.isTrainee)
                             PlatformCard(
                               title: "BBC API Tool",
                               subtitle: "API Testing & Operations",
@@ -207,32 +209,40 @@ class PlatformDashboard extends StatelessWidget {
                               },
                             ),
 
-
-                          // Only trainee + super admin
-                          if (
-                          AuthService.isSuperAdmin ||
-                              AuthService.isTrainee
-                          )
+                          // Training Portal
+                          if (AuthService.isSuperAdmin ||
+                              AuthService.isTrainee)
                             PlatformCard(
                               title: "Training Portal",
                               subtitle: "Videos, Quizzes and Progress Tracking",
                               icon: Icons.school,
-                              enabled: false,
-                              onPressed: () {},
+                              enabled: true,
+                              onPressed: () {
+                                 Navigator.push(
+                                   context,
+                                   MaterialPageRoute(
+                                     builder: (_) => const TrainingDashboard(),
+                                   ),
+                                 );
+                              },
                             ),
 
-
-                          // Only agent + super admin
-                          if (
-                          AuthService.isSuperAdmin ||
-                              AuthService.isAgent
-                          )
+                          // Product Awareness
+                          if (AuthService.isSuperAdmin ||
+                              AuthService.isAgent)
                             PlatformCard(
                               title: "Product Awareness",
                               subtitle: "Products, SOPs & Documentation",
                               icon: Icons.menu_book,
-                              enabled: false,
-                              onPressed: () {},
+                              enabled: true,
+                              onPressed: () {
+                                // Navigator.push(
+                                //   context,
+                                //   MaterialPageRoute(
+                                //     builder: (_) => const BbcApiHomeScreen(),
+                                //   ),
+                                // );
+                              },
                             ),
 
                         ],

@@ -8,11 +8,13 @@ import { setGlobalOptions } from "firebase-functions/v2/options";
 import fetch from "node-fetch";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-
+import { getFirestore } from "firebase-admin/firestore";
+import drive from "./google_drive_services.js";
 // ✅ Initialize Firebase Admin safely for Node.js 20 (ESM)
 if (!getApps().length) initializeApp();
 
 const auth = getAuth();
+const db = getFirestore();
 
 
 // 🌍 Global settings
@@ -593,5 +595,176 @@ export const setUserRole = onCall(async(request)=>{
 
   }
 
+
+});
+
+export const syncCourseLessons = onCall(async (request) => {
+
+ console.log("SYNC FUNCTION STARTED");
+
+  console.log("AUTH:", request.auth);
+
+  requireSuperAdmin(request);
+
+  console.log("🚀 syncCourseLessons START");
+
+
+  requireSuperAdmin(request);
+
+
+  const { courseId, folderId } = request.data;
+
+
+  console.log("📘 Course ID:", courseId);
+  console.log("📂 Folder ID:", folderId);
+
+
+
+  if (!courseId || !folderId) {
+    throw new HttpsError(
+      "invalid-argument",
+      "courseId and folderId are required."
+    );
+  }
+
+
+  try {
+
+
+    console.log("🔎 Reading Google Drive...");
+
+
+    const response = await drive.files.list({
+      q: `'${folderId}' in parents and mimeType contains 'video/' and trashed = false`,
+      fields: "files(id,name,webViewLink)",
+    });
+
+
+    const files = response.data.files || [];
+
+
+    console.log(
+      "🎥 Videos found:",
+      files.length
+    );
+
+
+
+    const lessonsRef = db
+      .collection("courses")
+      .doc(courseId)
+      .collection("lessons");
+
+
+
+    const batch = db.batch();
+
+    let createdCount = 0;
+
+
+
+    for (const file of files) {
+
+
+      console.log(
+        "Processing:",
+        file.name
+      );
+
+
+      const existing = await lessonsRef
+        .where("videoId", "==", file.id)
+        .get();
+
+
+
+      if (!existing.empty) {
+
+        console.log(
+          "Already exists:",
+          file.name
+        );
+
+        continue;
+      }
+
+
+
+      batch.set(
+        lessonsRef.doc(),
+        {
+          title:file.name,
+          videoUrl:file.webViewLink,
+          videoId:file.id,
+          createdAt:new Date(),
+        }
+      );
+
+
+      createdCount++;
+
+    }
+
+
+
+    await batch.commit();
+
+
+    console.log(
+      "Created lessons:",
+      createdCount
+    );
+
+
+
+    const snapshot = await lessonsRef.get();
+
+
+
+    await db
+      .collection("courses")
+      .doc(courseId)
+      .update({
+        lessonsCount:snapshot.size,
+      });
+
+
+
+    console.log(
+      "Total lessons:",
+      snapshot.size
+    );
+
+
+
+    return {
+
+      success:true,
+
+      lessonsFound:files.length,
+
+      lessonsCreated:createdCount,
+
+      totalLessons:snapshot.size,
+
+    };
+
+
+
+  } catch(error){
+
+
+    console.error(
+      "❌ Drive sync failed:",
+      error
+    );
+
+
+    throw new HttpsError(
+      "internal",
+      error.message
+    );
+
+  }
 
 });

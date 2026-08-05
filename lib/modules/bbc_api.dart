@@ -136,16 +136,46 @@ class _BbcApiHomeScreen extends State<BbcApiHomeScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+
+                        tooltip: "Back",
+
+                        onPressed: () {
+
+                          Navigator.pop(context);
+
+                        },
+
+                      ),
+
+
+                      const SizedBox(width: 8),
+
+
                       Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+
                             Image.asset(
                               'assets/logo.png',
                               height: 70,
                               fit: BoxFit.contain,
                             ),
+
+
                             const SizedBox(height: 8),
+
+
                             const Text(
                               "BBC API Collections",
                               style: TextStyle(
@@ -156,23 +186,24 @@ class _BbcApiHomeScreen extends State<BbcApiHomeScreen> {
                               ),
                               textAlign: TextAlign.center,
                             ),
+
                           ],
                         ),
                       ),
-                      // if (isSuperAdmin)
-                      //   IconButton(
-                      //     tooltip: "Admin Console",
-                      //     icon: const Icon(
-                      //       Icons.admin_panel_settings_rounded,
-                      //       color: Colors.white,
-                      //     ),
-                      //     onPressed: _openAdminConsole,
-                      //   ),
+
+
                       IconButton(
                         tooltip: "Logout",
-                        icon: const Icon(Icons.logout, color: Colors.white),
+
+                        icon: const Icon(
+                          Icons.logout,
+                          color: Colors.white,
+                        ),
+
                         onPressed: _logout,
+
                       ),
+
                     ],
                   ),
                 ),

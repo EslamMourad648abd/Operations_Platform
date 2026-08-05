@@ -20,9 +20,11 @@ dependencies:
   path_provider: ^2.0.15
   cloud_firestore: ^4.7.1
   firebase_auth: ^4.19.0
-  url_launcher: ^6.3.0
+  url_launcher: ^6.3.2
   cupertino_icons: ^1.0.8
   cloud_functions: ^4.7.6
+  webview_flutter: ^4.14.1
+  flutter_widget_from_html: ^0.16.1
 
 dev_dependencies:
   flutter_test:
