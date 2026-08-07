@@ -1,40 +1,50 @@
-
 // ------------------------------------------------------
-// ✅ Firebase Cloud Functions (Node.js 20 - ESM Safe)
+// Firebase Cloud Functions (Node.js 20 - ESM Safe)
 // ------------------------------------------------------
-
-import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
-import { setGlobalOptions } from "firebase-functions/v2/options";
+import {
+  onRequest,
+  onCall,
+  HttpsError,
+} from "firebase-functions/v2/https";
+import {
+  setGlobalOptions,
+} from "firebase-functions/v2/options";
 import fetch from "node-fetch";
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import {
+  initializeApp,
+  getApps,
+} from "firebase-admin/app";
+import {
+  getAuth,
+} from "firebase-admin/auth";
+import {
+  getFirestore,
+  FieldValue,
+} from "firebase-admin/firestore";
 import drive from "./google_drive_services.js";
-// ✅ Initialize Firebase Admin safely for Node.js 20 (ESM)
-if (!getApps().length) initializeApp();
-
+// ------------------------------------------------------
+// Initialize Firebase Admin
+// ------------------------------------------------------
+if (!getApps().length) {
+  initializeApp();
+}
 const auth = getAuth();
 const db = getFirestore();
-
-
-// 🌍 Global settings
+// ------------------------------------------------------
+// Global Settings
+// ------------------------------------------------------
 setGlobalOptions({
   region: "us-central1",
   timeoutSeconds: 60,
 });
-
-
 // ------------------------------------------------------
-// 🔐 Roles Configuration
+// Roles Configuration
 // ------------------------------------------------------
-
 const allowedRoles = [
   "agent",
   "trainee",
   "superadmin",
 ];
-
-
 function validateRole(role) {
   if (!allowedRoles.includes(role)) {
     throw new HttpsError(
@@ -43,728 +53,651 @@ function validateRole(role) {
     );
   }
 }
-
-
 // ------------------------------------------------------
-// 🌐 Bevatel Proxy
+// Helper: Resolve Display Name
 // ------------------------------------------------------
-
-export const bevatelProxy = onRequest(async (req, res) => {
-
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS"
-  );
-  res.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).send("");
-  }
-
-
-  try {
-
-    const {
-      url,
-      method,
-      headers,
-      body
-    } = req.body || {};
-
-
-    if (!url || !method) {
-      return res.status(400).json({
-        error:"Missing URL or method"
+//
+// Rule:
+// 1. Use displayName when it is not empty.
+// 2. Otherwise use email.
+// 3. Never return "Unknown".
+// ------------------------------------------------------
+function resolveDisplayName(displayName, email) {
+  const name =
+    typeof displayName === "string"
+      ? displayName.trim()
+      : "";
+  const userEmail =
+    typeof email === "string"
+      ? email.trim()
+      : "";
+  return name || userEmail;
+}
+// ------------------------------------------------------
+// Bevatel Proxy
+// ------------------------------------------------------
+export const bevatelProxy = onRequest(
+  async (req, res) => {
+    res.set(
+      "Access-Control-Allow-Origin",
+      "*"
+    );
+    res.set(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, OPTIONS"
+    );
+    res.set(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization"
+    );
+    if (req.method === "OPTIONS") {
+      return res.status(204).send("");
+    }
+    try {
+      const {
+        url,
+        method,
+        headers,
+        body,
+      } = req.body || {};
+      if (!url || !method) {
+        return res.status(400).json({
+          error: "Missing URL or method",
+        });
+      }
+      console.log(
+        "➡️ Forwarding request to:",
+        url
+      );
+      const response = await fetch(
+        url,
+        {
+          method,
+          headers,
+          body:
+            method !== "GET" && body
+              ? JSON.stringify(body)
+              : undefined,
+        }
+      );
+      const text =
+        await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
+      return res
+        .status(response.status)
+        .json(data);
+    } catch (error) {
+      console.error(
+        "Proxy error:",
+        error
+      );
+      return res.status(500).json({
+        error:
+          error.message ||
+          "Proxy request failed",
       });
     }
-
-
-    console.log("➡️ Forwarding request to:", url);
-
-
-    const bevatelResponse = await fetch(url,{
-      method,
-      headers,
-      body:
-        method !== "GET" && body
-          ? JSON.stringify(body)
-          : undefined,
-    });
-
-
-    const text = await bevatelResponse.text();
-
-
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    }
-    catch {
-      data = text;
-    }
-
-
-    console.log(
-      "✅ Proxy OK:",
-      bevatelResponse.status
-    );
-
-
-    return res
-      .status(bevatelResponse.status)
-      .json(data);
-
-
-  } catch(err){
-
-    console.error(
-      "❌ Proxy error:",
-      err
-    );
-
-
-    return res.status(500).json({
-      error:"Proxy request failed",
-      details:err.message,
-    });
-
   }
-
-});
-
-
-
+);
 // ------------------------------------------------------
-// 👑 Super Admin Management
+// Super Admin Permission
 // ------------------------------------------------------
-
-
-// 🔒 Permission helper
-
-function requireSuperAdmin(request){
-
-  if(!request?.auth){
-
+function requireSuperAdmin(request) {
+  if (!request?.auth) {
     throw new HttpsError(
       "unauthenticated",
-      "You must be logged in."
+      "Authentication required"
     );
-
   }
-
-
-  if(request.auth.token.role !== "superadmin"){
-
+  if (
+    request.auth.token.role !==
+    "superadmin"
+  ) {
     throw new HttpsError(
       "permission-denied",
-      "Only superadmins allowed."
+      "Super admin only"
     );
-
   }
-
 }
-
-
-
 // ------------------------------------------------------
-// 👤 List all users
+// List Users
 // ------------------------------------------------------
-
-export const listUsers = onCall(async(request)=>{
-
-  try{
-
-
-    requireSuperAdmin(request);
-
-
-    const list = await auth.listUsers(1000);
-
-
-
-    return {
-
-      users:list.users.map((u)=>({
-
-        uid:u.uid,
-
-        email:u.email,
-
-        displayName:
-          u.displayName || "",
-
-
-        role:
-          u.customClaims?.role ||
-          "trainee",
-
-
-        disabled:u.disabled,
-
-      }))
-
-    };
-
-
-  }
-  catch(err){
-
-    console.error(
-      "🔥 listUsers failed:",
-      err
-    );
-
-
-    throw new HttpsError(
-      "internal",
-      err.message ||
-      "Failed to list users."
-    );
-
-  }
-
-});
-
-
-
-
-// ------------------------------------------------------
-// ➕ Create user
-// ------------------------------------------------------
-
-export const createUser = onCall(async(request)=>{
-
-
-  try{
-
-
-    requireSuperAdmin(request);
-
-
-
-    const {
-      email,
-      password,
-      displayName,
-      role
-    } = request.data;
-
-
-
-    if(!email || !password){
-
-      throw new HttpsError(
-        "invalid-argument",
-        "Email and password required."
+export const listUsers =
+  onCall(async (request) => {
+    try {
+      requireSuperAdmin(request);
+      const snapshot =
+        await db
+          .collection("users")
+          .get();
+      return {
+        users:
+          snapshot.docs.map((doc) => {
+            const data =
+              doc.data();
+            const email =
+              data.email ?? "";
+            const displayName =
+              resolveDisplayName(
+                data.displayName,
+                email
+              );
+            return {
+              uid:
+                doc.id,
+              email:
+                email,
+              displayName:
+                displayName,
+              role:
+                data.role ?? "trainee",
+            };
+          }),
+      };
+    } catch (error) {
+      console.error(
+        "LIST USERS ERROR:",
+        error
       );
-
+      throw new HttpsError(
+        "internal",
+        error.message ||
+          "Failed to list users"
+      );
     }
-
-
-
-    const userRole =
-      role || "trainee";
-
-
-
-    validateRole(userRole);
-
-
-
-    const user = await auth.createUser({
-
-      email,
-
-      password,
-
-      displayName,
-
-    });
-
-
-
-    await auth.setCustomUserClaims(
-      user.uid,
-      {
-        role:userRole
+  });
+// ------------------------------------------------------
+// Create User
+// ------------------------------------------------------
+export const createUser =
+  onCall(async (request) => {
+    try {
+      requireSuperAdmin(request);
+      const {
+        email,
+        password,
+        displayName,
+        role,
+      } = request.data;
+      if (!email || !password) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Email and password required"
+        );
       }
-    );
-
-
-
-    return {
-
-      uid:user.uid,
-
-      email:user.email,
-
-      role:userRole
-
-    };
-
-
-  }
-  catch(err){
-
-    console.error(
-      "🔥 createUser failed:",
-      err
-    );
-
-
-    throw new HttpsError(
-      "internal",
-      err.message ||
-      "Failed to create user."
-    );
-
-  }
-
-
-});
-
-
-
-
-
-// ------------------------------------------------------
-// ✏️ Update user
-// ------------------------------------------------------
-
-export const updateUser = onCall(async(request)=>{
-
-
-  try{
-
-
-    requireSuperAdmin(request);
-
-
-
-    const {
-
-      uid,
-
-      email,
-
-      password,
-
-      displayName,
-
-      role,
-
-      disabled
-
-    } = request.data;
-
-
-
-    if(!uid){
-
+      const normalizedEmail =
+        email.trim();
+      const resolvedDisplayName =
+        resolveDisplayName(
+          displayName,
+          normalizedEmail
+        );
+      const userRole =
+        role ?? "trainee";
+      validateRole(userRole);
+      // ----------------------------------------------
+      // Create Firebase Authentication user
+      // ----------------------------------------------
+      const user =
+        await auth.createUser({
+          email:
+            normalizedEmail,
+          password,
+          displayName:
+            resolvedDisplayName,
+        });
+      // ----------------------------------------------
+      // Set Firebase Auth role claim
+      // ----------------------------------------------
+      await auth.setCustomUserClaims(
+        user.uid,
+        {
+          role: userRole,
+        }
+      );
+      // ----------------------------------------------
+      // Create Firestore user document
+      // ----------------------------------------------
+      await db
+        .collection("users")
+        .doc(user.uid)
+        .set({
+          displayName:
+            resolvedDisplayName,
+          email:
+            normalizedEmail,
+          role:
+            userRole,
+          createdAt:
+            FieldValue.serverTimestamp(),
+        });
+      return {
+        uid:
+          user.uid,
+        email:
+          normalizedEmail,
+        displayName:
+          resolvedDisplayName,
+        role:
+          userRole,
+        success:
+          true,
+      };
+    } catch (error) {
+      console.error(
+        "CREATE USER ERROR:",
+        error
+      );
       throw new HttpsError(
-        "invalid-argument",
-        "User UID is required."
+        "internal",
+        error.message ||
+          "Failed creating user"
       );
-
     }
-
-
-
-    const updateData = {};
-
-
-
-    if(email)
-      updateData.email=email;
-
-
-    if(password)
-      updateData.password=password;
-
-
-    if(displayName)
-      updateData.displayName=displayName;
-
-
-
-    if(typeof disabled === "boolean")
-      updateData.disabled=disabled;
-
-
-
-
-    const user =
-      await auth.updateUser(
+  });
+// ------------------------------------------------------
+// Update User
+// ------------------------------------------------------
+export const updateUser =
+  onCall(async (request) => {
+    try {
+      requireSuperAdmin(request);
+      const {
         uid,
-        updateData
+        email,
+        password,
+        displayName,
+        role,
+        disabled,
+      } = request.data;
+      if (!uid) {
+        throw new HttpsError(
+          "invalid-argument",
+          "UID required"
+        );
+      }
+      // ----------------------------------------------
+      // Get current Firebase Auth user
+      // ----------------------------------------------
+      const currentUser =
+        await auth.getUser(uid);
+      const finalEmail =
+        email !== undefined &&
+        email !== null &&
+        email.toString().trim() !== ""
+          ? email.toString().trim()
+          : currentUser.email ?? "";
+      const finalDisplayName =
+        resolveDisplayName(
+          displayName,
+          finalEmail
+        );
+      // ----------------------------------------------
+      // Update Firebase Authentication
+      // ----------------------------------------------
+      const updateData = {};
+      if (
+        email !== undefined &&
+        email !== null &&
+        email.toString().trim() !== ""
+      ) {
+        updateData.email =
+          email.toString().trim();
+      }
+      if (
+        password !== undefined &&
+        password !== null &&
+        password.toString().trim() !== ""
+      ) {
+        updateData.password =
+          password.toString().trim();
+      }
+      // Always update displayName.
+      //
+      // If the admin clears the name,
+      // it becomes the email instead.
+      updateData.displayName =
+        finalDisplayName;
+      if (
+        typeof disabled ===
+        "boolean"
+      ) {
+        updateData.disabled =
+          disabled;
+      }
+      const user =
+        await auth.updateUser(
+          uid,
+          updateData
+        );
+      // ----------------------------------------------
+      // Update Firebase Auth role
+      // ----------------------------------------------
+      let finalRole =
+        role;
+      if (role) {
+        validateRole(role);
+        await auth.setCustomUserClaims(
+          uid,
+          {
+            role,
+          }
+        );
+      } else {
+        finalRole =
+          currentUser.customClaims?.role ??
+          "trainee";
+      }
+      // ----------------------------------------------
+      // Update Firestore user document
+      // ----------------------------------------------
+      await db
+        .collection("users")
+        .doc(uid)
+        .set({
+          displayName:
+            finalDisplayName,
+          email:
+            finalEmail,
+          role:
+            finalRole,
+          updatedAt:
+            FieldValue.serverTimestamp(),
+        }, {
+          merge: true,
+        });
+      return {
+        success:
+          true,
+        uid:
+          user.uid,
+        email:
+          finalEmail,
+        displayName:
+          finalDisplayName,
+        role:
+          finalRole,
+      };
+    } catch (error) {
+      console.error(
+        "UPDATE USER ERROR:",
+        error
       );
-
-
-
-    if(role){
-
+      throw new HttpsError(
+        "internal",
+        error.message ||
+          "Failed updating user"
+      );
+    }
+  });
+// ------------------------------------------------------
+// Delete User
+// ------------------------------------------------------
+export const deleteUser =
+  onCall(async (request) => {
+    try {
+      requireSuperAdmin(request);
+      const {
+        uid,
+      } = request.data;
+      if (!uid) {
+        throw new HttpsError(
+          "invalid-argument",
+          "UID required"
+        );
+      }
+      // Delete Firebase Authentication user
+      await auth.deleteUser(uid);
+      // Delete Firestore user document
+      await db
+        .collection("users")
+        .doc(uid)
+        .delete();
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error(
+        "DELETE USER ERROR:",
+        error
+      );
+      throw new HttpsError(
+        "internal",
+        error.message ||
+          "Failed deleting user"
+      );
+    }
+  });
+// ------------------------------------------------------
+// Set User Role
+// ------------------------------------------------------
+export const setUserRole =
+  onCall(async (request) => {
+    try {
+      requireSuperAdmin(request);
+      const {
+        uid,
+        role,
+      } = request.data;
+      if (!uid || !role) {
+        throw new HttpsError(
+          "invalid-argument",
+          "UID and role required"
+        );
+      }
       validateRole(role);
-
-
+      // ----------------------------------------------
+      // Update Firebase Auth claim
+      // ----------------------------------------------
       await auth.setCustomUserClaims(
         uid,
         {
-          role
+          role,
         }
       );
-
-    }
-
-
-
-
-    return {
-
-      uid:user.uid,
-
-      email:user.email
-
-    };
-
-
-  }
-  catch(err){
-
-    console.error(
-      "🔥 updateUser failed:",
-      err
-    );
-
-
-    throw new HttpsError(
-      "internal",
-      err.message ||
-      "Failed to update user."
-    );
-
-  }
-
-
-});
-
-
-
-
-
-// ------------------------------------------------------
-// ❌ Delete user
-// ------------------------------------------------------
-
-export const deleteUser = onCall(async(request)=>{
-
-
-  try{
-
-
-    requireSuperAdmin(request);
-
-
-    const {
-      uid
-    } = request.data;
-
-
-
-    if(!uid){
-
-      throw new HttpsError(
-        "invalid-argument",
-        "User UID is required."
+      // ----------------------------------------------
+      // Update Firestore role
+      // ----------------------------------------------
+      await db
+        .collection("users")
+        .doc(uid)
+        .set({
+          role,
+          updatedAt:
+            FieldValue.serverTimestamp(),
+        }, {
+          merge: true,
+        });
+      return {
+        success:
+          true,
+        uid,
+        role,
+      };
+    } catch (error) {
+      console.error(
+        "SET ROLE ERROR:",
+        error
       );
-
-    }
-
-
-
-    await auth.deleteUser(uid);
-
-
-
-    return {
-      success:true
-    };
-
-
-  }
-  catch(err){
-
-
-    console.error(
-      "🔥 deleteUser failed:",
-      err
-    );
-
-
-    throw new HttpsError(
-      "internal",
-      err.message ||
-      "Failed to delete user."
-    );
-
-  }
-
-
-});
-
-
-
-
-
-// ------------------------------------------------------
-// 🔄 Set role
-// ------------------------------------------------------
-
-export const setUserRole = onCall(async(request)=>{
-
-
-  try{
-
-
-    requireSuperAdmin(request);
-
-
-
-    const {
-      uid,
-      role
-    } = request.data;
-
-
-
-    if(!uid || !role){
-
       throw new HttpsError(
-        "invalid-argument",
-        "UID and role are required."
+        "internal",
+        error.message ||
+          "Failed updating role"
       );
-
     }
-
-
-
-    validateRole(role);
-
-
-
-    await auth.setCustomUserClaims(
-      uid,
-      {
-        role
-      }
-    );
-
-
-
-    return {
-
-      uid,
-
-      role,
-
-      success:true
-
-    };
-
-
-  }
-  catch(err){
-
-
-    console.error(
-      "🔥 setUserRole failed:",
-      err
-    );
-
-
-    throw new HttpsError(
-      "internal",
-      err.message ||
-      "Failed to update role."
-    );
-
-  }
-
-
-});
-
-export const syncCourseLessons = onCall(async (request) => {
-
- console.log("SYNC FUNCTION STARTED");
-
-  console.log("AUTH:", request.auth);
-
-  requireSuperAdmin(request);
-
-  console.log("🚀 syncCourseLessons START");
-
-
-  requireSuperAdmin(request);
-
-
-  const { courseId, folderId } = request.data;
-
-
-  console.log("📘 Course ID:", courseId);
-  console.log("📂 Folder ID:", folderId);
-
-
-
-  if (!courseId || !folderId) {
-    throw new HttpsError(
-      "invalid-argument",
-      "courseId and folderId are required."
-    );
-  }
-
-
-  try {
-
-
-    console.log("🔎 Reading Google Drive...");
-
-
-    const response = await drive.files.list({
-      q: `'${folderId}' in parents and mimeType contains 'video/' and trashed = false`,
-      fields: "files(id,name,webViewLink)",
-    });
-
-
-    const files = response.data.files || [];
-
-
+  });
+// ------------------------------------------------------
+// Sync Google Drive Lessons
+// ------------------------------------------------------
+export const syncCourseLessons =
+  onCall(async (request) => {
     console.log(
-      "🎥 Videos found:",
-      files.length
+      "SYNC COURSE LESSONS START"
     );
-
-
-
-    const lessonsRef = db
-      .collection("courses")
-      .doc(courseId)
-      .collection("lessons");
-
-
-
-    const batch = db.batch();
-
-    let createdCount = 0;
-
-
-
-    for (const file of files) {
-
-
-      console.log(
-        "Processing:",
-        file.name
-      );
-
-
-      const existing = await lessonsRef
-        .where("videoId", "==", file.id)
-        .get();
-
-
-
-      if (!existing.empty) {
-
-        console.log(
-          "Already exists:",
-          file.name
+    try {
+      requireSuperAdmin(request);
+      const {
+        courseId,
+        folderId,
+      } = request.data;
+      if (!courseId || !folderId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "courseId and folderId required"
         );
-
-        continue;
       }
-
-
-
-      batch.set(
-        lessonsRef.doc(),
-        {
-          title:file.name,
-          videoUrl:file.webViewLink,
-          videoId:file.id,
-          createdAt:new Date(),
-        }
+      // ----------------------------------------------
+      // Read Google Drive videos
+      // ----------------------------------------------
+      const response =
+        await drive.files.list({
+          q:
+            `'${folderId}' in parents and mimeType contains 'video/' and trashed = false`,
+          fields:
+            "files(id,name,webViewLink)",
+        });
+      const files =
+        response.data.files || [];
+      console.log(
+        "Videos found:",
+        files.length
       );
-
-
-      createdCount++;
-
+      // ----------------------------------------------
+      // Lessons collection
+      // ----------------------------------------------
+      const lessonsRef =
+        db
+          .collection("courses")
+          .doc(courseId)
+          .collection("lessons");
+      const batch =
+        db.batch();
+      let created = 0;
+      // ----------------------------------------------
+      // Process videos
+      // ----------------------------------------------
+      for (
+        const file of files
+      ) {
+        const existing =
+          await lessonsRef
+            .where(
+              "videoId",
+              "==",
+              file.id
+            )
+            .get();
+        if (!existing.empty) {
+          continue;
+        }
+        batch.set(
+          lessonsRef.doc(),
+          {
+            title:
+              file.name,
+            videoUrl:
+              file.webViewLink,
+            videoId:
+              file.id,
+            createdAt:
+              FieldValue.serverTimestamp(),
+          }
+        );
+        created++;
+      }
+      await batch.commit();
+      // ----------------------------------------------
+      // Update course lesson count
+      // ----------------------------------------------
+      const snapshot =
+        await lessonsRef.get();
+      await db
+        .collection("courses")
+        .doc(courseId)
+        .update({
+          lessonsCount:
+            snapshot.size,
+        });
+      return {
+        success:
+          true,
+        lessonsFound:
+          files.length,
+        lessonsCreated:
+          created,
+        totalLessons:
+          snapshot.size,
+      };
+    } catch (error) {
+      console.error(
+        "SYNC LESSONS ERROR:",
+        error
+      );
+      throw new HttpsError(
+        "internal",
+        error.message ||
+          "Sync failed"
+      );
     }
-
-
-
-    await batch.commit();
-
-
-    console.log(
-      "Created lessons:",
-      createdCount
-    );
-
-
-
-    const snapshot = await lessonsRef.get();
-
-
-
-    await db
-      .collection("courses")
-      .doc(courseId)
-      .update({
-        lessonsCount:snapshot.size,
-      });
-
-
-
-    console.log(
-      "Total lessons:",
-      snapshot.size
-    );
-
-
-
-    return {
-
-      success:true,
-
-      lessonsFound:files.length,
-
-      lessonsCreated:createdCount,
-
-      totalLessons:snapshot.size,
-
-    };
-
-
-
-  } catch(error){
-
-
-    console.error(
-      "❌ Drive sync failed:",
-      error
-    );
-
-
-    throw new HttpsError(
-      "internal",
-      error.message
-    );
-
-  }
-
-});
+  });
+// =====================================================
+// MIGRATE USER ROLES TO FIRESTORE
+// =====================================================
+export const migrateUserRolesToFirestore =
+  onCall(async (request) => {
+    try {
+      requireSuperAdmin(request);
+      const list =
+        await auth.listUsers(1000);
+      let migrated = 0;
+      for (
+        const user of list.users
+      ) {
+        const role =
+          user.customClaims?.role;
+        if (!role) {
+          continue;
+        }
+        const email =
+          user.email ?? "";
+        const displayName =
+          resolveDisplayName(
+            user.displayName,
+            email
+          );
+        await db
+          .collection("users")
+          .doc(user.uid)
+          .set({
+            displayName,
+            email,
+            role,
+            updatedAt:
+              FieldValue.serverTimestamp(),
+          }, {
+            merge: true,
+          });
+        migrated++;
+      }
+      return {
+        success:
+          true,
+        migrated,
+      };
+    } catch (error) {
+      console.error(
+        "MIGRATION ERROR:",
+        error
+      );
+      throw new HttpsError(
+        "internal",
+        error.message ||
+          "Migration failed"
+      );
+    }
+  });

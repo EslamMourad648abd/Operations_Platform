@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../modules/Training/models/course_model.dart';
+import '../../modules/training/models/course_model.dart';
 
 class CourseAdminCard extends StatelessWidget {
   final CourseModel course;
@@ -72,21 +72,6 @@ class CourseAdminCard extends StatelessWidget {
 
             const SizedBox(height: 18),
 
-            /// Duration
-            Row(
-              children: [
-                const Icon(
-                  Icons.timer_outlined,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  "${course.duration} minutes",
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
 
             /// Lessons Count
             Row(

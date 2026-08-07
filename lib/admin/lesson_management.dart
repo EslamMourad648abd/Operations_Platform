@@ -1,49 +1,43 @@
-import 'package:bbc_api_tool/admin/services/training_admin_service.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
-import '../../modules/Training/models/lesson_model.dart';
+import '../modules/training/models/course_model.dart';
+import '../modules/training/repositories/firebase_training_repository.dart';
 
+import 'lesson_management_screen.dart';
+import 'services/training_admin_service.dart';
+import 'widgets/course_admin_card.dart';
+import 'widgets/course_form_dialog.dart';
 
+class TrainingManagement extends StatefulWidget {
 
-class LessonManagement extends StatefulWidget {
-
-
-  final String courseId;
-
-
-  const LessonManagement({
-
+  const TrainingManagement({
     super.key,
-
-    required this.courseId,
-
+    required FirebaseFunctions functions,
   });
 
 
-
   @override
-  State<LessonManagement> createState() =>
-      _LessonManagementState();
+  State<TrainingManagement> createState() =>
+      _TrainingManagementState();
 
 }
 
 
 
+class _TrainingManagementState
+    extends State<TrainingManagement> {
 
 
+  final FirebaseTrainingRepository repository =
+  FirebaseTrainingRepository();
 
 
-class _LessonManagementState
-    extends State<LessonManagement> {
-
-
-
-  final TrainingAdminService service =
+  final TrainingAdminService adminService =
   TrainingAdminService();
 
 
-
-  List<LessonModel> lessons = [];
+  List<CourseModel> courses = [];
 
 
   bool loading = true;
@@ -52,15 +46,12 @@ class _LessonManagementState
 
 
 
-
-
-
   @override
-  void initState(){
+  void initState() {
 
     super.initState();
 
-    _loadLessons();
+    _loadCourses();
 
   }
 
@@ -71,56 +62,77 @@ class _LessonManagementState
 
 
 
+  Future<void> _loadCourses() async {
 
-  Future<void> _loadLessons() async {
+    if(mounted){
+
+      setState(() {
+
+        loading = true;
+
+      });
+
+    }
 
 
-    try{
+    try {
 
 
       final result =
-      await service.getLessons(
-        widget.courseId,
-      );
+      await repository.getCourses();
 
 
 
       if(!mounted) return;
 
 
+      setState(() {
 
-      setState((){
-
-
-        lessons = result;
+        courses = result;
 
         loading = false;
-
 
       });
 
 
-
     }
+
     catch(e){
 
-
       debugPrint(
-          "LOAD LESSONS ERROR: $e"
+        "LOAD COURSES ERROR: $e",
       );
 
 
+      if(!mounted) return;
 
-      setState((){
+
+      setState(() {
 
         loading = false;
 
       });
 
 
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+
+        SnackBar(
+
+          content:
+          Text(
+            "Failed to load courses: $e",
+          ),
+
+          backgroundColor:
+          Colors.red,
+
+        ),
+
+      );
+
     }
 
-
   }
 
 
@@ -131,464 +143,70 @@ class _LessonManagementState
 
 
 
-  Future<void> _deleteLesson(
+  Future<void> _showAddCourseDialog() async {
 
-      LessonModel lesson,
 
-      ) async {
-
-
-
-    await service.deleteLesson(
-
-      widget.courseId,
-
-      lesson.id,
-
-    );
-
-
-
-    await _loadLessons();
-
-
-  }
-
-
-
-
-
-
-
-
-
-  void _openLessonDialog({
-
-    LessonModel? lesson,
-
-  }){
-
-
-
-    final title =
-    TextEditingController(
-
-      text: lesson?.title ?? "",
-
-    );
-
-
-
-    final description =
-    TextEditingController(
-
-      text: lesson?.description ?? "",
-
-    );
-
-
-
-    final videoUrl =
-    TextEditingController(
-
-      text: lesson?.videoUrl ?? "",
-
-    );
-
-
-
-    final duration =
-    TextEditingController(
-
-      text:
-
-      lesson == null
-
-          ? ""
-
-          :
-
-      lesson.duration.toString(),
-
-    );
-
-
-
-    final order =
-    TextEditingController(
-
-      text:
-
-      lesson == null
-
-          ? ""
-
-          :
-
-      lesson.order.toString(),
-
-    );
-
-
-
-    bool quizEnabled =
-        lesson?.quizEnabled ?? false;
-
-
-
-
-
-
-
-
-    showDialog(
+    await showDialog(
 
       context: context,
 
       builder:(context){
 
 
-        return StatefulBuilder(
+        return CourseFormDialog(
 
-          builder:(context,setDialogState){
+          onSave:(data) async {
 
 
-            return AlertDialog(
+            try {
 
 
-              title: Text(
+              await adminService.addCourse(
 
-                lesson == null
+                title:
+                data["title"] ?? "",
 
-                    ? "Add Lesson"
 
-                    :
+                description:
+                data["description"] ?? "",
 
-                "Edit Lesson",
 
-              ),
+                driveFolderId:
+                data["driveFolderId"] ?? "",
 
 
+                driveFolderUrl:
+                data["driveFolderUrl"] ?? "",
 
-              content: SingleChildScrollView(
+              );
 
-                child: Column(
 
-                  children:[
 
+              if(context.mounted){
 
-                    TextField(
+                Navigator.pop(context);
 
-                      controller:title,
+              }
 
-                      decoration:
 
-                      const InputDecoration(
+              await _loadCourses();
 
-                        labelText:"Title",
 
-                      ),
 
-                    ),
+            }
 
+            catch(e){
 
 
-                    TextField(
+              debugPrint(
+                "ADD COURSE ERROR: $e",
+              );
 
-                      controller:description,
 
-                      decoration:
-
-                      const InputDecoration(
-
-                        labelText:"Description",
-
-                      ),
-
-                    ),
-
-
-
-                    TextField(
-
-                      controller:videoUrl,
-
-                      decoration:
-
-                      const InputDecoration(
-
-                        labelText:"Video URL",
-
-                      ),
-
-                    ),
-
-
-
-                    TextField(
-
-                      controller:duration,
-
-                      keyboardType:
-
-                      TextInputType.number,
-
-                      decoration:
-
-                      const InputDecoration(
-
-                        labelText:"Duration (minutes)",
-
-                      ),
-
-                    ),
-
-
-
-                    TextField(
-
-                      controller:order,
-
-                      keyboardType:
-
-                      TextInputType.number,
-
-                      decoration:
-
-                      const InputDecoration(
-
-                        labelText:"Order",
-
-                      ),
-
-                    ),
-
-
-
-
-
-                    SwitchListTile(
-
-                      title:
-
-                      const Text(
-
-                        "Enable Quiz",
-
-                      ),
-
-
-                      value:quizEnabled,
-
-
-                      onChanged:(value){
-
-
-                        setDialogState((){
-
-
-                          quizEnabled = value;
-
-
-                        });
-
-
-                      },
-
-
-                    ),
-
-
-
-                  ],
-
-                ),
-
-              ),
-
-
-
-
-
-              actions:[
-
-
-
-                TextButton(
-
-                  onPressed:(){
-
-                    Navigator.pop(context);
-
-                  },
-
-                  child:
-
-                  const Text(
-
-                    "Cancel",
-
-                  ),
-
-                ),
-
-
-
-
-
-                ElevatedButton(
-
-
-                  onPressed:() async{
-
-
-                    final data = {
-
-
-                      "title":
-
-                      title.text.trim(),
-
-
-                      "description":
-
-                      description.text.trim(),
-
-
-                      "videoUrl":
-
-                      videoUrl.text.trim(),
-
-
-                      "duration":
-
-                      int.tryParse(
-
-                        duration.text,
-
-                      ) ?? 0,
-
-
-                      "order":
-
-                      int.tryParse(
-
-                        order.text,
-
-                      ) ?? 0,
-
-
-                      "quizEnabled":
-
-                      quizEnabled,
-
-
-                    };
-
-
-
-                    if(lesson == null){
-
-
-                      await service.addLesson(
-
-                        courseId:
-
-                        widget.courseId,
-
-
-                        title:
-
-                        data["title"] as String,
-
-
-                        description:
-
-                        data["description"] as String,
-
-
-                        videoUrl:
-
-                        data["videoUrl"] as String,
-
-
-                        duration:
-
-                        data["duration"] as int,
-
-
-                        order:
-
-                        data["order"] as int,
-
-
-                        quizEnabled:
-
-                        data["quizEnabled"] as bool,
-
-
-                      );
-
-
-
-                    }
-                    else{
-
-
-                      await service.updateLesson(
-
-                        widget.courseId,
-
-                        lesson.id,
-
-                        data,
-
-                      );
-
-
-                    }
-
-
-
-
-                    if(context.mounted){
-
-
-                      Navigator.pop(context);
-
-
-                    }
-
-
-
-                    await _loadLessons();
-
-
-                  },
-
-
-                  child:
-
-                  const Text(
-
-                    "Save",
-
-                  ),
-
-
-                ),
-
-
-
-              ],
-
-
-
-            );
+            }
 
 
           },
-
 
         );
 
@@ -598,6 +216,297 @@ class _LessonManagementState
     );
 
 
+  }
+
+
+
+
+
+
+
+
+
+  Future<void> _showEditCourseDialog(
+      CourseModel course,
+      ) async {
+
+
+    await showDialog(
+
+      context: context,
+
+      builder:(context){
+
+
+        return CourseFormDialog(
+
+
+          initialData:{
+
+
+            "title":
+            course.title,
+
+
+            "description":
+            course.description,
+
+
+            "driveFolderId":
+            course.driveFolderId,
+
+
+            "driveFolderUrl":
+            course.driveFolderUrl,
+
+          },
+
+
+
+          onSave:(data) async {
+
+
+            try {
+
+
+              await adminService.updateCourse(
+
+                course.id,
+
+                {
+
+
+                  "title":
+                  data["title"] ?? "",
+
+
+                  "description":
+                  data["description"] ?? "",
+
+
+                  "driveFolderId":
+                  data["driveFolderId"] ?? "",
+
+
+                  "driveFolderUrl":
+                  data["driveFolderUrl"] ?? "",
+
+
+                },
+
+              );
+
+
+
+              if(context.mounted){
+
+                Navigator.pop(context);
+
+              }
+
+
+              await _loadCourses();
+
+
+            }
+
+
+            catch(e){
+
+              debugPrint(
+                "UPDATE COURSE ERROR: $e",
+              );
+
+            }
+
+
+          },
+
+        );
+
+
+      },
+
+    );
+
+
+  }
+
+
+
+
+
+
+
+
+
+  Future<void> _deleteCourse(
+      CourseModel course,
+      ) async {
+
+
+
+    final confirm =
+    await showDialog<bool>(
+
+
+      context: context,
+
+
+      builder:(context){
+
+
+        return AlertDialog(
+
+
+          title:
+          const Text(
+            "Delete Course",
+          ),
+
+
+          content:
+          Text(
+            "Delete ${course.title}?",
+          ),
+
+
+
+          actions:[
+
+
+            TextButton(
+
+              onPressed:(){
+
+                Navigator.pop(
+                  context,
+                  false,
+                );
+
+              },
+
+              child:
+              const Text(
+                "Cancel",
+              ),
+
+            ),
+
+
+
+            ElevatedButton(
+
+              style:
+              ElevatedButton.styleFrom(
+
+                backgroundColor:
+                Colors.red,
+
+              ),
+
+
+              onPressed:(){
+
+                Navigator.pop(
+                  context,
+                  true,
+                );
+
+              },
+
+
+              child:
+              const Text(
+                "Delete",
+              ),
+
+            ),
+
+
+          ],
+
+
+        );
+
+
+      },
+
+
+    );
+
+
+
+    if(confirm != true){
+
+      return;
+
+    }
+
+
+
+
+
+    try {
+
+
+      await adminService.deleteCourse(
+        course.id,
+      );
+
+
+      await _loadCourses();
+
+
+    }
+
+
+    catch(e){
+
+      debugPrint(
+        "DELETE COURSE ERROR: $e",
+      );
+
+    }
+
+
+  }
+
+
+
+
+
+
+
+
+
+  Future<void> _manageLessons(
+      CourseModel course,
+      ) async {
+
+
+    await Navigator.push(
+
+      context,
+
+      MaterialPageRoute(
+
+        builder:(_)=>
+
+            LessonManagementScreen(
+
+              course:course,
+
+            ),
+
+      ),
+
+    );
+
+
+
+    await _loadCourses();
+
 
   }
 
@@ -610,11 +519,16 @@ class _LessonManagementState
 
 
   @override
-  Widget build(BuildContext context){
-
+  Widget build(BuildContext context) {
 
 
     return Scaffold(
+
+
+      backgroundColor:
+      const Color(
+        0xffF5F8FC,
+      ),
 
 
 
@@ -623,14 +537,34 @@ class _LessonManagementState
       AppBar(
 
         title:
-
         const Text(
-
-          "Lesson Management",
-
+          "Training Management",
         ),
 
+
+        actions:[
+
+
+          IconButton(
+
+            icon:
+            const Icon(
+              Icons.refresh,
+            ),
+
+            onPressed:
+            loading
+                ? null
+                : _loadCourses,
+
+          ),
+
+        ],
+
+
       ),
+
+
 
 
 
@@ -640,34 +574,24 @@ class _LessonManagementState
 
       FloatingActionButton.extended(
 
-
-        onPressed:(){
-
-          _openLessonDialog();
-
-        },
-
-
-        label:
-
-        const Text(
-
-          "Add Lesson",
-
-        ),
+        onPressed:
+        _showAddCourseDialog,
 
 
         icon:
-
         const Icon(
-
           Icons.add,
-
         ),
 
 
+        label:
+        const Text(
+          "Add Course",
+        ),
 
       ),
+
+
 
 
 
@@ -678,14 +602,11 @@ class _LessonManagementState
 
       loading
 
-
           ?
-
 
       const Center(
 
         child:
-
         CircularProgressIndicator(),
 
       )
@@ -694,164 +615,104 @@ class _LessonManagementState
           :
 
 
-      ListView.builder(
+      courses.isEmpty
 
 
-        padding:
+          ?
 
-        const EdgeInsets.all(20),
+      const Center(
 
+        child:
+        Text(
+          "No Courses Yet",
+        ),
 
+      )
 
-        itemCount:
 
-        lessons.length,
+          :
 
 
+      RefreshIndicator(
 
-        itemBuilder:(context,index){
 
+        onRefresh:
+        _loadCourses,
 
 
-          final lesson =
-          lessons[index];
+        child:
 
+        ListView.builder(
 
 
-          return Card(
+          padding:
+          const EdgeInsets.all(24),
 
 
-            margin:
 
-            const EdgeInsets.only(
+          itemCount:
+          courses.length,
 
-              bottom:15,
 
-            ),
 
+          itemBuilder:(context,index){
 
 
-            child:
+            final course =
+            courses[index];
 
-            ListTile(
 
 
+            return CourseAdminCard(
 
-              title:
+              course:
+              course,
 
-              Text(
 
-                "${lesson.order}. ${lesson.title}",
 
-              ),
+              onEdit:(){
 
+                _showEditCourseDialog(
+                  course,
+                );
 
+              },
 
-              subtitle:
 
-              Text(
 
-                lesson.description,
+              onDelete:(){
 
-              ),
+                _deleteCourse(
+                  course,
+                );
 
+              },
 
 
-              trailing:
 
-              Row(
+              onManageLessons:(){
 
+                _manageLessons(
+                  course,
+                );
 
-                mainAxisSize:
+              },
 
-                MainAxisSize.min,
 
+            );
 
 
-                children:[
+          },
 
-
-
-                  IconButton(
-
-                    icon:
-
-                    const Icon(
-
-                      Icons.edit,
-
-                    ),
-
-                    onPressed:(){
-
-                      _openLessonDialog(
-
-                        lesson:lesson,
-
-                      );
-
-                    },
-
-                  ),
-
-
-
-
-                  IconButton(
-
-                    icon:
-
-                    const Icon(
-
-                      Icons.delete,
-
-                      color:Colors.red,
-
-                    ),
-
-
-                    onPressed:(){
-
-                      _deleteLesson(
-
-                        lesson,
-
-                      );
-
-                    },
-
-
-                  ),
-
-
-
-                ],
-
-
-              ),
-
-
-
-            ),
-
-
-          );
-
-
-
-        },
-
+        ),
 
       ),
-
 
 
     );
 
 
-
   }
-
 
 
 }

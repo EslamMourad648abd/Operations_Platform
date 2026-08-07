@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../modules/Training/screens/training_dashboard.dart';
+import '../modules/training/screens/training_dashboard.dart';
 import '../widgets/platform_card.dart';
 import '../modules/bbc_api.dart';
 import '../services/auth_service.dart';
@@ -227,6 +227,7 @@ class PlatformDashboard extends StatelessWidget {
                               },
                             ),
 
+
                           // Product Awareness
                           if (AuthService.isSuperAdmin ||
                               AuthService.isAgent)
@@ -234,7 +235,7 @@ class PlatformDashboard extends StatelessWidget {
                               title: "Product Awareness",
                               subtitle: "Products, SOPs & Documentation",
                               icon: Icons.menu_book,
-                              enabled: true,
+                              enabled: false,
                               onPressed: () {
                                 // Navigator.push(
                                 //   context,

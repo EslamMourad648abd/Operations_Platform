@@ -1,8 +1,8 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
-import '../modules/Training/models/course_model.dart';
-import '../modules/Training/repositories/firebase_training_repository.dart';
+import '../modules/training/models/course_model.dart';
+import '../modules/training/repositories/firebase_training_repository.dart';
 
 import 'lesson_management_screen.dart';
 import 'services/training_admin_service.dart';
@@ -101,8 +101,6 @@ class _TrainingManagementState
                 data["title"] ?? "",
                 description:
                 data["description"] ?? "",
-                duration:
-                data["duration"] ?? 0,
                 driveFolderId:
                 data["driveFolderId"] ?? "",
                 driveFolderUrl:
@@ -167,8 +165,6 @@ class _TrainingManagementState
             course.title,
             "description":
             course.description,
-            "duration":
-            course.duration,
             "driveFolderId":
             course.driveFolderId,
             "driveFolderUrl":

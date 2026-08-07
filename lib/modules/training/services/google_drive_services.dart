@@ -34,7 +34,7 @@ class GoogleDriveService {
         id: "1",
         title: "Introduction to BBC",
         videoUrl:
-        "https://drive.google.com/example-video-1", description: '', duration: 1, order: 2,courseId: '', quizEnabled: true,
+        "https://drive.google.com/example-video-1", description: '',  order: 2,courseId: '', quizEnabled: true, duration: 1,
       ),
 
 
@@ -42,7 +42,7 @@ class GoogleDriveService {
         id: "2",
         title: "Platform Navigation",
         videoUrl:
-        "https://drive.google.com/example-video-2",description: '', duration: 1, order: 2,courseId: '', quizEnabled: true,
+        "https://drive.google.com/example-video-2",description: '',  order: 2,courseId: '', quizEnabled: true, duration: 1,
       ),
 
 
@@ -50,7 +50,7 @@ class GoogleDriveService {
         id: "3",
         title: "Customer Journey",
         videoUrl:
-        "https://drive.google.com/example-video-3",description: '', duration: 1, order: 2, courseId: '', quizEnabled: true,
+        "https://drive.google.com/example-video-3",description: '',  order: 2, courseId: '', quizEnabled: true, duration: 1,
       )
 
     ];

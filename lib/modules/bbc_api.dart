@@ -1,12 +1,12 @@
+import 'dart:html' as html;
+
 import 'package:bbc_api_tool/models/api_preset.dart';
 import 'package:bbc_api_tool/models/api_prest_group.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../data/postman_loader.dart';
-import 'dart:html' as html;
 
-import '../widgets/request_editor.dart'; // ⬅️ add this at the top
+import '../data/postman_loader.dart';
+import '../widgets/request_editor.dart';
 
 class BbcApiHomeScreen extends StatefulWidget {
   const BbcApiHomeScreen({super.key});
@@ -16,408 +16,559 @@ class BbcApiHomeScreen extends StatefulWidget {
 }
 
 class _BbcApiHomeScreen extends State<BbcApiHomeScreen> {
-  List<ApiPresetGroup> groups = [];
-  bool loading = true;
-  String? error;
-  dynamic selectedPreset;
+List<ApiPresetGroup> groups = [];
 
-  String? selectedGroupName; // 🔹 track selected group
-  String? selectedCallTitle; // 🔹 track selected call title
-  bool isSuperAdmin = false;
-  bool _disposed = false;
+bool loading = true;
+String? error;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadCollection();
-    // _checkSuperAdmin();
-  }
+dynamic selectedPreset;
 
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
-  }
+String? selectedGroupName;
+String? selectedCallTitle;
 
-  // Future<void> _checkSuperAdmin() async {
-  //   final user = FirebaseAuth.instance.currentUser;
-  //   if (user != null) {
-  //     final tokenResult = await user.getIdTokenResult(true);
-  //     final claims = tokenResult.claims ?? {};
-  //     if (!_disposed && mounted) {
-  //       setState(() {
-  //         isSuperAdmin = claims['superadmin'] == true;
-  //       });
-  //     }
-  //     debugPrint('👑 Superadmin status: $isSuperAdmin');
-  //   }
-  // }
+bool isSuperAdmin = false;
+bool _disposed = false;
 
-  Future<void> _openAdminConsole() async {
-    final baseUrl = Uri.base.origin;
-    html.window.open('$baseUrl/admin-console', '_blank');
-  }
+@override
+void initState() {
+super.initState();
+_loadCollection();
+}
 
-  Future<void> _loadCollection() async {
-    try {
-      final loadedGroups = await PostmanLoader.loadFromAssets(
-        'assets/BBC_Request.postman_collection.json',
-      );
-      if (!_disposed && mounted) {
-        setState(() {
-          groups = loadedGroups;
-          loading = false;
-        });
-      }
-    } catch (e) {
-      if (!_disposed && mounted) {
-        setState(() {
-          error = e.toString();
-          loading = false;
-        });
-      }
-    }
-  }
+@override
+void dispose() {
+_disposed = true;
+super.dispose();
+}
 
-  Future<void> _logout() async {
-    try {
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Logout failed: $e"),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
-  }
+Future<void> _openAdminConsole() async {
+final baseUrl = Uri.base.origin;
+html.window.open('$baseUrl/admin-console', '_blank');
+}
 
-  // 🔹 Helper to generate a unique key for a preset (call)
-  String _callKey(ApiPreset preset) => preset.name;
+Future<void> _loadCollection() async {
+try {
+final loadedGroups = await PostmanLoader.loadFromAssets(
+'assets/BBC_Request.postman_collection.json',
+);
 
-  @override
-  Widget build(BuildContext context) {
-    const mainBgColor = Color(0xFFF6F8FA);
-    const cardBorder = Color(0xFFE0E5EC);
+if (!_disposed && mounted) {
+setState(() {
+groups = loadedGroups;
+loading = false;
+});
+}
+} catch (e) {
+if (!_disposed && mounted) {
+setState(() {
+error = e.toString();
+loading = false;
+});
+}
+}
+}
 
-    if (loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+Future<void> _logout() async {
+try {
+await FirebaseAuth.instance.signOut();
 
-    if (error != null) {
-      return Scaffold(body: Center(child: Text('❌ Failed to load: $error')));
-    }
+if (mounted) {
+Navigator.of(context).pushReplacementNamed('/login');
+}
+} catch (e) {
+ScaffoldMessenger.of(context).showSnackBar(
+SnackBar(
+content: Text("Logout failed: $e"),
+backgroundColor: Colors.redAccent,
+),
+);
+}
+}
 
-    return Scaffold(
-      // appBar: const RamadanAppBar(height: 50),
+String _callKey(ApiPreset preset) => preset.name;
 
-      backgroundColor: mainBgColor,
-      body: Row(
-        children: [
-          // 🧭 Sidebar
-          Container(
-            width: 280,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xCC001C38), Color(0xCC80CFFF)],
-              ),
+@override
+Widget build(BuildContext context) {
+const mainBgColor = Color(0xffF5F8FC);
+const primaryColor = Color(0xff003366);
+const accentColor = Color(0xff80CFFF);
+const cardBorder = Color(0xFFE4E9F0);
+
+if (loading) {
+return const Scaffold(
+body: Center(
+child: CircularProgressIndicator(),
+),
+);
+}
+
+if (error != null) {
+return Scaffold(
+body: Center(
+child: Text("❌ Failed to load: $error"),
+),
+);
+}
+
+return Scaffold(
+backgroundColor: mainBgColor,
+body: Row(
+children: [
+
+Container(
+width: 310,
+decoration: const BoxDecoration(
+gradient: LinearGradient(
+begin: Alignment.topCenter,
+end: Alignment.bottomCenter,
+colors: [
+primaryColor,
+accentColor,
+],
+),
+),
+
+child: Column(
+children: [
+
+SafeArea(
+bottom: false,
+child: Padding(
+padding: const EdgeInsets.fromLTRB(
+18,
+20,
+18,
+20,
+),
+
+child: Row(
+crossAxisAlignment:
+CrossAxisAlignment.center,
+
+children: [
+
+Container(
+decoration: BoxDecoration(
+color: Colors.white.withOpacity(.12),
+borderRadius:
+BorderRadius.circular(12),
+),
+child: IconButton(
+icon: const Icon(
+Icons.arrow_back,
+color: Colors.white,
+),
+tooltip: "Back",
+onPressed: () {
+Navigator.pop(context);
+},
+),
+),
+
+const SizedBox(width: 14),
+
+Expanded(
+child: Column(
+children: [
+
+Image.asset(
+"assets/logo.png",
+height: 58,
+),
+
+const SizedBox(height: 10),
+
+const Text(
+"BBC API Collections",
+textAlign: TextAlign.center,
+style: TextStyle(
+color: Colors.white,
+fontWeight: FontWeight.bold,
+fontSize: 18,
+),
+),
+],
+),
+),
+
+Container(
+decoration: BoxDecoration(
+color: Colors.white.withOpacity(.12),
+borderRadius:
+BorderRadius.circular(12),
+),
+),
+],
+),
+),
+),
+
+const Divider(
+color: Colors.white24,
+height: 1,
+),
+
+Expanded(
+child: ListView.builder(
+padding: const EdgeInsets.symmetric(
+horizontal: 12,
+vertical: 18,
+),
+
+itemCount: groups.length,
+
+itemBuilder: (context, index) {
+
+final group = groups[index];
+
+final selected =
+selectedGroupName == group.name;
+
+return Container(
+margin: const EdgeInsets.only(
+bottom: 14,
+),
+
+decoration: BoxDecoration(
+color: Colors.white.withOpacity(
+selected ? .20 : .10,
+),
+
+borderRadius:
+BorderRadius.circular(18),
+
+border: Border.all(
+color: selected
+? Colors.white
+: Colors.white24,
+),
+),
+
+child: Theme(
+data: Theme.of(context).copyWith(
+dividerColor:
+Colors.transparent,
+splashColor:
+Colors.transparent,
+highlightColor:
+Colors.transparent,
+),
+
+child: ExpansionTile(
+collapsedIconColor:
+Colors.white,
+
+iconColor:
+Colors.white,
+
+tilePadding:
+const EdgeInsets.symmetric(
+horizontal: 18,
+),
+
+title: Text(
+group.name,
+style: const TextStyle(
+color: Colors.white,
+fontWeight:
+FontWeight.w700,
+fontSize: 15,
+),
+),
+
+children: group.presets.map((preset) {
+
+final isSelected =
+selectedCallTitle ==
+_callKey(preset);
+
+return Container(
+margin:
+const EdgeInsets.symmetric(
+horizontal: 10,
+vertical: 4,
+),
+
+decoration: BoxDecoration(
+color: isSelected
+? Colors.white
+: Colors.transparent,
+
+borderRadius:
+BorderRadius.circular(
+10),
+),
+
+child: ListTile(
+dense: true,
+
+shape:
+RoundedRectangleBorder(
+borderRadius:
+BorderRadius.circular(
+10),
+),
+
+title: Text(
+preset.name,
+
+style: TextStyle(
+color: isSelected
+? primaryColor
+: Colors.white,
+
+fontWeight: isSelected
+? FontWeight.bold
+: FontWeight.w500,
+),
+),
+
+onTap: () {
+setState(() {
+selectedGroupName =
+group.name;
+
+selectedCallTitle =
+_callKey(preset);
+
+selectedPreset =
+ApiPreset(
+id: preset.id,
+name: preset.name,
+method: preset.method,
+url: preset.url,
+headers:
+Map<String,
+String>.from(
+preset.headers),
+params:
+Map<String,
+String>.from(
+preset.params),
+body: preset.body,
+editableFields:
+Map<String,
+bool>.from(
+preset.editableFields),
+urlVariables:
+List<String>.from(
+preset.urlVariables),
+authType:
+preset.authType,
+authToken:
+preset.authToken,
+);
+});
+},
+),
+);
+}).toList(),
+),
+),
+);
+},
+),
+),
+],
+),
+),
+
+// 🧰 Main Area
+  Expanded(
+    child: Container(
+      color: mainBgColor,
+      padding: const EdgeInsets.all(24),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        switchInCurve: Curves.easeInOut,
+        switchOutCurve: Curves.easeInOut,
+        layoutBuilder: (currentChild, previousChildren) {
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              for (final child in previousChildren)
+                Offstage(
+                  offstage: true,
+                  child: child,
+                ),
+              if (currentChild != null) currentChild,
+            ],
+          );
+        },
+
+        child: selectedPreset == null
+
+            ? Center(
+          key: const ValueKey("empty"),
+
+          child: Container(
+            constraints:
+            const BoxConstraints(maxWidth: 500),
+
+            padding: const EdgeInsets.all(40),
+
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius:
+              BorderRadius.circular(24),
+
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            child: ListView(
+
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // 🔹 Header
-                DrawerHeader(
-                  margin: EdgeInsets.zero,
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
 
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                Image.asset(
+                  "assets/backgound_asset.png",
+                  height: 160,
+                ),
 
-                        icon: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.white,
-                          size: 26,
-                        ),
+                const SizedBox(height: 28),
 
-                        tooltip: "Back",
-
-                        onPressed: () {
-
-                          Navigator.pop(context);
-
-                        },
-
-                      ),
-
-
-                      const SizedBox(width: 8),
-
-
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-
-                            Image.asset(
-                              'assets/logo.png',
-                              height: 70,
-                              fit: BoxFit.contain,
-                            ),
-
-
-                            const SizedBox(height: 8),
-
-
-                            const Text(
-                              "BBC API Collections",
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 0.8,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-
-                          ],
-                        ),
-                      ),
-
-
-                      IconButton(
-                        tooltip: "Logout",
-
-                        icon: const Icon(
-                          Icons.logout,
-                          color: Colors.white,
-                        ),
-
-                        onPressed: _logout,
-
-                      ),
-
-                    ],
+                const Text(
+                  "BBC API Collections",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
                   ),
                 ),
 
-                // 🔹 Groups
-                for (final group in groups)
-                  Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          selectedGroupName == group.name
-                              ? Colors.transparent
-                              : Colors.white.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color:
-                            selectedGroupName == group.name
-                                ? Colors.blueAccent
-                                : Colors.white24,
-                        width: 1,
-                      ),
-                    ),
-                    child: Theme(
-                      data: Theme.of(context).copyWith(
-                        dividerColor: Colors.transparent,
-                        splashColor: Colors.transparent,
-                        highlightColor: Colors.transparent,
-                        iconTheme: const IconThemeData(color: Colors.white),
-                      ),
-                      child: ExpansionTile(
-                        collapsedIconColor: Colors.white,
-                        iconColor: Colors.white,
-                        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-                        title: Text(
-                          group.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                        childrenPadding: const EdgeInsets.only(bottom: 8),
-                        children:
-                            group.presets.map((preset) {
-                              final bool isSelected =
-                                  selectedCallTitle == _callKey(preset);
-                              return ListTile(
-                                dense: true,
-                                title: Text(
-                                  preset.name,
-                                  style: TextStyle(
-                                    color:
-                                        isSelected
-                                            ? Colors.black
-                                            : Colors.white.withOpacity(0.85),
-                                    fontWeight:
-                                        isSelected
-                                            ? FontWeight.bold
-                                            : FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                onTap:
-                                    () => setState(() {
-                                      selectedGroupName = group.name;
-                                      selectedCallTitle = _callKey(preset);
+                const SizedBox(height: 14),
 
-                                      selectedPreset = ApiPreset(
-                                        id: preset.id,
-                                        name: preset.name,
-                                        method: preset.method,
-                                        url: preset.url,
-                                        headers: Map<String, String>.from(
-                                          preset.headers,
-                                        ),
-                                        params: Map<String, String>.from(
-                                          preset.params,
-                                        ),
-                                        body: preset.body,
-                                        editableFields: Map<String, bool>.from(
-                                          preset.editableFields,
-                                        ),
-                                        urlVariables: List<String>.from(
-                                          preset.urlVariables,
-                                        ),
-                                        authType: preset.authType,
-                                        authToken: preset.authToken,
-                                      );
-                                    }),
-                              );
-                            }).toList(),
-                      ),
-                    ),
+                const Text(
+                  "Select a request from the left sidebar to start testing APIs.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                    height: 1.5,
                   ),
+                ),
               ],
             ),
           ),
+        )
 
-          // 🧰 Main Area
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              switchInCurve: Curves.easeInOut,
-              switchOutCurve: Curves.easeInOut,
-              layoutBuilder: (currentChild, previousChildren) {
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    for (final child in previousChildren)
-                      Offstage(offstage: true, child: child),
-                    if (currentChild != null) currentChild,
-                  ],
-                );
-              },
-              child:
-                  selectedPreset == null
-                      ? Center(
-                        key: const ValueKey('default'),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              'assets/backgound_asset.png',
-                              height: 130,
-                              fit: BoxFit.contain,
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              "Select a request from the sidebar to begin",
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Color(0xFF7C8894),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                      : Column(
-                        key: ValueKey(selectedPreset.id),
-                        children: [
-                          // 🔹 Sticky Top Bar
-                          Container(
-                            color: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    selectedPreset.name,
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF2C2F36),
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.close,
-                                    color: Colors.redAccent,
-                                  ),
-                                  tooltip: 'Close request',
-                                  onPressed:
-                                      () => setState(() {
-                                        selectedPreset = null;
-                                        selectedCallTitle = null;
-                                        selectedGroupName = null;
-                                      }),
-                                ),
-                              ],
-                            ),
-                          ),
+            : Column(
+          key: ValueKey(selectedPreset.id),
+          children: [
 
-                          // 🔹 Main Request Editor
-                          Expanded(
-                            child: Container(
-                              margin: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: cardBorder,
-                                  width: 1.2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black12.withOpacity(0.04),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: RequestEditor(
-                                key: ValueKey(selectedPreset.id),
-                                preset: selectedPreset,
-                              ),
-                            ),
-                          ),
-                        ],
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 18,
+              ),
+
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                BorderRadius.circular(18),
+
+                border: Border.all(
+                  color: cardBorder,
+                ),
+
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(.04),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+
+              child: Row(
+                children: [
+
+                  const Icon(
+                    Icons.api,
+                    color: primaryColor,
+                    size: 28,
+                  ),
+
+                  const SizedBox(width: 14),
+
+                  Expanded(
+                    child: Text(
+                      selectedPreset.name,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+
+                  IconButton(
+                    tooltip: "Close",
+
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.redAccent,
+                    ),
+
+                    onPressed: () {
+                      setState(() {
+                        selectedPreset = null;
+                        selectedGroupName = null;
+                        selectedCallTitle = null;
+                      });
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+
+            const SizedBox(height: 20),
+
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+
+                  borderRadius:
+                  BorderRadius.circular(20),
+
+                  border: Border.all(
+                    color: cardBorder,
+                  ),
+
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(.04),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+
+                child: ClipRRect(
+                  borderRadius:
+                  BorderRadius.circular(20),
+
+                  child: RequestEditor(
+                    key: ValueKey(selectedPreset.id),
+                    preset: selectedPreset,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  ),
+],
+),
+);
+}
 }

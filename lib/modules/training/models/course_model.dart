@@ -58,7 +58,7 @@ class CourseModel {
 
 
       lessonsCount:
-      data["LessonsCount"] ?? 0,
+      data["lessonsCount"] ?? 0,
 
     );
 
