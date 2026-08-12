@@ -179,8 +179,6 @@ class _TrainingManagementState
                   data["title"] ?? "",
                   "description":
                   data["description"] ?? "",
-                  "duration":
-                  data["duration"] ?? 0,
                   "driveFolderId":
                   data["driveFolderId"] ?? "",
                   "driveFolderUrl":

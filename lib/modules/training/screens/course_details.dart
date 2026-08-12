@@ -1,209 +1,1140 @@
-import 'package:flutter/material.dart';
+// import 'package:flutter/material.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:url_launcher/url_launcher.dart';
+// import '../models/course_model.dart';
+// import '../models/lesson_model.dart';
+// import '../repositories/firebase_training_repository.dart';
+// import '../services/certificate_service.dart';
+// import '../widgets/progress_bar.dart';
+// import '../widgets/lesson_tile.dart';
+// import 'lesson_screen.dart';
+// class CourseDetails extends StatefulWidget {
+//   final CourseModel course;
+//   const CourseDetails({
+//     super.key,
+//     required this.course,
+//   });
+//   @override
+//   State<CourseDetails> createState() => _CourseDetailsState();
+// }
+// class _CourseDetailsState extends State<CourseDetails> {
+//   final FirebaseTrainingRepository repository =
+//   FirebaseTrainingRepository();
+//   final CertificateService certificateService =
+//   CertificateService();
+//   double progress = 0;
+//   bool loadingProgress = true;
+//   bool generatingCertificate = false;
+//   List<LessonModel> lessons = [];
+//   Map<String, Map<String, bool>> lessonProgress = {};
+//   int totalDuration = 0;
+//   // ============================================================
+//   // FORMAT DURATION
+//   // ============================================================
+//   String _formatDuration(int seconds) {
+//     final minutes = seconds ~/ 60;
+//     final remainingSeconds = seconds % 60;
+//     return '${minutes.toString().padLeft(2, '0')}:'
+//         '${remainingSeconds.toString().padLeft(2, '0')}';
+//   }
+//   // ============================================================
+//   // LOAD DATA
+//   // ============================================================
+//   Future<void> _loadData() async {
+//     try {
+//       // --------------------------------------------------------
+//       // Load lessons
+//       // --------------------------------------------------------
+//       final loadedLessons =
+//       await repository.getLessons(widget.course.id);
+//       // --------------------------------------------------------
+//       // Calculate total course duration
+//       // --------------------------------------------------------
+//       int calculatedDuration = 0;
+//       for (final lesson in loadedLessons) {
+//         calculatedDuration += lesson.duration;
+//       }
+//       // --------------------------------------------------------
+//       // Load CURRENT USER
+//       // --------------------------------------------------------
+//       final user =
+//           FirebaseAuth.instance.currentUser;
+//       final Map<String, Map<String, bool>> progressMap = {};
+//       double totalLessonProgress = 0;
+//       // --------------------------------------------------------
+//       // ONE Firestore read for ALL lesson progress
+//       // --------------------------------------------------------
+//       if (user != null) {
+//         final progressSnapshot =
+//         await FirebaseFirestore.instance
+//             .collection("users")
+//             .doc(user.uid)
+//             .collection("training_progress")
+//             .doc(widget.course.id)
+//             .collection("lessons")
+//             .get();
+//         // ------------------------------------------------------
+//         // Convert Firestore documents into a local map
+//         // ------------------------------------------------------
+//         final Map<String, Map<String, dynamic>>
+//         firestoreProgress = {};
+//         for (final doc in progressSnapshot.docs) {
+//           firestoreProgress[doc.id] = doc.data();
+//         }
+//         // ------------------------------------------------------
+//         // Calculate progress locally
+//         // ------------------------------------------------------
+//         for (final lesson in loadedLessons) {
+//           final data =
+//               firestoreProgress[lesson.id] ?? {};
+//           final completed =
+//               data["completed"] == true;
+//           final quizSubmitted =
+//               data["quizSubmitted"] == true;
+//           final videoCompleted =
+//               data["videoCompleted"] == true;
+//           double lessonProgressValue = 0;
+//           // ----------------------------------------------------
+//           // Quiz lesson
+//           //
+//           // Video = 50%
+//           // Quiz  = 50%
+//           // ----------------------------------------------------
+//           if (lesson.quizEnabled) {
+//             if (videoCompleted) {
+//               lessonProgressValue += 0.5;
+//             }
+//             if (quizSubmitted) {
+//               lessonProgressValue += 0.5;
+//             }
+//           }
+//           // ----------------------------------------------------
+//           // Non-quiz lesson
+//           //
+//           // Video = 100%
+//           // ----------------------------------------------------
+//           else {
+//             if (completed || videoCompleted) {
+//               lessonProgressValue = 1.0;
+//             }
+//           }
+//           totalLessonProgress +=
+//               lessonProgressValue;
+//           progressMap[lesson.id] = {
+//             "completed": completed,
+//             "quizSubmitted": quizSubmitted,
+//             "videoCompleted": videoCompleted,
+//           };
+//         }
+//       }
+//       // --------------------------------------------------------
+//       // Update UI
+//       // --------------------------------------------------------
+//       if (!mounted) return;
+//       setState(() {
+//         lessons = loadedLessons;
+//         lessonProgress = progressMap;
+//         totalDuration =
+//             calculatedDuration;
+//         progress =
+//         loadedLessons.isEmpty
+//             ? 0
+//             : totalLessonProgress /
+//             loadedLessons.length;
+//         loadingProgress = false;
+//       });
+//     } catch (e) {
+//       debugPrint(
+//         "COURSE DETAILS ERROR: $e",
+//       );
+//       if (!mounted) return;
+//       setState(() {
+//         loadingProgress = false;
+//       });
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(
+//           content: Text(
+//             "Failed to load course data: $e",
+//           ),
+//           backgroundColor: Colors.red,
+//         ),
+//       );
+//     }
+//   }
+//   // ============================================================
+//   // COURSE COMPLETION
+//   // ============================================================
+//   bool get _courseCompleted {
+//     if (lessons.isEmpty) {
+//       return false;
+//     }
+//     for (final lesson in lessons) {
+//       final status =
+//       lessonProgress[lesson.id];
+//       if (status == null ||
+//           status["completed"] != true) {
+//         return false;
+//       }
+//     }
+//     return true;
+//   }
+//   // ============================================================
+//   // GENERATE CERTIFICATE
+//   // ============================================================
+//   Future<void> _generateCertificate() async {
+//     if (!_courseCompleted ||
+//         generatingCertificate) {
+//       return;
+//     }
+//     setState(() {
+//       generatingCertificate = true;
+//     });
+//     try {
+//       final certificateUrl =
+//       await certificateService.generateCertificate(
+//         courseId: widget.course.id,
+//       );
+//       final uri =
+//       Uri.tryParse(certificateUrl);
+//       if (uri == null) {
+//         throw Exception(
+//           "Invalid certificate URL.",
+//         );
+//       }
+//       final launched =
+//       await launchUrl(
+//         uri,
+//         mode: LaunchMode.platformDefault,
+//       );
+//       if (!launched) {
+//         throw Exception(
+//           "Could not open certificate.",
+//         );
+//       }
+//     } catch (e) {
+//       debugPrint(
+//         "CERTIFICATE ERROR: $e",
+//       );
+//       if (!mounted) return;
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(
+//           content: Text(
+//             "Failed to generate certificate: $e",
+//           ),
+//           backgroundColor: Colors.red,
+//         ),
+//       );
+//     } finally {
+//       if (!mounted) return;
+//       setState(() {
+//         generatingCertificate = false;
+//       });
+//     }
+//   }
+//   // ============================================================
+//   // OPEN LESSON
+//   // ============================================================
+//   Future<void> _openLesson(
+//       LessonModel lesson,
+//       ) async {
+//     await Navigator.push(
+//       context,
+//       MaterialPageRoute(
+//         builder: (_) => LessonScreen(
+//           lesson: lesson,
+//         ),
+//       ),
+//     );
+//     await _loadData();
+//   }
+//   // ============================================================
+//   // INIT
+//   // ============================================================
+//   @override
+//   void initState() {
+//     super.initState();
+//     _loadData();
+//   }
+//   // ============================================================
+//   // BUILD
+//   // ============================================================
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       backgroundColor:
+//       const Color(0xffF5F8FC),
+//       appBar: AppBar(
+//         title:
+//         Text(widget.course.title),
+//       ),
+//       body: loadingProgress
+//           ? const Center(
+//         child:
+//         CircularProgressIndicator(),
+//       )
+//           : SingleChildScrollView(
+//         padding:
+//         const EdgeInsets.all(24),
+//         child: Column(
+//           crossAxisAlignment:
+//           CrossAxisAlignment.start,
+//           children: [
+//             // --------------------------------------------------
+//             // TITLE
+//             // --------------------------------------------------
+//             Text(
+//               widget.course.title,
+//               style:
+//               const TextStyle(
+//                 fontSize: 28,
+//                 fontWeight:
+//                 FontWeight.bold,
+//               ),
+//             ),
+//             const SizedBox(
+//               height: 12,
+//             ),
+//             Text(
+//               widget.course.description,
+//               style:
+//               const TextStyle(
+//                 fontSize: 16,
+//                 color: Colors.grey,
+//               ),
+//             ),
+//             const SizedBox(
+//               height: 28,
+//             ),
+//             // --------------------------------------------------
+//             // PROGRESS
+//             // --------------------------------------------------
+//             const Text(
+//               "Course Progress",
+//               style:
+//               TextStyle(
+//                 fontSize: 18,
+//                 fontWeight:
+//                 FontWeight.bold,
+//               ),
+//             ),
+//             const SizedBox(
+//               height: 12,
+//             ),
+//             ProgressBar(
+//               value: progress,
+//             ),
+//             const SizedBox(
+//               height: 30,
+//             ),
+//             // --------------------------------------------------
+//             // CERTIFICATE
+//             // --------------------------------------------------
+//             if (_courseCompleted)
+//               _buildCertificateCard(),
+//             if (_courseCompleted)
+//               const SizedBox(
+//                 height: 30,
+//               ),
+//             // --------------------------------------------------
+//             // COURSE INFO
+//             // --------------------------------------------------
+//             Row(
+//               children: [
+//                 _InfoCard(
+//                   icon:
+//                   Icons.menu_book,
+//                   title:
+//                   "Lessons",
+//                   value:
+//                   lessons.length
+//                       .toString(),
+//                 ),
+//                 const SizedBox(
+//                   width: 12,
+//                 ),
+//                 _InfoCard(
+//                   icon:
+//                   Icons.timer,
+//                   title:
+//                   "Duration",
+//                   value:
+//                   _formatDuration(
+//                     totalDuration,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             const SizedBox(
+//               height: 35,
+//             ),
+//             // --------------------------------------------------
+//             // LESSONS
+//             // --------------------------------------------------
+//             const Text(
+//               "Lessons",
+//               style:
+//               TextStyle(
+//                 fontSize: 22,
+//                 fontWeight:
+//                 FontWeight.bold,
+//               ),
+//             ),
+//             const SizedBox(
+//               height: 16,
+//             ),
+//             if (lessons.isEmpty)
+//               const Padding(
+//                 padding:
+//                 EdgeInsets.all(30),
+//                 child:
+//                 Center(
+//                   child: Text(
+//                     "No lessons available",
+//                   ),
+//                 ),
+//               )
+//             else
+//               ListView.builder(
+//                 shrinkWrap: true,
+//                 physics:
+//                 const NeverScrollableScrollPhysics(),
+//                 itemCount:
+//                 lessons.length,
+//                 itemBuilder:
+//                     (context, index) {
+//                   final lesson =
+//                   lessons[index];
+//                   final status =
+//                       lessonProgress[
+//                       lesson.id] ??
+//                           {};
+//                   return LessonTile(
+//                     lesson: lesson,
+//                     completed:
+//                     status[
+//                     "completed"] ??
+//                         false,
+//                     quizSubmitted:
+//                     status[
+//                     "quizSubmitted"] ??
+//                         false,
+//                     videoCompleted:
+//                     status[
+//                     "videoCompleted"] ??
+//                         false,
+//                     onPressed: () {
+//                       _openLesson(
+//                         lesson,
+//                       );
+//                     },
+//                   );
+//                 },
+//               ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//   // ============================================================
+//   // CERTIFICATE CARD
+//   // ============================================================
+//   Widget _buildCertificateCard() {
+//     return Container(
+//       width: double.infinity,
+//       padding:
+//       const EdgeInsets.all(22),
+//       decoration:
+//       BoxDecoration(
+//         color: Colors.white,
+//         borderRadius:
+//         BorderRadius.circular(16),
+//         border: Border.all(
+//           color:
+//           const Color(0xffD7E7F5),
+//         ),
+//       ),
+//       child: Column(
+//         crossAxisAlignment:
+//         CrossAxisAlignment.start,
+//         children: [
+//           Row(
+//             children: const [
+//               Icon(
+//                 Icons.workspace_premium,
+//                 color:
+//                 Color(0xff003366),
+//                 size: 30,
+//               ),
+//               SizedBox(
+//                 width: 12,
+//               ),
+//               Expanded(
+//                 child: Text(
+//                   "Course Completed!",
+//                   style:
+//                   TextStyle(
+//                     fontSize: 20,
+//                     fontWeight:
+//                     FontWeight.bold,
+//                     color:
+//                     Color(0xff003366),
+//                   ),
+//                 ),
+//               ),
+//             ],
+//           ),
+//           const SizedBox(
+//             height: 10,
+//           ),
+//           const Text(
+//             "Congratulations! You have successfully "
+//                 "completed all lessons in this course.",
+//           ),
+//           const SizedBox(
+//             height: 18,
+//           ),
+//           SizedBox(
+//             width: double.infinity,
+//             child:
+//             ElevatedButton.icon(
+//               onPressed:
+//               generatingCertificate
+//                   ? null
+//                   : _generateCertificate,
+//               icon:
+//               generatingCertificate
+//                   ? const SizedBox(
+//                 width: 18,
+//                 height: 18,
+//                 child:
+//                 CircularProgressIndicator(
+//                   strokeWidth: 2,
+//                   color:
+//                   Colors.white,
+//                 ),
+//               )
+//                   : const Icon(
+//                 Icons.download,
+//               ),
+//               label: Text(
+//                 generatingCertificate
+//                     ? "Generating Certificate..."
+//                     : "Download Certificate",
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+// // ============================================================
+// // INFO CARD
+// // ============================================================
+// class _InfoCard
+//     extends StatelessWidget {
+//   final IconData icon;
+//   final String title;
+//   final String value;
+//   const _InfoCard({
+//     required this.icon,
+//     required this.title,
+//     required this.value,
+//   });
+//   @override
+//   Widget build(
+//       BuildContext context,
+//       ) {
+//     return Expanded(
+//       child: Container(
+//         padding:
+//         const EdgeInsets.all(16),
+//         decoration:
+//         BoxDecoration(
+//           color: Colors.white,
+//           borderRadius:
+//           BorderRadius.circular(16),
+//         ),
+//         child: Column(
+//           children: [
+//             Icon(icon),
+//             const SizedBox(
+//               height: 8,
+//             ),
+//             Text(
+//               title,
+//               style:
+//               const TextStyle(
+//                 color: Colors.grey,
+//               ),
+//             ),
+//             const SizedBox(
+//               height: 6,
+//             ),
+//             Text(
+//               value,
+//               style:
+//               const TextStyle(
+//                 fontSize: 18,
+//                 fontWeight:
+//                 FontWeight.bold,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+import 'dart:html' as html;
+import 'dart:ui_web' as ui_web;
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+
 import '../models/course_model.dart';
 import '../models/lesson_model.dart';
 import '../repositories/firebase_training_repository.dart';
-import '../services/training_progress_service.dart';
-import '../widgets/progress_bar.dart';
+import '../services/certificate_service.dart';
 import '../widgets/lesson_tile.dart';
+import '../widgets/progress_bar.dart';
 import 'lesson_screen.dart';
+
 class CourseDetails extends StatefulWidget {
   final CourseModel course;
+
   const CourseDetails({
     super.key,
     required this.course,
   });
+
   @override
   State<CourseDetails> createState() =>
       _CourseDetailsState();
 }
-class _CourseDetailsState
-    extends State<CourseDetails> {
+
+class _CourseDetailsState extends State<CourseDetails>
+    with SingleTickerProviderStateMixin {
   final FirebaseTrainingRepository repository =
   FirebaseTrainingRepository();
-  final TrainingProgressService progressService =
-  TrainingProgressService();
+
+  final CertificateService certificateService =
+  CertificateService();
+
   double progress = 0;
+
   bool loadingProgress = true;
+
+  bool openingCertificate = false;
+
   List<LessonModel> lessons = [];
+
   Map<String, Map<String, bool>> lessonProgress = {};
-  // Total duration of all lessons in seconds.
+
   int totalDuration = 0;
+
+  // ============================================================
+  // COMPLETION STATE
+  // ============================================================
+
+  bool _completionStateInitialized = false;
+
+  bool _previousCourseCompleted = false;
+
+  bool _completionCelebrationShown = false;
+
+  // ============================================================
+  // CELEBRATION ANIMATION
+  // ============================================================
+
+  late AnimationController _celebrationController;
+
+  late Animation<double> _scaleAnimation;
+
+  late Animation<double> _fadeAnimation;
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
   @override
   void initState() {
     super.initState();
+
+    _celebrationController =
+        AnimationController(
+          vsync: this,
+          duration:
+          const Duration(milliseconds: 900),
+        );
+
+    _scaleAnimation =
+        CurvedAnimation(
+          parent:
+          _celebrationController,
+          curve:
+          Curves.elasticOut,
+        );
+
+    _fadeAnimation =
+        CurvedAnimation(
+          parent:
+          _celebrationController,
+          curve:
+          Curves.easeOut,
+        );
+
     _loadData();
   }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
+  @override
+  void dispose() {
+    _celebrationController.dispose();
+
+    super.dispose();
+  }
+
   // ============================================================
   // FORMAT DURATION
   // ============================================================
-  //
-  // Firebase stores lesson duration as TOTAL SECONDS.
-  //
-  // Examples:
-  // 343 seconds -> 05:43
-  // 300 seconds -> 05:00
-  // 83 seconds  -> 01:23
-  //
-  // This method is only for display.
-  // The Firebase value itself is NOT modified.
-  // ============================================================
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
+
+  String _formatDuration(
+      int seconds) {
+    final minutes =
+        seconds ~/ 60;
+
+    final remainingSeconds =
+        seconds % 60;
+
     return '${minutes.toString().padLeft(2, '0')}:'
         '${remainingSeconds.toString().padLeft(2, '0')}';
   }
+
   // ============================================================
   // LOAD DATA
   // ============================================================
+
   Future<void> _loadData() async {
     try {
       final loadedLessons =
       await repository.getLessons(
         widget.course.id,
       );
-      // ========================================================
-      // CALCULATE TOTAL COURSE DURATION
-      // ========================================================
-      //
-      // Each lesson contains its own duration in seconds.
-      //
-      // Example:
-      //
-      // Lesson 1 = 343 seconds
-      // Lesson 2 = 300 seconds
-      // Lesson 3 = 83 seconds
-      //
-      // Total = 726 seconds = 12:06
-      //
-      // This makes the course duration dynamic and ensures
-      // it always reflects the actual lessons in Firestore.
-      // ========================================================
-      int calculatedTotalDuration = 0;
-      for (final lesson in loadedLessons) {
-        calculatedTotalDuration += lesson.duration;
+
+      int calculatedDuration = 0;
+
+      for (final lesson
+      in loadedLessons) {
+        calculatedDuration +=
+            lesson.duration;
       }
+
       final user =
-          FirebaseAuth.instance.currentUser;
-      int completedCount = 0;
-      final Map<String, Map<String, bool>>
+          FirebaseAuth.instance
+              .currentUser;
+
+      final Map<String,
+          Map<String, bool>>
       progressMap = {};
+
+      double totalLessonProgress =
+      0;
+
+      bool celebrationShown =
+      false;
+
       if (user != null) {
-        for (final lesson in loadedLessons) {
+        final progressSnapshot =
+        await FirebaseFirestore
+            .instance
+            .collection("users")
+            .doc(user.uid)
+            .collection(
+            "training_progress")
+            .doc(widget.course.id)
+            .collection("lessons")
+            .get();
+
+        final Map<String,
+            Map<String, dynamic>>
+        firestoreProgress = {};
+
+        for (final doc
+        in progressSnapshot.docs) {
+          firestoreProgress[
+          doc.id] =
+              doc.data();
+        }
+
+        for (final lesson
+        in loadedLessons) {
+          final data =
+              firestoreProgress[
+              lesson.id] ??
+                  {};
+
           final completed =
-          await progressService.isLessonCompleted(
-            userId: user.uid,
-            courseId: widget.course.id,
-            lessonId: lesson.id,
-          );
+              data["completed"] ==
+                  true;
+
           final quizSubmitted =
-          await progressService.isQuizSubmitted(
-            userId: user.uid,
-            courseId: widget.course.id,
-            lessonId: lesson.id,
-          );
+              data["quizSubmitted"] ==
+                  true;
+
           final videoCompleted =
-          await progressService.isVideoCompleted(
-            userId: user.uid,
-            courseId: widget.course.id,
-            lessonId: lesson.id,
-          );
-          if (completed) {
-            completedCount++;
+              data["videoCompleted"] ==
+                  true;
+
+          double lessonProgressValue =
+          0;
+
+          if (lesson.quizEnabled) {
+            if (videoCompleted) {
+              lessonProgressValue +=
+              0.5;
+            }
+
+            if (quizSubmitted) {
+              lessonProgressValue +=
+              0.5;
+            }
+          } else {
+            if (completed ||
+                videoCompleted) {
+              lessonProgressValue =
+              1.0;
+            }
           }
+
+          totalLessonProgress +=
+              lessonProgressValue;
+
           progressMap[lesson.id] = {
-            "completed": completed,
-            "quizSubmitted": quizSubmitted,
-            "videoCompleted": videoCompleted,
+            "completed":
+            completed,
+            "quizSubmitted":
+            quizSubmitted,
+            "videoCompleted":
+            videoCompleted,
           };
         }
+
+        final courseProgressDoc =
+        await FirebaseFirestore
+            .instance
+            .collection("users")
+            .doc(user.uid)
+            .collection(
+            "training_progress")
+            .doc(widget.course.id)
+            .get();
+
+        if (courseProgressDoc.exists) {
+          final data =
+          courseProgressDoc.data();
+
+          celebrationShown =
+              data?[
+              "completionCelebrationShown"] ==
+                  true;
+        }
       }
+
+      final double newProgress =
+      loadedLessons.isEmpty
+          ? 0
+          : totalLessonProgress /
+          loadedLessons.length;
+
       if (!mounted) return;
+
       setState(() {
-        lessons = loadedLessons;
-        lessonProgress = progressMap;
+        lessons =
+            loadedLessons;
+
+        lessonProgress =
+            progressMap;
+
         totalDuration =
-            calculatedTotalDuration;
-        progress = loadedLessons.isEmpty
-            ? 0
-            : completedCount /
-            loadedLessons.length;
-        loadingProgress = false;
+            calculatedDuration;
+
+        progress =
+            newProgress;
+
+        loadingProgress =
+        false;
+
+        _completionCelebrationShown =
+            celebrationShown;
       });
+
+      _checkCompletionTransition();
     } catch (e) {
       debugPrint(
-        "COURSE DETAILS LOAD ERROR: $e",
+        "COURSE DETAILS ERROR: $e",
       );
+
       if (!mounted) return;
+
       setState(() {
-        loadingProgress = false;
+        loadingProgress =
+        false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+
+      ScaffoldMessenger.of(
+          context)
+          .showSnackBar(
         SnackBar(
           content: Text(
             "Failed to load course data: $e",
           ),
-          backgroundColor: Colors.red,
+          backgroundColor:
+          Colors.red,
         ),
       );
     }
   }
+
+  // ============================================================
+  // COURSE COMPLETION
+  // ============================================================
+
+  bool get _courseCompleted {
+    if (lessons.isEmpty) {
+      return false;
+    }
+
+    for (final lesson
+    in lessons) {
+      final status =
+      lessonProgress[
+      lesson.id];
+
+      if (status == null ||
+          status["completed"] !=
+              true) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // ============================================================
+  // CHECK COMPLETION TRANSITION
+  // ============================================================
+
+  void _checkCompletionTransition() {
+    if (!mounted) return;
+
+    final currentCompleted =
+        _courseCompleted;
+
+    if (!_completionStateInitialized) {
+      _completionStateInitialized =
+      true;
+
+      _previousCourseCompleted =
+          currentCompleted;
+
+      return;
+    }
+
+    final justCompleted =
+        !_previousCourseCompleted &&
+            currentCompleted;
+
+    _previousCourseCompleted =
+        currentCompleted;
+
+    if (!justCompleted) {
+      return;
+    }
+
+    if (_completionCelebrationShown) {
+      return;
+    }
+
+    WidgetsBinding.instance
+        .addPostFrameCallback(
+          (_) async {
+        if (!mounted) return;
+
+        await _markCelebrationShown();
+
+        if (!mounted) return;
+
+        await _showCompletionPopup(
+          firstCompletion: true,
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // MARK CELEBRATION AS SHOWN
+  // ============================================================
+
+  Future<void>
+  _markCelebrationShown() async {
+    final user =
+        FirebaseAuth.instance
+            .currentUser;
+
+    if (user == null) {
+      return;
+    }
+
+    try {
+      await FirebaseFirestore
+          .instance
+          .collection("users")
+          .doc(user.uid)
+          .collection(
+          "training_progress")
+          .doc(widget.course.id)
+          .set(
+        {
+          "completionCelebrationShown":
+          true,
+          "completed":
+          true,
+          "completedAt":
+          FieldValue
+              .serverTimestamp(),
+        },
+        SetOptions(
+          merge: true,
+        ),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _completionCelebrationShown =
+        true;
+      });
+    } catch (e) {
+      debugPrint(
+        "CELEBRATION FLAG ERROR: $e",
+      );
+    }
+  }
+
+  // ============================================================
+  // SHOW COMPLETION POPUP
+  // ============================================================
+
+  Future<void> _showCompletionPopup({
+    required bool firstCompletion,
+  }) async {
+    if (openingCertificate) {
+      return;
+    }
+
+    if (firstCompletion) {
+      _celebrationController
+          .reset();
+
+      await _celebrationController
+          .forward();
+
+      if (!mounted) return;
+    }
+
+    setState(() {
+      openingCertificate =
+      true;
+    });
+
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible:
+        false,
+        builder:
+            (dialogContext) {
+          return _CertificateDialog(
+            course:
+            widget.course,
+            certificateService:
+            certificateService,
+            firstCompletion:
+            firstCompletion,
+            scaleAnimation:
+            _scaleAnimation,
+            fadeAnimation:
+            _fadeAnimation,
+          );
+        },
+      );
+    } finally {
+      if (!mounted) return;
+
+      setState(() {
+        openingCertificate =
+        false;
+      });
+    }
+  }
+
   // ============================================================
   // OPEN LESSON
   // ============================================================
+
   Future<void> _openLesson(
       LessonModel lesson,
       ) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => LessonScreen(
-          lesson: lesson,
-        ),
+        builder: (_) =>
+            LessonScreen(
+              lesson: lesson,
+            ),
       ),
     );
-    // Reload progress and lesson data after
-    // returning from the lesson screen.
+
     await _loadData();
   }
+
   // ============================================================
   // BUILD
   // ============================================================
+
   @override
   Widget build(
-      BuildContext context,
-      ) {
+      BuildContext context) {
     return Scaffold(
       backgroundColor:
       const Color(0xffF5F8FC),
-      // ========================================================
-      // APP BAR
-      // ========================================================
       appBar: AppBar(
-        title: Text(
-          widget.course.title,
-        ),
-        elevation: 0,
+        title:
+        Text(widget.course.title),
       ),
-      // ========================================================
-      // BODY
-      // ========================================================
-      body: loadingProgress
+      body:
+      loadingProgress
           ? const Center(
         child:
         CircularProgressIndicator(),
       )
           : SingleChildScrollView(
         padding:
-        const EdgeInsets.all(24),
-        child: Column(
+        const EdgeInsets.all(
+          24,
+        ),
+        child:
+        Column(
           crossAxisAlignment:
           CrossAxisAlignment.start,
           children: [
-            // ==================================================
-            // COURSE TITLE
-            // ==================================================
             Text(
               widget.course.title,
               style:
@@ -213,26 +1144,25 @@ class _CourseDetailsState
                 FontWeight.bold,
               ),
             ),
+
             const SizedBox(
               height: 12,
             ),
-            // ==================================================
-            // COURSE DESCRIPTION
-            // ==================================================
+
             Text(
               widget.course.description,
               style:
               const TextStyle(
                 fontSize: 16,
-                color: Colors.grey,
+                color:
+                Colors.grey,
               ),
             ),
+
             const SizedBox(
-              height: 25,
+              height: 28,
             ),
-            // ==================================================
-            // COURSE PROGRESS
-            // ==================================================
+
             const Text(
               "Course Progress",
               style:
@@ -242,23 +1172,30 @@ class _CourseDetailsState
                 FontWeight.bold,
               ),
             ),
+
             const SizedBox(
               height: 12,
             ),
+
             ProgressBar(
-              value: progress,
+              value:
+              progress,
             ),
+
             const SizedBox(
               height: 30,
             ),
-            // ==================================================
-            // COURSE INFORMATION
-            // ==================================================
+
+            if (_courseCompleted)
+              _buildCertificateCard(),
+
+            if (_courseCompleted)
+              const SizedBox(
+                height: 30,
+              ),
+
             Row(
               children: [
-                // =============================================
-                // LESSONS COUNT
-                // =============================================
                 _InfoCard(
                   icon:
                   Icons.menu_book,
@@ -271,22 +1208,6 @@ class _CourseDetailsState
                 const SizedBox(
                   width: 12,
                 ),
-                // =============================================
-                // COURSE DURATION
-                // =============================================
-                //
-                // IMPORTANT:
-                //
-                // This is calculated from the actual lessons:
-                //
-                // lesson.duration + lesson.duration + ...
-                //
-                // The value is stored/displayed as HH:MM style
-                // through _formatDuration().
-                //
-                // widget.course.duration is intentionally NOT
-                // used here.
-                // =============================================
                 _InfoCard(
                   icon:
                   Icons.timer,
@@ -299,12 +1220,11 @@ class _CourseDetailsState
                 ),
               ],
             ),
+
             const SizedBox(
               height: 35,
             ),
-            // ==================================================
-            // LESSONS TITLE
-            // ==================================================
+
             const Text(
               "Lessons",
               style:
@@ -314,42 +1234,47 @@ class _CourseDetailsState
                 FontWeight.bold,
               ),
             ),
+
             const SizedBox(
               height: 16,
             ),
-            // ==================================================
-            // EMPTY LESSONS
-            // ==================================================
+
             if (lessons.isEmpty)
-              const Center(
-                child: Padding(
-                  padding:
-                  EdgeInsets.all(30),
-                  child: Text(
+              const Padding(
+                padding:
+                EdgeInsets.all(
+                  30,
+                ),
+                child:
+                Center(
+                  child:
+                  Text(
                     "No lessons available",
                   ),
                 ),
               )
-            // ==================================================
-            // LESSON LIST
-            // ==================================================
             else
               ListView.builder(
-                shrinkWrap: true,
+                shrinkWrap:
+                true,
                 physics:
                 const NeverScrollableScrollPhysics(),
                 itemCount:
                 lessons.length,
                 itemBuilder:
-                    (context, index) {
+                    (context,
+                    index) {
                   final lesson =
                   lessons[index];
+
                   final status =
                       lessonProgress[
                       lesson.id] ??
                           {};
+
                   return LessonTile(
-                    lesson: lesson,
+                    lesson:
+                    lesson,
                     completed:
                     status[
                     "completed"] ??
@@ -362,7 +1287,8 @@ class _CourseDetailsState
                     status[
                     "videoCompleted"] ??
                         false,
-                    onPressed: () {
+                    onPressed:
+                        () {
                       _openLesson(
                         lesson,
                       );
@@ -375,66 +1301,857 @@ class _CourseDetailsState
       ),
     );
   }
+
+  // ============================================================
+  // CERTIFICATE CARD
+  // ============================================================
+
+  Widget _buildCertificateCard() {
+    return Container(
+      width:
+      double.infinity,
+      padding:
+      const EdgeInsets.all(
+        22,
+      ),
+      decoration:
+      BoxDecoration(
+        color:
+        Colors.white,
+        borderRadius:
+        BorderRadius.circular(
+          16,
+        ),
+        border:
+        Border.all(
+          color:
+          const Color(
+            0xffD7E7F5,
+          ),
+        ),
+      ),
+      child:
+      Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(
+                Icons.workspace_premium,
+                color:
+                Color(0xff003366),
+                size: 30,
+              ),
+              SizedBox(
+                width: 12,
+              ),
+              Expanded(
+                child:
+                Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Course Completed!",
+                      style:
+                      TextStyle(
+                        fontSize: 20,
+                        fontWeight:
+                        FontWeight.bold,
+                        color:
+                        Color(
+                          0xff003366,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 4,
+                    ),
+                    Text(
+                      "Certificate available",
+                      style:
+                      TextStyle(
+                        color:
+                        Colors.green,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(
+            height: 12,
+          ),
+
+          const Text(
+            "Congratulations! You have successfully "
+                "completed all lessons in this course.",
+          ),
+
+          const SizedBox(
+            height: 18,
+          ),
+
+          SizedBox(
+            width:
+            double.infinity,
+            height: 48,
+            child:
+            ElevatedButton.icon(
+              onPressed:
+              openingCertificate
+                  ? null
+                  : () {
+                _showCompletionPopup(
+                  firstCompletion:
+                  false,
+                );
+              },
+              icon:
+              openingCertificate
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child:
+                CircularProgressIndicator(
+                  strokeWidth:
+                  2,
+                  color:
+                  Colors.white,
+                ),
+              )
+                  : const Icon(
+                Icons.workspace_premium,
+              ),
+              label:
+              Text(
+                openingCertificate
+                    ? "Opening Certificate..."
+                    : "View Certificate",
+              ),
+              style:
+              ElevatedButton.styleFrom(
+                backgroundColor:
+                const Color(
+                  0xff003366,
+                ),
+                foregroundColor:
+                Colors.white,
+                disabledBackgroundColor:
+                Colors.grey.shade400,
+                disabledForegroundColor:
+                Colors.white,
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(
+                    12,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+// ============================================================
+// CERTIFICATE DIALOG
+// ============================================================
+
+class _CertificateDialog
+    extends StatefulWidget {
+  final CourseModel course;
+
+  final CertificateService
+  certificateService;
+
+  final bool firstCompletion;
+
+  final Animation<double>
+  scaleAnimation;
+
+  final Animation<double>
+  fadeAnimation;
+
+  const _CertificateDialog({
+    required this.course,
+    required this.certificateService,
+    required this.firstCompletion,
+    required this.scaleAnimation,
+    required this.fadeAnimation,
+  });
+
+  @override
+  State<_CertificateDialog>
+  createState() =>
+      _CertificateDialogState();
+}
+
+class _CertificateDialogState
+    extends State<_CertificateDialog> {
+  String? certificateUrl;
+
+  String? certificateViewType;
+
+  bool generating = true;
+
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _generateCertificate();
+  }
+
+  // ============================================================
+  // GENERATE CERTIFICATE
+  // ============================================================
+
+  Future<void>
+  _generateCertificate() async {
+    try {
+      final url =
+      await widget
+          .certificateService
+          .generateCertificate(
+        courseId:
+        widget.course.id,
+      );
+
+      if (!mounted) return;
+
+      final viewType =
+          'certificate-pdf-${DateTime.now().microsecondsSinceEpoch}';
+
+      final iframe =
+      html.IFrameElement()
+        ..src = url
+        ..style.border = '0'
+        ..style.outline = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.backgroundColor =
+            'white'
+        ..allowFullscreen = true;
+
+      ui_web.platformViewRegistry
+          .registerViewFactory(
+        viewType,
+            (int viewId) => iframe,
+      );
+
+      setState(() {
+        certificateUrl =
+            url;
+
+        certificateViewType =
+            viewType;
+
+        generating = false;
+      });
+    } catch (e) {
+      debugPrint(
+        "CERTIFICATE POPUP ERROR: $e",
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        generating = false;
+
+        error =
+            e.toString();
+      });
+    }
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(
+      BuildContext context) {
+    return Dialog(
+      backgroundColor:
+      Colors.white,
+      surfaceTintColor:
+      Colors.white,
+      elevation: 12,
+      insetPadding:
+      const EdgeInsets.symmetric(
+        horizontal: 18,
+        vertical: 18,
+      ),
+      shape:
+      RoundedRectangleBorder(
+        borderRadius:
+        BorderRadius.circular(
+          24,
+        ),
+      ),
+      child:
+      SizedBox(
+        width:
+        MediaQuery.of(context)
+            .size
+            .width
+            .clamp(
+          320.0,
+          1000.0,
+        ),
+        height:
+        MediaQuery.of(context)
+            .size
+            .height
+            .clamp(
+          500.0,
+          900.0,
+        ) *
+            0.88,
+        child:
+        Column(
+          children: [
+            // ==================================================
+            // HEADER
+            // ==================================================
+
+            Padding(
+              padding:
+              const EdgeInsets.fromLTRB(
+                24,
+                20,
+                16,
+                14,
+              ),
+              child:
+              Row(
+                children: [
+                  widget.firstCompletion
+                      ? FadeTransition(
+                    opacity:
+                    widget.fadeAnimation,
+                    child:
+                    ScaleTransition(
+                      scale:
+                      widget.scaleAnimation,
+                      child:
+                      _buildHeaderIcon(),
+                    ),
+                  )
+                      : _buildHeaderIcon(),
+
+                  const SizedBox(
+                    width: 14,
+                  ),
+
+                  Expanded(
+                    child:
+                    Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.firstCompletion
+                              ? "Course Completed!"
+                              : "Course Completed",
+                          style:
+                          const TextStyle(
+                            fontSize: 23,
+                            fontWeight:
+                            FontWeight.w700,
+                            color:
+                            Color(
+                              0xff003366,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(
+                          height: 3,
+                        ),
+
+                        Text(
+                          widget.course.title,
+                          maxLines: 1,
+                          overflow:
+                          TextOverflow.ellipsis,
+                          style:
+                          const TextStyle(
+                            fontSize: 14,
+                            color:
+                            Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  IconButton(
+                    tooltip:
+                    "Close",
+                    onPressed:
+                    generating
+                        ? null
+                        : () {
+                      Navigator.of(
+                        context,
+                      ).pop();
+                    },
+                    icon:
+                    const Icon(
+                      Icons.close,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(
+              height: 1,
+            ),
+
+            // ==================================================
+            // CONTENT
+            // ==================================================
+
+            Expanded(
+              child:
+              Padding(
+                padding:
+                const EdgeInsets.fromLTRB(
+                  24,
+                  18,
+                  24,
+                  0,
+                ),
+                child:
+                Column(
+                  children: [
+                    // ------------------------------------------
+                    // FIRST COMPLETION MESSAGE
+                    // ------------------------------------------
+
+                    if (widget
+                        .firstCompletion)
+                      Padding(
+                        padding:
+                        const EdgeInsets.only(
+                          bottom: 16,
+                        ),
+                        child:
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.celebration,
+                              size: 20,
+                              color:
+                              Color(
+                                0xff003366,
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 8,
+                            ),
+                            Expanded(
+                              child:
+                              Text(
+                                generating
+                                    ? "Your certificate is being prepared..."
+                                    : "Congratulations! Your certificate is ready.",
+                                style:
+                                const TextStyle(
+                                  fontSize: 14,
+                                  color:
+                                  Colors.grey,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // ------------------------------------------
+                    // CERTIFICATE AREA
+                    // ------------------------------------------
+
+                    Expanded(
+                      child:
+                      _buildCertificateArea(),
+                    ),
+
+                    const SizedBox(
+                      height: 12,
+                    ),
+
+                    // ------------------------------------------
+                    // FOOTER
+                    // ------------------------------------------
+
+                    Padding(
+                      padding:
+                      const EdgeInsets.only(
+                        bottom: 14,
+                      ),
+                      child:
+                      SizedBox(
+                        width:
+                        double.infinity,
+                        height: 46,
+                        child:
+                        OutlinedButton(
+                          onPressed:
+                          generating
+                              ? null
+                              : () {
+                            Navigator.of(
+                              context,
+                            ).pop();
+                          },
+                          style:
+                          OutlinedButton.styleFrom(
+                            foregroundColor:
+                            const Color(
+                              0xff003366,
+                            ),
+                            side:
+                            const BorderSide(
+                              color:
+                              Color(
+                                0xffD7E7F5,
+                              ),
+                            ),
+                            shape:
+                            RoundedRectangleBorder(
+                              borderRadius:
+                              BorderRadius.circular(
+                                12,
+                              ),
+                            ),
+                          ),
+                          child:
+                          const Text(
+                            "Close",
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // HEADER ICON
+  // ============================================================
+
+  Widget _buildHeaderIcon() {
+    return Container(
+      width: 54,
+      height: 54,
+      decoration:
+      const BoxDecoration(
+        color:
+        Color(0xffEAF4FF),
+        shape:
+        BoxShape.circle,
+      ),
+      child:
+      const Icon(
+        Icons.workspace_premium,
+        size: 32,
+        color:
+        Color(0xff003366),
+      ),
+    );
+  }
+
+  // ============================================================
+  // CERTIFICATE AREA
+  // ============================================================
+
+  Widget _buildCertificateArea() {
+    // ----------------------------------------------------------
+    // GENERATING
+    // ----------------------------------------------------------
+
+    if (generating) {
+      return Container(
+        width:
+        double.infinity,
+        decoration:
+        BoxDecoration(
+          color:
+          const Color(
+            0xffF8FBFE,
+          ),
+          borderRadius:
+          BorderRadius.circular(
+            16,
+          ),
+          border:
+          Border.all(
+            color:
+            const Color(
+              0xffE2EDF6,
+            ),
+          ),
+        ),
+        child:
+        Center(
+          child:
+          Column(
+            mainAxisSize:
+            MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration:
+                const BoxDecoration(
+                  color:
+                  Color(
+                    0xffEAF4FF,
+                  ),
+                  shape:
+                  BoxShape.circle,
+                ),
+                child:
+                const Padding(
+                  padding:
+                  EdgeInsets.all(
+                    22,
+                  ),
+                  child:
+                  CircularProgressIndicator(
+                    strokeWidth:
+                    3,
+                    color:
+                    Color(
+                      0xff003366,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(
+                height: 20,
+              ),
+
+              const Text(
+                "Preparing your certificate",
+                style:
+                TextStyle(
+                  fontSize: 18,
+                  fontWeight:
+                  FontWeight.w600,
+                  color:
+                  Color(
+                    0xff003366,
+                  ),
+                ),
+              ),
+
+              const SizedBox(
+                height: 8,
+              ),
+
+              const Text(
+                "Please wait a moment...",
+                style:
+                TextStyle(
+                  fontSize: 14,
+                  color:
+                  Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ----------------------------------------------------------
+    // ERROR
+    // ----------------------------------------------------------
+
+    if (error != null) {
+      return Container(
+        width:
+        double.infinity,
+        decoration:
+        BoxDecoration(
+          color:
+          const Color(
+            0xfffff7f7,
+          ),
+          borderRadius:
+          BorderRadius.circular(
+            16,
+          ),
+          border:
+          Border.all(
+            color:
+            const Color(
+              0xffffdddd,
+            ),
+          ),
+        ),
+        child:
+        Center(
+          child:
+          Column(
+            mainAxisSize:
+            MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color:
+                Colors.red,
+              ),
+
+              const SizedBox(
+                height: 12,
+              ),
+
+              const Text(
+                "Unable to load certificate",
+                style:
+                TextStyle(
+                  fontSize: 17,
+                  fontWeight:
+                  FontWeight.w600,
+                ),
+              ),
+
+              const SizedBox(
+                height: 6,
+              ),
+
+              const Text(
+                "Please close this window and try again.",
+                style:
+                TextStyle(
+                  color:
+                  Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ----------------------------------------------------------
+    // PDF
+    // ----------------------------------------------------------
+
+    if (certificateUrl != null &&
+        certificateViewType != null) {
+      return ClipRRect(
+        borderRadius:
+        BorderRadius.circular(
+          16,
+        ),
+        child:
+        Container(
+          width:
+          double.infinity,
+          color:
+          Colors.white,
+          child:
+          HtmlElementView(
+            viewType:
+            certificateViewType!,
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox();
+  }
+}
+
 // ============================================================
 // INFO CARD
 // ============================================================
+
 class _InfoCard
     extends StatelessWidget {
   final IconData icon;
+
   final String title;
+
   final String value;
+
   const _InfoCard({
     required this.icon,
     required this.title,
     required this.value,
   });
+
   @override
   Widget build(
-      BuildContext context,
-      ) {
+      BuildContext context) {
     return Expanded(
-      child: Container(
+      child:
+      Container(
         padding:
-        const EdgeInsets.all(16),
+        const EdgeInsets.all(
+          16,
+        ),
         decoration:
         BoxDecoration(
-          color: Colors.white,
+          color:
+          Colors.white,
           borderRadius:
-          BorderRadius.circular(16),
+          BorderRadius.circular(
+            16,
+          ),
         ),
-        child: Column(
+        child:
+        Column(
           children: [
-            // ======================================================
-            // ICON
-            // ======================================================
             Icon(icon),
+
             const SizedBox(
               height: 8,
             ),
-            // ======================================================
-            // TITLE
-            // ======================================================
+
             Text(
               title,
               style:
               const TextStyle(
-                color: Colors.grey,
+                color:
+                Colors.grey,
               ),
             ),
+
             const SizedBox(
-              height: 5,
+              height: 6,
             ),
-            // ======================================================
-            // VALUE
-            // ======================================================
+
             Text(
               value,
               style:
               const TextStyle(
+                fontSize: 18,
                 fontWeight:
                 FontWeight.bold,
-                fontSize: 18,
               ),
             ),
           ],

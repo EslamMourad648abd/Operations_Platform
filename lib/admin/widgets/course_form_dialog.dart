@@ -40,8 +40,6 @@ class _CourseFormDialogState
 
   late TextEditingController descriptionController;
 
-  late TextEditingController durationController;
-
   late TextEditingController folderIdController;
 
   late TextEditingController folderUrlController;
@@ -68,15 +66,6 @@ class _CourseFormDialogState
           widget.initialData?["description"] ?? "",
         );
 
-
-    durationController =
-        TextEditingController(
-          text:
-          widget.initialData?["duration"]
-              ?.toString()
-              ??
-              "",
-        );
 
 
     folderIdController =
@@ -167,21 +156,6 @@ class _CourseFormDialogState
 
 
 
-            TextField(
-
-              controller:
-              durationController,
-
-              keyboardType:
-              TextInputType.number,
-
-              decoration:
-              const InputDecoration(
-                labelText:"Duration (minutes)",
-              ),
-
-            ),
-
 
 
             TextField(
@@ -254,13 +228,6 @@ class _CourseFormDialogState
               descriptionController.text.trim(),
 
 
-
-              "duration":
-              int.tryParse(
-                durationController.text,
-              )
-                  ??
-                  0,
 
 
 

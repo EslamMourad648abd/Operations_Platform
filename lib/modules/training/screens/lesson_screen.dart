@@ -1,6 +1,7 @@
 import 'package:bbc_api_tool/modules/training/screens/quiz_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';import '../services/training_progress_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/training_progress_service.dart';
 
 
 import 'quiz_review_screen.dart';

@@ -11,14 +11,21 @@ class PlatformDashboard extends StatelessWidget {
     try {
       await FirebaseAuth.instance.signOut();
 
-      Navigator.of(context).pushReplacementNamed('/');
+      if (context.mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login',
+              (route) => false,
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Logout failed: $e"),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to logout: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
   @override
