@@ -1,11 +1,11 @@
 {
-    "name": "bbc_api_tool",
-    "short_name": "bbc_api_tool",
+    "name": "BBC Operations Platform",
+    "short_name": "BBC Operations",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "An application that hosts our most used API calls",
+    "description": "BBC Operations Platform",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

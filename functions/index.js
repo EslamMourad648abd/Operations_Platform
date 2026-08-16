@@ -963,10 +963,83 @@ export const migrateUserRolesToFirestore =
         // =================================================
         const existingCertificate =
           await certificateRef.get();
+
         const existingData =
           existingCertificate.exists
             ? existingCertificate.data() || {}
             : {};
+
+        // =================================================
+        // RETURN EXISTING CERTIFICATE
+        // =================================================
+        //
+        // A certificate is generated only once per
+        // trainee + course.
+        //
+        // If a valid certificate already exists,
+        // return it immediately.
+        //
+        // This prevents:
+        // - generating another PDF
+        // - deleting the existing PDF
+        // - uploading another PDF
+        // - updating the Firestore certificate record
+        //
+        // =================================================
+
+        if (
+          existingCertificate.exists &&
+          existingData.certificateUrl &&
+          existingData.storagePath
+        ) {
+          console.log(
+            "Existing certificate found."
+          );
+
+          console.log(
+            "Returning existing certificate without regeneration."
+          );
+
+          return {
+            success: true,
+            existing: true,
+            regenerated: false,
+            certificate: {
+              id: certificateId,
+              userId:
+                existingData.userId || userId,
+              traineeName:
+                existingData.traineeName || userName,
+              courseId:
+                existingData.courseId || courseId,
+              courseTitle:
+                existingData.courseTitle || courseTitle,
+              certificateNumber:
+                existingData.certificateNumber,
+              certificateUrl:
+                existingData.certificateUrl,
+              issuedAt:
+                existingData.issuedAt || null,
+              storagePath:
+                existingData.storagePath,
+              totalLessons:
+                existingData.totalLessons ??
+                totalLessons,
+              completedLessons:
+                existingData.completedLessons ??
+                completedLessons,
+              averageQuizScore:
+                existingData.averageQuizScore ??
+                averageQuizScore,
+              submittedQuizCount:
+                existingData.submittedQuizCount ??
+                submittedQuizCount,
+              totalQuizScore:
+                existingData.totalQuizScore ??
+                totalQuizScore,
+            },
+          };
+        }
         // =================================================
         // PRESERVE CERTIFICATE NUMBER
         // =================================================

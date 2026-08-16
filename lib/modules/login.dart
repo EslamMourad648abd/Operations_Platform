@@ -139,7 +139,7 @@ class _LoginPageState extends State<LoginPage> {
                         Image.asset('assets/logo.png', height: 150, fit: BoxFit.contain),
                         const SizedBox(height: 5),
                         const Text(
-                          'Sign in to BBC API Tool',
+                          'Sign in to BBC Operations Platform',
                           style: TextStyle(fontSize: 20,fontWeight: FontWeight.bold, color: Color(0xFF1F5B8A)),
                         ),
                       ],
