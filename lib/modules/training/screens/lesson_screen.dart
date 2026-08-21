@@ -16,28 +16,20 @@ class LessonScreen extends StatefulWidget {
   });
 
   @override
-  State<LessonScreen> createState() =>
-      _LessonScreenState();
+  State<LessonScreen> createState() => _LessonScreenState();
 }
 
-class _LessonScreenState
-    extends State<LessonScreen> {
-  final TrainingProgressService
-  progressService =
+class _LessonScreenState extends State<LessonScreen> {
+  final TrainingProgressService progressService =
   TrainingProgressService();
 
   bool lessonCompleted = false;
-
   bool loadingProgress = true;
-
   bool quizSubmitted = false;
-
   bool videoCompleted = false;
-
   bool processingAction = false;
 
-  bool get quizEnabled =>
-      widget.lesson.quizEnabled;
+  bool get quizEnabled => widget.lesson.quizEnabled;
 
   @override
   void initState() {
@@ -51,8 +43,7 @@ class _LessonScreenState
   // ============================================================
 
   Future<void> _loadProgress() async {
-    final user =
-        FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       if (!mounted) return;
@@ -65,52 +56,34 @@ class _LessonScreenState
     }
 
     try {
-      final completed =
-      await progressService
-          .isLessonCompleted(
+      final completed = await progressService.isLessonCompleted(
         userId: user.uid,
-        courseId:
-        widget.lesson.courseId,
-        lessonId:
-        widget.lesson.id,
+        courseId: widget.lesson.courseId,
+        lessonId: widget.lesson.id,
       );
 
-      final submitted =
-      await progressService
-          .isQuizSubmitted(
+      final submitted = await progressService.isQuizSubmitted(
         userId: user.uid,
-        courseId:
-        widget.lesson.courseId,
-        lessonId:
-        widget.lesson.id,
+        courseId: widget.lesson.courseId,
+        lessonId: widget.lesson.id,
       );
 
-      final video =
-      await progressService
-          .isVideoCompleted(
+      final video = await progressService.isVideoCompleted(
         userId: user.uid,
-        courseId:
-        widget.lesson.courseId,
-        lessonId:
-        widget.lesson.id,
+        courseId: widget.lesson.courseId,
+        lessonId: widget.lesson.id,
       );
 
-      final effectiveCompleted =
-      quizEnabled
+      final effectiveCompleted = quizEnabled
           ? completed
           : (completed || video);
 
-      if (!quizEnabled &&
-          video &&
-          !completed) {
+      if (!quizEnabled && video && !completed) {
         try {
-          await progressService
-              .completeLesson(
+          await progressService.completeLesson(
             userId: user.uid,
-            courseId:
-            widget.lesson.courseId,
-            lessonId:
-            widget.lesson.id,
+            courseId: widget.lesson.courseId,
+            lessonId: widget.lesson.id,
           );
         } catch (e) {
           debugPrint(
@@ -123,10 +96,8 @@ class _LessonScreenState
 
       setState(() {
         videoCompleted = video;
-        lessonCompleted =
-            effectiveCompleted;
-        quizSubmitted =
-            quizEnabled && submitted;
+        lessonCompleted = effectiveCompleted;
+        quizSubmitted = quizEnabled && submitted;
         loadingProgress = false;
       });
     } catch (e) {
@@ -140,30 +111,27 @@ class _LessonScreenState
         loadingProgress = false;
       });
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             "Failed to load lesson progress: $e",
           ),
-          backgroundColor:
-          Colors.red,
+          backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-// ============================================================
-// COMPLETE LESSON / VIDEO
-// ============================================================
+  // ============================================================
+  // COMPLETE LESSON / VIDEO
+  // ============================================================
 
   Future<void> _completeLesson() async {
     if (processingAction) {
       return;
     }
 
-    final user =
-        FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       return;
@@ -225,11 +193,10 @@ class _LessonScreenState
           processingAction = false;
         });
 
-         context.go(quizPath);
+        context.go(quizPath);
 
         if (!mounted) return;
 
-        // Reload the lesson state after returning
         await _loadProgress();
 
         return;
@@ -282,9 +249,9 @@ class _LessonScreenState
     }
   }
 
-// ============================================================
-// REVIEW QUIZ
-// ============================================================
+  // ============================================================
+  // REVIEW QUIZ
+  // ============================================================
 
   Future<void> _reviewQuiz() async {
     if (!quizEnabled || !quizSubmitted) {
@@ -320,9 +287,9 @@ class _LessonScreenState
     await _loadProgress();
   }
 
-// ============================================================
-// BACK
-// ============================================================
+  // ============================================================
+  // BACK
+  // ============================================================
 
   void _goBack() {
     debugPrint('================================');
@@ -350,11 +317,8 @@ class _LessonScreenState
   // ============================================================
 
   @override
-  Widget build(
-      BuildContext context,
-      ) {
-    final lesson =
-        widget.lesson;
+  Widget build(BuildContext context) {
+    final lesson = widget.lesson;
 
     double lessonProgress = 0;
 
@@ -369,17 +333,14 @@ class _LessonScreenState
         progressText = "Completed";
       } else {
         lessonProgress = 0;
-        progressText =
-        "Not completed yet";
+        progressText = "Not completed yet";
       }
     } else if (videoCompleted) {
       lessonProgress = 0.5;
-      progressText =
-      "Video completed - Quiz pending";
+      progressText = "Video completed - Quiz pending";
     } else {
       lessonProgress = 0;
-      progressText =
-      "Not completed yet";
+      progressText = "Not completed yet";
     }
 
     String buttonText;
@@ -387,18 +348,13 @@ class _LessonScreenState
     VoidCallback? buttonAction;
 
     if (lessonCompleted) {
-      if (quizEnabled &&
-          quizSubmitted) {
+      if (quizEnabled && quizSubmitted) {
         buttonText = "Review Quiz";
-        buttonIcon =
-            Icons.visibility;
-        buttonAction =
-            _reviewQuiz;
+        buttonIcon = Icons.visibility;
+        buttonAction = _reviewQuiz;
       } else {
-        buttonText =
-        "Lesson Completed";
-        buttonIcon =
-            Icons.check_circle;
+        buttonText = "Lesson Completed";
+        buttonIcon = Icons.check_circle;
         buttonAction = null;
       }
     } else if (!videoCompleted) {
@@ -406,105 +362,73 @@ class _LessonScreenState
           ? "Complete Video & Take Quiz"
           : "Complete Video";
 
-      buttonIcon =
-          Icons.play_arrow;
-
-      buttonAction =
-          _completeLesson;
+      buttonIcon = Icons.play_arrow;
+      buttonAction = _completeLesson;
     } else if (quizEnabled) {
       buttonText = "Take Quiz";
       buttonIcon = Icons.quiz;
-      buttonAction =
-          _completeLesson;
+      buttonAction = _completeLesson;
     } else {
       buttonText = "Complete Lesson";
       buttonIcon = Icons.check;
-      buttonAction =
-          _completeLesson;
+      buttonAction = _completeLesson;
     }
 
     return Scaffold(
-      backgroundColor:
-      const Color(0xffF5F8FC),
-
+      backgroundColor: const Color(0xffF5F8FC),
       appBar: AppBar(
-        backgroundColor:
-        const Color(0xff003366),
-        foregroundColor:
-        Colors.white,
+        backgroundColor: const Color(0xff003366),
+        foregroundColor: Colors.white,
         elevation: 0,
-
         leading: IconButton(
           onPressed: _goBack,
-          icon:
-          const Icon(
+          icon: const Icon(
             Icons.arrow_back,
           ),
         ),
-
         title: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               "Training Portal",
-              style:
-              TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color:
-                Colors.white70,
+                color: Colors.white70,
               ),
             ),
             Text(
               lesson.title,
-              style:
-              const TextStyle(
-                fontWeight:
-                FontWeight.bold,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
             ),
           ],
         ),
       ),
-
-      body:
-      SingleChildScrollView(
-        padding:
-        const EdgeInsets.all(30),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(30),
         child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ==================================================
-            // VIDEO / URL CONTENT
+            // VIDEO
             // ==================================================
 
             Center(
               child: ConstrainedBox(
-                constraints:
-                const BoxConstraints(
+                constraints: const BoxConstraints(
                   maxWidth: 1100,
                 ),
                 child: Container(
-                  decoration:
-                  BoxDecoration(
-                    color:
-                    Colors.white,
-                    borderRadius:
-                    BorderRadius.circular(
-                      16,
-                    ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: ClipRRect(
-                    borderRadius:
-                    BorderRadius.circular(
-                      16,
-                    ),
-                    child:
-                    GoogleDrivePlayer(
-                      videoUrl:
-                      lesson.videoUrl,
+                    borderRadius: BorderRadius.circular(16),
+                    child: GoogleDrivePlayer(
+                      videoUrl: lesson.videoUrl,
                     ),
                   ),
                 ),
@@ -516,15 +440,10 @@ class _LessonScreenState
             ),
 
             // ==================================================
-            // URL INFORMATION
+            // LESSON DESCRIPTION
             // ==================================================
 
-            if (lesson.videoUrl
-                .trim()
-                .isNotEmpty)
-              _buildUrlCard(
-                lesson.videoUrl,
-              ),
+            _buildDescriptionCard(),
 
             const SizedBox(
               height: 20,
@@ -536,18 +455,14 @@ class _LessonScreenState
 
             _buildCard(
               child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     "Lesson Completion",
-                    style:
-                    TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
-                      fontWeight:
-                      FontWeight.bold,
-                      color:
-                      Color(0xff003366),
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff003366),
                     ),
                   ),
 
@@ -560,42 +475,31 @@ class _LessonScreenState
                   else
                     SizedBox(
                       height: 46,
-                      child:
-                      ElevatedButton.icon(
-                        onPressed:
-                        processingAction
+                      child: ElevatedButton.icon(
+                        onPressed: processingAction
                             ? null
                             : buttonAction,
-                        icon:
-                        processingAction
+                        icon: processingAction
                             ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child:
-                          CircularProgressIndicator(
-                            strokeWidth:
-                            2,
-                            color:
-                            Colors.white,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
                           ),
                         )
                             : Icon(
                           buttonIcon,
                         ),
-                        label:
-                        Text(
+                        label: Text(
                           processingAction
                               ? "Updating..."
                               : buttonText,
                         ),
-                        style:
-                        ElevatedButton.styleFrom(
+                        style: ElevatedButton.styleFrom(
                           backgroundColor:
-                          const Color(
-                            0xff003366,
-                          ),
-                          foregroundColor:
-                          Colors.white,
+                          const Color(0xff003366),
+                          foregroundColor: Colors.white,
                         ),
                       ),
                     ),
@@ -613,18 +517,14 @@ class _LessonScreenState
 
             _buildCard(
               child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     "Lesson Progress",
-                    style:
-                    TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
-                      fontWeight:
-                      FontWeight.bold,
-                      color:
-                      Color(0xff003366),
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xff003366),
                     ),
                   ),
 
@@ -633,8 +533,7 @@ class _LessonScreenState
                   ),
 
                   LinearProgressIndicator(
-                    value:
-                    lessonProgress,
+                    value: lessonProgress,
                     minHeight: 8,
                   ),
 
@@ -655,35 +554,46 @@ class _LessonScreenState
   }
 
   // ============================================================
-  // URL CARD
+  // LESSON DESCRIPTION CARD
   // ============================================================
 
-  Widget _buildUrlCard(
-      String url,
-      ) {
+  Widget _buildDescriptionCard() {
     return _buildCard(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.link,
-            color:
-            Color(0xff003366),
+          const Row(
+            children: [
+              Icon(
+                Icons.description_outlined,
+                color: Color(0xff003366),
+              ),
+
+              SizedBox(
+                width: 10,
+              ),
+
+              Text(
+                "Lesson Description",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xff003366),
+                ),
+              ),
+            ],
           ),
 
           const SizedBox(
-            width: 12,
+            height: 14,
           ),
 
-          Expanded(
-            child: Text(
-              url,
-              maxLines: 2,
-              overflow:
-              TextOverflow.ellipsis,
-              style:
-              const TextStyle(
-                color: Colors.grey,
-              ),
+          Text(
+            widget.lesson.description,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.6,
+              color: Color(0xff4A5568),
             ),
           ),
         ],
@@ -700,16 +610,12 @@ class _LessonScreenState
   }) {
     return Container(
       width: double.infinity,
-      padding:
-      const EdgeInsets.all(22),
-      decoration:
-      BoxDecoration(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-        BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color:
-          const Color(0xffE4E9F0),
+          color: const Color(0xffE4E9F0),
         ),
       ),
       child: child,
