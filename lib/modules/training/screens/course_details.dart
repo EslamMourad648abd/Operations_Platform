@@ -1,607 +1,18 @@
-// import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:url_launcher/url_launcher.dart';
-// import '../models/course_model.dart';
-// import '../models/lesson_model.dart';
-// import '../repositories/firebase_training_repository.dart';
-// import '../services/certificate_service.dart';
-// import '../widgets/progress_bar.dart';
-// import '../widgets/lesson_tile.dart';
-// import 'lesson_screen.dart';
-// class CourseDetails extends StatefulWidget {
-//   final CourseModel course;
-//   const CourseDetails({
-//     super.key,
-//     required this.course,
-//   });
-//   @override
-//   State<CourseDetails> createState() => _CourseDetailsState();
-// }
-// class _CourseDetailsState extends State<CourseDetails> {
-//   final FirebaseTrainingRepository repository =
-//   FirebaseTrainingRepository();
-//   final CertificateService certificateService =
-//   CertificateService();
-//   double progress = 0;
-//   bool loadingProgress = true;
-//   bool generatingCertificate = false;
-//   List<LessonModel> lessons = [];
-//   Map<String, Map<String, bool>> lessonProgress = {};
-//   int totalDuration = 0;
-//   // ============================================================
-//   // FORMAT DURATION
-//   // ============================================================
-//   String _formatDuration(int seconds) {
-//     final minutes = seconds ~/ 60;
-//     final remainingSeconds = seconds % 60;
-//     return '${minutes.toString().padLeft(2, '0')}:'
-//         '${remainingSeconds.toString().padLeft(2, '0')}';
-//   }
-//   // ============================================================
-//   // LOAD DATA
-//   // ============================================================
-//   Future<void> _loadData() async {
-//     try {
-//       // --------------------------------------------------------
-//       // Load lessons
-//       // --------------------------------------------------------
-//       final loadedLessons =
-//       await repository.getLessons(widget.course.id);
-//       // --------------------------------------------------------
-//       // Calculate total course duration
-//       // --------------------------------------------------------
-//       int calculatedDuration = 0;
-//       for (final lesson in loadedLessons) {
-//         calculatedDuration += lesson.duration;
-//       }
-//       // --------------------------------------------------------
-//       // Load CURRENT USER
-//       // --------------------------------------------------------
-//       final user =
-//           FirebaseAuth.instance.currentUser;
-//       final Map<String, Map<String, bool>> progressMap = {};
-//       double totalLessonProgress = 0;
-//       // --------------------------------------------------------
-//       // ONE Firestore read for ALL lesson progress
-//       // --------------------------------------------------------
-//       if (user != null) {
-//         final progressSnapshot =
-//         await FirebaseFirestore.instance
-//             .collection("users")
-//             .doc(user.uid)
-//             .collection("training_progress")
-//             .doc(widget.course.id)
-//             .collection("lessons")
-//             .get();
-//         // ------------------------------------------------------
-//         // Convert Firestore documents into a local map
-//         // ------------------------------------------------------
-//         final Map<String, Map<String, dynamic>>
-//         firestoreProgress = {};
-//         for (final doc in progressSnapshot.docs) {
-//           firestoreProgress[doc.id] = doc.data();
-//         }
-//         // ------------------------------------------------------
-//         // Calculate progress locally
-//         // ------------------------------------------------------
-//         for (final lesson in loadedLessons) {
-//           final data =
-//               firestoreProgress[lesson.id] ?? {};
-//           final completed =
-//               data["completed"] == true;
-//           final quizSubmitted =
-//               data["quizSubmitted"] == true;
-//           final videoCompleted =
-//               data["videoCompleted"] == true;
-//           double lessonProgressValue = 0;
-//           // ----------------------------------------------------
-//           // Quiz lesson
-//           //
-//           // Video = 50%
-//           // Quiz  = 50%
-//           // ----------------------------------------------------
-//           if (lesson.quizEnabled) {
-//             if (videoCompleted) {
-//               lessonProgressValue += 0.5;
-//             }
-//             if (quizSubmitted) {
-//               lessonProgressValue += 0.5;
-//             }
-//           }
-//           // ----------------------------------------------------
-//           // Non-quiz lesson
-//           //
-//           // Video = 100%
-//           // ----------------------------------------------------
-//           else {
-//             if (completed || videoCompleted) {
-//               lessonProgressValue = 1.0;
-//             }
-//           }
-//           totalLessonProgress +=
-//               lessonProgressValue;
-//           progressMap[lesson.id] = {
-//             "completed": completed,
-//             "quizSubmitted": quizSubmitted,
-//             "videoCompleted": videoCompleted,
-//           };
-//         }
-//       }
-//       // --------------------------------------------------------
-//       // Update UI
-//       // --------------------------------------------------------
-//       if (!mounted) return;
-//       setState(() {
-//         lessons = loadedLessons;
-//         lessonProgress = progressMap;
-//         totalDuration =
-//             calculatedDuration;
-//         progress =
-//         loadedLessons.isEmpty
-//             ? 0
-//             : totalLessonProgress /
-//             loadedLessons.length;
-//         loadingProgress = false;
-//       });
-//     } catch (e) {
-//       debugPrint(
-//         "COURSE DETAILS ERROR: $e",
-//       );
-//       if (!mounted) return;
-//       setState(() {
-//         loadingProgress = false;
-//       });
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text(
-//             "Failed to load course data: $e",
-//           ),
-//           backgroundColor: Colors.red,
-//         ),
-//       );
-//     }
-//   }
-//   // ============================================================
-//   // COURSE COMPLETION
-//   // ============================================================
-//   bool get _courseCompleted {
-//     if (lessons.isEmpty) {
-//       return false;
-//     }
-//     for (final lesson in lessons) {
-//       final status =
-//       lessonProgress[lesson.id];
-//       if (status == null ||
-//           status["completed"] != true) {
-//         return false;
-//       }
-//     }
-//     return true;
-//   }
-//   // ============================================================
-//   // GENERATE CERTIFICATE
-//   // ============================================================
-//   Future<void> _generateCertificate() async {
-//     if (!_courseCompleted ||
-//         generatingCertificate) {
-//       return;
-//     }
-//     setState(() {
-//       generatingCertificate = true;
-//     });
-//     try {
-//       final certificateUrl =
-//       await certificateService.generateCertificate(
-//         courseId: widget.course.id,
-//       );
-//       final uri =
-//       Uri.tryParse(certificateUrl);
-//       if (uri == null) {
-//         throw Exception(
-//           "Invalid certificate URL.",
-//         );
-//       }
-//       final launched =
-//       await launchUrl(
-//         uri,
-//         mode: LaunchMode.platformDefault,
-//       );
-//       if (!launched) {
-//         throw Exception(
-//           "Could not open certificate.",
-//         );
-//       }
-//     } catch (e) {
-//       debugPrint(
-//         "CERTIFICATE ERROR: $e",
-//       );
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text(
-//             "Failed to generate certificate: $e",
-//           ),
-//           backgroundColor: Colors.red,
-//         ),
-//       );
-//     } finally {
-//       if (!mounted) return;
-//       setState(() {
-//         generatingCertificate = false;
-//       });
-//     }
-//   }
-//   // ============================================================
-//   // OPEN LESSON
-//   // ============================================================
-//   Future<void> _openLesson(
-//       LessonModel lesson,
-//       ) async {
-//     await Navigator.push(
-//       context,
-//       MaterialPageRoute(
-//         builder: (_) => LessonScreen(
-//           lesson: lesson,
-//         ),
-//       ),
-//     );
-//     await _loadData();
-//   }
-//   // ============================================================
-//   // INIT
-//   // ============================================================
-//   @override
-//   void initState() {
-//     super.initState();
-//     _loadData();
-//   }
-//   // ============================================================
-//   // BUILD
-//   // ============================================================
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor:
-//       const Color(0xffF5F8FC),
-//       appBar: AppBar(
-//         title:
-//         Text(widget.course.title),
-//       ),
-//       body: loadingProgress
-//           ? const Center(
-//         child:
-//         CircularProgressIndicator(),
-//       )
-//           : SingleChildScrollView(
-//         padding:
-//         const EdgeInsets.all(24),
-//         child: Column(
-//           crossAxisAlignment:
-//           CrossAxisAlignment.start,
-//           children: [
-//             // --------------------------------------------------
-//             // TITLE
-//             // --------------------------------------------------
-//             Text(
-//               widget.course.title,
-//               style:
-//               const TextStyle(
-//                 fontSize: 28,
-//                 fontWeight:
-//                 FontWeight.bold,
-//               ),
-//             ),
-//             const SizedBox(
-//               height: 12,
-//             ),
-//             Text(
-//               widget.course.description,
-//               style:
-//               const TextStyle(
-//                 fontSize: 16,
-//                 color: Colors.grey,
-//               ),
-//             ),
-//             const SizedBox(
-//               height: 28,
-//             ),
-//             // --------------------------------------------------
-//             // PROGRESS
-//             // --------------------------------------------------
-//             const Text(
-//               "Course Progress",
-//               style:
-//               TextStyle(
-//                 fontSize: 18,
-//                 fontWeight:
-//                 FontWeight.bold,
-//               ),
-//             ),
-//             const SizedBox(
-//               height: 12,
-//             ),
-//             ProgressBar(
-//               value: progress,
-//             ),
-//             const SizedBox(
-//               height: 30,
-//             ),
-//             // --------------------------------------------------
-//             // CERTIFICATE
-//             // --------------------------------------------------
-//             if (_courseCompleted)
-//               _buildCertificateCard(),
-//             if (_courseCompleted)
-//               const SizedBox(
-//                 height: 30,
-//               ),
-//             // --------------------------------------------------
-//             // COURSE INFO
-//             // --------------------------------------------------
-//             Row(
-//               children: [
-//                 _InfoCard(
-//                   icon:
-//                   Icons.menu_book,
-//                   title:
-//                   "Lessons",
-//                   value:
-//                   lessons.length
-//                       .toString(),
-//                 ),
-//                 const SizedBox(
-//                   width: 12,
-//                 ),
-//                 _InfoCard(
-//                   icon:
-//                   Icons.timer,
-//                   title:
-//                   "Duration",
-//                   value:
-//                   _formatDuration(
-//                     totalDuration,
-//                   ),
-//                 ),
-//               ],
-//             ),
-//             const SizedBox(
-//               height: 35,
-//             ),
-//             // --------------------------------------------------
-//             // LESSONS
-//             // --------------------------------------------------
-//             const Text(
-//               "Lessons",
-//               style:
-//               TextStyle(
-//                 fontSize: 22,
-//                 fontWeight:
-//                 FontWeight.bold,
-//               ),
-//             ),
-//             const SizedBox(
-//               height: 16,
-//             ),
-//             if (lessons.isEmpty)
-//               const Padding(
-//                 padding:
-//                 EdgeInsets.all(30),
-//                 child:
-//                 Center(
-//                   child: Text(
-//                     "No lessons available",
-//                   ),
-//                 ),
-//               )
-//             else
-//               ListView.builder(
-//                 shrinkWrap: true,
-//                 physics:
-//                 const NeverScrollableScrollPhysics(),
-//                 itemCount:
-//                 lessons.length,
-//                 itemBuilder:
-//                     (context, index) {
-//                   final lesson =
-//                   lessons[index];
-//                   final status =
-//                       lessonProgress[
-//                       lesson.id] ??
-//                           {};
-//                   return LessonTile(
-//                     lesson: lesson,
-//                     completed:
-//                     status[
-//                     "completed"] ??
-//                         false,
-//                     quizSubmitted:
-//                     status[
-//                     "quizSubmitted"] ??
-//                         false,
-//                     videoCompleted:
-//                     status[
-//                     "videoCompleted"] ??
-//                         false,
-//                     onPressed: () {
-//                       _openLesson(
-//                         lesson,
-//                       );
-//                     },
-//                   );
-//                 },
-//               ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-//   // ============================================================
-//   // CERTIFICATE CARD
-//   // ============================================================
-//   Widget _buildCertificateCard() {
-//     return Container(
-//       width: double.infinity,
-//       padding:
-//       const EdgeInsets.all(22),
-//       decoration:
-//       BoxDecoration(
-//         color: Colors.white,
-//         borderRadius:
-//         BorderRadius.circular(16),
-//         border: Border.all(
-//           color:
-//           const Color(0xffD7E7F5),
-//         ),
-//       ),
-//       child: Column(
-//         crossAxisAlignment:
-//         CrossAxisAlignment.start,
-//         children: [
-//           Row(
-//             children: const [
-//               Icon(
-//                 Icons.workspace_premium,
-//                 color:
-//                 Color(0xff003366),
-//                 size: 30,
-//               ),
-//               SizedBox(
-//                 width: 12,
-//               ),
-//               Expanded(
-//                 child: Text(
-//                   "Course Completed!",
-//                   style:
-//                   TextStyle(
-//                     fontSize: 20,
-//                     fontWeight:
-//                     FontWeight.bold,
-//                     color:
-//                     Color(0xff003366),
-//                   ),
-//                 ),
-//               ),
-//             ],
-//           ),
-//           const SizedBox(
-//             height: 10,
-//           ),
-//           const Text(
-//             "Congratulations! You have successfully "
-//                 "completed all lessons in this course.",
-//           ),
-//           const SizedBox(
-//             height: 18,
-//           ),
-//           SizedBox(
-//             width: double.infinity,
-//             child:
-//             ElevatedButton.icon(
-//               onPressed:
-//               generatingCertificate
-//                   ? null
-//                   : _generateCertificate,
-//               icon:
-//               generatingCertificate
-//                   ? const SizedBox(
-//                 width: 18,
-//                 height: 18,
-//                 child:
-//                 CircularProgressIndicator(
-//                   strokeWidth: 2,
-//                   color:
-//                   Colors.white,
-//                 ),
-//               )
-//                   : const Icon(
-//                 Icons.download,
-//               ),
-//               label: Text(
-//                 generatingCertificate
-//                     ? "Generating Certificate..."
-//                     : "Download Certificate",
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-// // ============================================================
-// // INFO CARD
-// // ============================================================
-// class _InfoCard
-//     extends StatelessWidget {
-//   final IconData icon;
-//   final String title;
-//   final String value;
-//   const _InfoCard({
-//     required this.icon,
-//     required this.title,
-//     required this.value,
-//   });
-//   @override
-//   Widget build(
-//       BuildContext context,
-//       ) {
-//     return Expanded(
-//       child: Container(
-//         padding:
-//         const EdgeInsets.all(16),
-//         decoration:
-//         BoxDecoration(
-//           color: Colors.white,
-//           borderRadius:
-//           BorderRadius.circular(16),
-//         ),
-//         child: Column(
-//           children: [
-//             Icon(icon),
-//             const SizedBox(
-//               height: 8,
-//             ),
-//             Text(
-//               title,
-//               style:
-//               const TextStyle(
-//                 color: Colors.grey,
-//               ),
-//             ),
-//             const SizedBox(
-//               height: 6,
-//             ),
-//             Text(
-//               value,
-//               style:
-//               const TextStyle(
-//                 fontSize: 18,
-//                 fontWeight:
-//                 FontWeight.bold,
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
-
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../router/app_router.dart';
 import '../models/course_model.dart';
 import '../models/lesson_model.dart';
 import '../repositories/firebase_training_repository.dart';
 import '../services/certificate_service.dart';
 import '../widgets/lesson_tile.dart';
 import '../widgets/progress_bar.dart';
-import 'lesson_screen.dart';
 
 class CourseDetails extends StatefulWidget {
   final CourseModel course;
@@ -616,7 +27,8 @@ class CourseDetails extends StatefulWidget {
       _CourseDetailsState();
 }
 
-class _CourseDetailsState extends State<CourseDetails>
+class _CourseDetailsState
+    extends State<CourseDetails>
     with SingleTickerProviderStateMixin {
   final FirebaseTrainingRepository repository =
   FirebaseTrainingRepository();
@@ -636,29 +48,17 @@ class _CourseDetailsState extends State<CourseDetails>
 
   int totalDuration = 0;
 
-  // ============================================================
-  // COMPLETION STATE
-  // ============================================================
-
   bool _completionStateInitialized = false;
 
   bool _previousCourseCompleted = false;
 
   bool _completionCelebrationShown = false;
 
-  // ============================================================
-  // CELEBRATION ANIMATION
-  // ============================================================
-
   late AnimationController _celebrationController;
 
   late Animation<double> _scaleAnimation;
 
   late Animation<double> _fadeAnimation;
-
-  // ============================================================
-  // INIT
-  // ============================================================
 
   @override
   void initState() {
@@ -690,23 +90,19 @@ class _CourseDetailsState extends State<CourseDetails>
     _loadData();
   }
 
-  // ============================================================
-  // DISPOSE
-  // ============================================================
-
   @override
   void dispose() {
     _celebrationController.dispose();
-
     super.dispose();
   }
 
   // ============================================================
-  // FORMAT DURATION
+  // DURATION
   // ============================================================
 
   String _formatDuration(
-      int seconds) {
+      int seconds,
+      ) {
     final minutes =
         seconds ~/ 60;
 
@@ -737,18 +133,14 @@ class _CourseDetailsState extends State<CourseDetails>
       }
 
       final user =
-          FirebaseAuth.instance
-              .currentUser;
+          FirebaseAuth.instance.currentUser;
 
-      final Map<String,
-          Map<String, bool>>
+      final Map<String, Map<String, bool>>
       progressMap = {};
 
-      double totalLessonProgress =
-      0;
+      double totalLessonProgress = 0;
 
-      bool celebrationShown =
-      false;
+      bool celebrationShown = false;
 
       if (user != null) {
         final progressSnapshot =
@@ -756,11 +148,15 @@ class _CourseDetailsState extends State<CourseDetails>
             .instance
             .collection("users")
             .doc(user.uid)
-            .collection(
-            "training_progress")
+            .collection("training_progress")
             .doc(widget.course.id)
             .collection("lessons")
-            .get();
+            .get(
+          const GetOptions(
+            source:
+            Source.server,
+          ),
+        );
 
         final Map<String,
             Map<String, dynamic>>
@@ -768,8 +164,7 @@ class _CourseDetailsState extends State<CourseDetails>
 
         for (final doc
         in progressSnapshot.docs) {
-          firestoreProgress[
-          doc.id] =
+          firestoreProgress[doc.id] =
               doc.data();
         }
 
@@ -780,9 +175,8 @@ class _CourseDetailsState extends State<CourseDetails>
               lesson.id] ??
                   {};
 
-          final completed =
-              data["completed"] ==
-                  true;
+          final rawCompleted =
+              data["completed"] == true;
 
           final quizSubmitted =
               data["quizSubmitted"] ==
@@ -791,6 +185,12 @@ class _CourseDetailsState extends State<CourseDetails>
           final videoCompleted =
               data["videoCompleted"] ==
                   true;
+
+          final effectiveCompleted =
+          lesson.quizEnabled
+              ? rawCompleted
+              : (rawCompleted ||
+              videoCompleted);
 
           double lessonProgressValue =
           0;
@@ -805,11 +205,15 @@ class _CourseDetailsState extends State<CourseDetails>
               lessonProgressValue +=
               0.5;
             }
-          } else {
-            if (completed ||
-                videoCompleted) {
+
+            if (rawCompleted) {
               lessonProgressValue =
-              1.0;
+              1;
+            }
+          } else {
+            if (effectiveCompleted) {
+              lessonProgressValue =
+              1;
             }
           }
 
@@ -818,9 +222,11 @@ class _CourseDetailsState extends State<CourseDetails>
 
           progressMap[lesson.id] = {
             "completed":
-            completed,
+            effectiveCompleted,
             "quizSubmitted":
-            quizSubmitted,
+            lesson.quizEnabled
+                ? quizSubmitted
+                : false,
             "videoCompleted":
             videoCompleted,
           };
@@ -831,14 +237,20 @@ class _CourseDetailsState extends State<CourseDetails>
             .instance
             .collection("users")
             .doc(user.uid)
-            .collection(
-            "training_progress")
+            .collection("training_progress")
             .doc(widget.course.id)
-            .get();
+            .get(
+          const GetOptions(
+            source:
+            Source.server,
+          ),
+        );
 
-        if (courseProgressDoc.exists) {
+        if (courseProgressDoc
+            .exists) {
           final data =
-          courseProgressDoc.data();
+          courseProgressDoc
+              .data();
 
           celebrationShown =
               data?[
@@ -847,9 +259,9 @@ class _CourseDetailsState extends State<CourseDetails>
         }
       }
 
-      final double newProgress =
+      final newProgress =
       loadedLessons.isEmpty
-          ? 0
+          ? 0.0
           : totalLessonProgress /
           loadedLessons.length;
 
@@ -884,15 +296,14 @@ class _CourseDetailsState extends State<CourseDetails>
       if (!mounted) return;
 
       setState(() {
-        loadingProgress =
-        false;
+        loadingProgress = false;
       });
 
-      ScaffoldMessenger.of(
-          context)
+      ScaffoldMessenger.of(context)
           .showSnackBar(
         SnackBar(
-          content: Text(
+          content:
+          Text(
             "Failed to load course data: $e",
           ),
           backgroundColor:
@@ -903,7 +314,7 @@ class _CourseDetailsState extends State<CourseDetails>
   }
 
   // ============================================================
-  // COURSE COMPLETION
+  // COMPLETION
   // ============================================================
 
   bool get _courseCompleted {
@@ -914,22 +325,16 @@ class _CourseDetailsState extends State<CourseDetails>
     for (final lesson
     in lessons) {
       final status =
-      lessonProgress[
-      lesson.id];
+      lessonProgress[lesson.id];
 
       if (status == null ||
-          status["completed"] !=
-              true) {
+          status["completed"] != true) {
         return false;
       }
     }
 
     return true;
   }
-
-  // ============================================================
-  // CHECK COMPLETION TRANSITION
-  // ============================================================
 
   void _checkCompletionTransition() {
     if (!mounted) return;
@@ -954,11 +359,8 @@ class _CourseDetailsState extends State<CourseDetails>
     _previousCourseCompleted =
         currentCompleted;
 
-    if (!justCompleted) {
-      return;
-    }
-
-    if (_completionCelebrationShown) {
+    if (!justCompleted ||
+        _completionCelebrationShown) {
       return;
     }
 
@@ -978,37 +380,27 @@ class _CourseDetailsState extends State<CourseDetails>
     );
   }
 
-  // ============================================================
-  // MARK CELEBRATION AS SHOWN
-  // ============================================================
-
-  Future<void>
-  _markCelebrationShown() async {
+  Future<void> _markCelebrationShown() async {
     final user =
-        FirebaseAuth.instance
-            .currentUser;
+        FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       return;
     }
 
     try {
-      await FirebaseFirestore
-          .instance
+      await FirebaseFirestore.instance
           .collection("users")
           .doc(user.uid)
-          .collection(
-          "training_progress")
+          .collection("training_progress")
           .doc(widget.course.id)
           .set(
         {
           "completionCelebrationShown":
           true,
-          "completed":
-          true,
+          "completed": true,
           "completedAt":
-          FieldValue
-              .serverTimestamp(),
+          FieldValue.serverTimestamp(),
         },
         SetOptions(
           merge: true,
@@ -1029,7 +421,7 @@ class _CourseDetailsState extends State<CourseDetails>
   }
 
   // ============================================================
-  // SHOW COMPLETION POPUP
+  // CERTIFICATE
   // ============================================================
 
   Future<void> _showCompletionPopup({
@@ -1040,8 +432,7 @@ class _CourseDetailsState extends State<CourseDetails>
     }
 
     if (firstCompletion) {
-      _celebrationController
-          .reset();
+      _celebrationController.reset();
 
       await _celebrationController
           .forward();
@@ -1050,20 +441,17 @@ class _CourseDetailsState extends State<CourseDetails>
     }
 
     setState(() {
-      openingCertificate =
-      true;
+      openingCertificate = true;
     });
 
     try {
       await showDialog<void>(
         context: context,
-        barrierDismissible:
-        false,
+        barrierDismissible: false,
         builder:
             (dialogContext) {
           return _CertificateDialog(
-            course:
-            widget.course,
+            course: widget.course,
             certificateService:
             certificateService,
             firstCompletion:
@@ -1079,29 +467,37 @@ class _CourseDetailsState extends State<CourseDetails>
       if (!mounted) return;
 
       setState(() {
-        openingCertificate =
-        false;
+        openingCertificate = false;
       });
     }
   }
 
-  // ============================================================
-  // OPEN LESSON
-  // ============================================================
+// ============================================================
+// OPEN LESSON
+// ============================================================
 
   Future<void> _openLesson(
       LessonModel lesson,
       ) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            LessonScreen(
-              lesson: lesson,
-            ),
-      ),
+    final path = AppRouter.lessonPath(
+      widget.course.id,
+      lesson.id,
     );
 
+    debugPrint('================================');
+    debugPrint('LESSON ID: ${lesson.id}');
+    debugPrint('COURSE ID: ${widget.course.id}');
+    debugPrint('LESSON ROUTE: $path');
+    debugPrint(
+      'CURRENT URL: ${GoRouterState.of(context).uri}',
+    );
+    debugPrint('================================');
+
+    context.go(path);
+
+    if (!mounted) return;
+
+    // Reload lesson/video/quiz progress after returning
     await _loadData();
   }
 
@@ -1111,27 +507,48 @@ class _CourseDetailsState extends State<CourseDetails>
 
   @override
   Widget build(
-      BuildContext context) {
+      BuildContext context,
+      ) {
     return Scaffold(
       backgroundColor:
       const Color(0xffF5F8FC),
+
       appBar: AppBar(
+        backgroundColor:
+        const Color(0xff003366),
+        foregroundColor:
+        Colors.white,
+
+        leading: IconButton(
+          icon:
+          const Icon(
+            Icons.arrow_back,
+          ),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(
+                AppRouter.training,
+              );
+            }
+          },
+        ),
+
         title:
         Text(widget.course.title),
       ),
-      body:
-      loadingProgress
+
+      body: loadingProgress
           ? const Center(
         child:
         CircularProgressIndicator(),
       )
           : SingleChildScrollView(
         padding:
-        const EdgeInsets.all(
-          24,
-        ),
-        child:
-        Column(
+        const EdgeInsets.all(24),
+
+        child: Column(
           crossAxisAlignment:
           CrossAxisAlignment.start,
           children: [
@@ -1178,8 +595,7 @@ class _CourseDetailsState extends State<CourseDetails>
             ),
 
             ProgressBar(
-              value:
-              progress,
+              value: progress,
             ),
 
             const SizedBox(
@@ -1205,9 +621,11 @@ class _CourseDetailsState extends State<CourseDetails>
                   lessons.length
                       .toString(),
                 ),
+
                 const SizedBox(
                   width: 12,
                 ),
+
                 _InfoCard(
                   icon:
                   Icons.timer,
@@ -1242,28 +660,25 @@ class _CourseDetailsState extends State<CourseDetails>
             if (lessons.isEmpty)
               const Padding(
                 padding:
-                EdgeInsets.all(
-                  30,
-                ),
-                child:
-                Center(
-                  child:
-                  Text(
+                EdgeInsets.all(30),
+                child: Center(
+                  child: Text(
                     "No lessons available",
                   ),
                 ),
               )
             else
               ListView.builder(
-                shrinkWrap:
-                true,
+                shrinkWrap: true,
                 physics:
                 const NeverScrollableScrollPhysics(),
                 itemCount:
                 lessons.length,
                 itemBuilder:
-                    (context,
-                    index) {
+                    (
+                    context,
+                    index,
+                    ) {
                   final lesson =
                   lessons[index];
 
@@ -1273,22 +688,22 @@ class _CourseDetailsState extends State<CourseDetails>
                           {};
 
                   return LessonTile(
-                    lesson:
-                    lesson,
+                    lesson: lesson,
                     completed:
                     status[
                     "completed"] ??
                         false,
                     quizSubmitted:
-                    status[
+                    lesson.quizEnabled
+                        ? (status[
                     "quizSubmitted"] ??
-                        false,
+                        false)
+                        : false,
                     videoCompleted:
                     status[
                     "videoCompleted"] ??
                         false,
-                    onPressed:
-                        () {
+                    onPressed: () {
                       _openLesson(
                         lesson,
                       );
@@ -1308,30 +723,20 @@ class _CourseDetailsState extends State<CourseDetails>
 
   Widget _buildCertificateCard() {
     return Container(
-      width:
-      double.infinity,
+      width: double.infinity,
       padding:
-      const EdgeInsets.all(
-        22,
-      ),
+      const EdgeInsets.all(22),
       decoration:
       BoxDecoration(
-        color:
-        Colors.white,
+        color: Colors.white,
         borderRadius:
-        BorderRadius.circular(
-          16,
-        ),
-        border:
-        Border.all(
+        BorderRadius.circular(16),
+        border: Border.all(
           color:
-          const Color(
-            0xffD7E7F5,
-          ),
+          const Color(0xffD7E7F5),
         ),
       ),
-      child:
-      Column(
+      child: Column(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
@@ -1347,8 +752,7 @@ class _CourseDetailsState extends State<CourseDetails>
                 width: 12,
               ),
               Expanded(
-                child:
-                Column(
+                child: Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
@@ -1360,9 +764,7 @@ class _CourseDetailsState extends State<CourseDetails>
                         fontWeight:
                         FontWeight.bold,
                         color:
-                        Color(
-                          0xff003366,
-                        ),
+                        Color(0xff003366),
                       ),
                     ),
                     SizedBox(
@@ -1397,8 +799,7 @@ class _CourseDetailsState extends State<CourseDetails>
           ),
 
           SizedBox(
-            width:
-            double.infinity,
+            width: double.infinity,
             height: 48,
             child:
             ElevatedButton.icon(
@@ -1418,8 +819,7 @@ class _CourseDetailsState extends State<CourseDetails>
                 height: 20,
                 child:
                 CircularProgressIndicator(
-                  strokeWidth:
-                  2,
+                  strokeWidth: 2,
                   color:
                   Colors.white,
                 ),
@@ -1442,7 +842,7 @@ class _CourseDetailsState extends State<CourseDetails>
                 foregroundColor:
                 Colors.white,
                 disabledBackgroundColor:
-                Colors.grey.shade400,
+                Colors.grey,
                 disabledForegroundColor:
                 Colors.white,
                 shape:
@@ -1511,12 +911,7 @@ class _CertificateDialogState
     _generateCertificate();
   }
 
-  // ============================================================
-  // GENERATE CERTIFICATE
-  // ============================================================
-
-  Future<void>
-  _generateCertificate() async {
+  Future<void> _generateCertificate() async {
     try {
       final url =
       await widget
@@ -1549,12 +944,9 @@ class _CertificateDialogState
       );
 
       setState(() {
-        certificateUrl =
-            url;
-
+        certificateUrl = url;
         certificateViewType =
             viewType;
-
         generating = false;
       });
     } catch (e) {
@@ -1566,25 +958,18 @@ class _CertificateDialogState
 
       setState(() {
         generating = false;
-
-        error =
-            e.toString();
+        error = e.toString();
       });
     }
   }
 
-  // ============================================================
-  // BUILD
-  // ============================================================
-
   @override
   Widget build(
-      BuildContext context) {
+      BuildContext context,
+      ) {
     return Dialog(
-      backgroundColor:
-      Colors.white,
-      surfaceTintColor:
-      Colors.white,
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
       elevation: 12,
       insetPadding:
       const EdgeInsets.symmetric(
@@ -1594,12 +979,9 @@ class _CertificateDialogState
       shape:
       RoundedRectangleBorder(
         borderRadius:
-        BorderRadius.circular(
-          24,
-        ),
+        BorderRadius.circular(24),
       ),
-      child:
-      SizedBox(
+      child: SizedBox(
         width:
         MediaQuery.of(context)
             .size
@@ -1617,13 +999,8 @@ class _CertificateDialogState
           900.0,
         ) *
             0.88,
-        child:
-        Column(
+        child: Column(
           children: [
-            // ==================================================
-            // HEADER
-            // ==================================================
-
             Padding(
               padding:
               const EdgeInsets.fromLTRB(
@@ -1632,8 +1009,7 @@ class _CertificateDialogState
                 16,
                 14,
               ),
-              child:
-              Row(
+              child: Row(
                 children: [
                   widget.firstCompletion
                       ? FadeTransition(
@@ -1654,8 +1030,7 @@ class _CertificateDialogState
                   ),
 
                   Expanded(
-                    child:
-                    Column(
+                    child: Column(
                       crossAxisAlignment:
                       CrossAxisAlignment.start,
                       children: [
@@ -1669,16 +1044,12 @@ class _CertificateDialogState
                             fontWeight:
                             FontWeight.w700,
                             color:
-                            Color(
-                              0xff003366,
-                            ),
+                            Color(0xff003366),
                           ),
                         ),
-
                         const SizedBox(
                           height: 3,
                         ),
-
                         Text(
                           widget.course.title,
                           maxLines: 1,
@@ -1696,8 +1067,6 @@ class _CertificateDialogState
                   ),
 
                   IconButton(
-                    tooltip:
-                    "Close",
                     onPressed:
                     generating
                         ? null
@@ -1719,13 +1088,8 @@ class _CertificateDialogState
               height: 1,
             ),
 
-            // ==================================================
-            // CONTENT
-            // ==================================================
-
             Expanded(
-              child:
-              Padding(
+              child: Padding(
                 padding:
                 const EdgeInsets.fromLTRB(
                   24,
@@ -1733,30 +1097,21 @@ class _CertificateDialogState
                   24,
                   0,
                 ),
-                child:
-                Column(
+                child: Column(
                   children: [
-                    // ------------------------------------------
-                    // FIRST COMPLETION MESSAGE
-                    // ------------------------------------------
-
-                    if (widget
-                        .firstCompletion)
+                    if (widget.firstCompletion)
                       Padding(
                         padding:
                         const EdgeInsets.only(
                           bottom: 16,
                         ),
-                        child:
-                        Row(
+                        child: Row(
                           children: [
                             const Icon(
                               Icons.celebration,
                               size: 20,
                               color:
-                              Color(
-                                0xff003366,
-                              ),
+                              Color(0xff003366),
                             ),
                             const SizedBox(
                               width: 8,
@@ -1779,10 +1134,6 @@ class _CertificateDialogState
                         ),
                       ),
 
-                    // ------------------------------------------
-                    // CERTIFICATE AREA
-                    // ------------------------------------------
-
                     Expanded(
                       child:
                       _buildCertificateArea(),
@@ -1792,17 +1143,12 @@ class _CertificateDialogState
                       height: 12,
                     ),
 
-                    // ------------------------------------------
-                    // FOOTER
-                    // ------------------------------------------
-
                     Padding(
                       padding:
                       const EdgeInsets.only(
                         bottom: 14,
                       ),
-                      child:
-                      SizedBox(
+                      child: SizedBox(
                         width:
                         double.infinity,
                         height: 46,
@@ -1816,27 +1162,6 @@ class _CertificateDialogState
                               context,
                             ).pop();
                           },
-                          style:
-                          OutlinedButton.styleFrom(
-                            foregroundColor:
-                            const Color(
-                              0xff003366,
-                            ),
-                            side:
-                            const BorderSide(
-                              color:
-                              Color(
-                                0xffD7E7F5,
-                              ),
-                            ),
-                            shape:
-                            RoundedRectangleBorder(
-                              borderRadius:
-                              BorderRadius.circular(
-                                12,
-                              ),
-                            ),
-                          ),
                           child:
                           const Text(
                             "Close",
@@ -1854,10 +1179,6 @@ class _CertificateDialogState
     );
   }
 
-  // ============================================================
-  // HEADER ICON
-  // ============================================================
-
   Widget _buildHeaderIcon() {
     return Container(
       width: 54,
@@ -1866,8 +1187,7 @@ class _CertificateDialogState
       const BoxDecoration(
         color:
         Color(0xffEAF4FF),
-        shape:
-        BoxShape.circle,
+        shape: BoxShape.circle,
       ),
       child:
       const Icon(
@@ -1879,79 +1199,39 @@ class _CertificateDialogState
     );
   }
 
-  // ============================================================
-  // CERTIFICATE AREA
-  // ============================================================
-
   Widget _buildCertificateArea() {
-    // ----------------------------------------------------------
-    // GENERATING
-    // ----------------------------------------------------------
-
     if (generating) {
       return Container(
-        width:
-        double.infinity,
+        width: double.infinity,
         decoration:
         BoxDecoration(
           color:
-          const Color(
-            0xffF8FBFE,
-          ),
+          const Color(0xffF8FBFE),
           borderRadius:
-          BorderRadius.circular(
-            16,
-          ),
-          border:
-          Border.all(
+          BorderRadius.circular(16),
+          border: Border.all(
             color:
-            const Color(
-              0xffE2EDF6,
-            ),
+            const Color(0xffE2EDF6),
           ),
         ),
-        child:
-        Center(
-          child:
-          Column(
+        child: const Center(
+          child: Column(
             mainAxisSize:
             MainAxisSize.min,
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration:
-                const BoxDecoration(
-                  color:
-                  Color(
-                    0xffEAF4FF,
-                  ),
-                  shape:
-                  BoxShape.circle,
-                ),
+              SizedBox(
+                width: 45,
+                height: 45,
                 child:
-                const Padding(
-                  padding:
-                  EdgeInsets.all(
-                    22,
-                  ),
-                  child:
-                  CircularProgressIndicator(
-                    strokeWidth:
-                    3,
-                    color:
-                    Color(
-                      0xff003366,
-                    ),
-                  ),
+                CircularProgressIndicator(
+                  color:
+                  Color(0xff003366),
                 ),
               ),
-
-              const SizedBox(
+              SizedBox(
                 height: 20,
               ),
-
-              const Text(
+              Text(
                 "Preparing your certificate",
                 style:
                 TextStyle(
@@ -1959,23 +1239,7 @@ class _CertificateDialogState
                   fontWeight:
                   FontWeight.w600,
                   color:
-                  Color(
-                    0xff003366,
-                  ),
-                ),
-              ),
-
-              const SizedBox(
-                height: 8,
-              ),
-
-              const Text(
-                "Please wait a moment...",
-                style:
-                TextStyle(
-                  fontSize: 14,
-                  color:
-                  Colors.grey,
+                  Color(0xff003366),
                 ),
               ),
             ],
@@ -1984,51 +1248,30 @@ class _CertificateDialogState
       );
     }
 
-    // ----------------------------------------------------------
-    // ERROR
-    // ----------------------------------------------------------
-
     if (error != null) {
       return Container(
-        width:
-        double.infinity,
+        width: double.infinity,
         decoration:
         BoxDecoration(
           color:
-          const Color(
-            0xfffff7f7,
-          ),
+          const Color(0xfffff7f7),
           borderRadius:
-          BorderRadius.circular(
-            16,
-          ),
-          border:
-          Border.all(
-            color:
-            const Color(
-              0xffffdddd,
-            ),
-          ),
+          BorderRadius.circular(16),
         ),
-        child:
-        Center(
-          child:
-          Column(
+        child: const Center(
+          child: Column(
             mainAxisSize:
             MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.error_outline,
                 size: 48,
-                color:
-                Colors.red,
+                color: Colors.red,
               ),
-
-              const SizedBox(
+              SizedBox(
                 height: 12,
               ),
-
-              const Text(
+              Text(
                 "Unable to load certificate",
                 style:
                 TextStyle(
@@ -2037,42 +1280,20 @@ class _CertificateDialogState
                   FontWeight.w600,
                 ),
               ),
-
-              const SizedBox(
-                height: 6,
-              ),
-
-              const Text(
-                "Please close this window and try again.",
-                style:
-                TextStyle(
-                  color:
-                  Colors.grey,
-                ),
-              ),
             ],
           ),
         ),
       );
     }
 
-    // ----------------------------------------------------------
-    // PDF
-    // ----------------------------------------------------------
-
     if (certificateUrl != null &&
         certificateViewType != null) {
       return ClipRRect(
         borderRadius:
-        BorderRadius.circular(
-          16,
-        ),
-        child:
-        Container(
-          width:
-          double.infinity,
-          color:
-          Colors.white,
+        BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          color: Colors.white,
           child:
           HtmlElementView(
             viewType:
@@ -2093,9 +1314,7 @@ class _CertificateDialogState
 class _InfoCard
     extends StatelessWidget {
   final IconData icon;
-
   final String title;
-
   final String value;
 
   const _InfoCard({
@@ -2106,45 +1325,34 @@ class _InfoCard
 
   @override
   Widget build(
-      BuildContext context) {
+      BuildContext context,
+      ) {
     return Expanded(
-      child:
-      Container(
+      child: Container(
         padding:
-        const EdgeInsets.all(
-          16,
-        ),
+        const EdgeInsets.all(16),
         decoration:
         BoxDecoration(
-          color:
-          Colors.white,
+          color: Colors.white,
           borderRadius:
-          BorderRadius.circular(
-            16,
-          ),
+          BorderRadius.circular(16),
         ),
-        child:
-        Column(
+        child: Column(
           children: [
             Icon(icon),
-
             const SizedBox(
               height: 8,
             ),
-
             Text(
               title,
               style:
               const TextStyle(
-                color:
-                Colors.grey,
+                color: Colors.grey,
               ),
             ),
-
             const SizedBox(
               height: 6,
             ),
-
             Text(
               value,
               style:

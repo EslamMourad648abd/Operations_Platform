@@ -623,16 +623,7 @@ class _UserManagementState extends State<UserManagement> {
           const EdgeInsets.all(20),
           child: Row(
             children: [
-              const Text(
-                "User Management",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight:
-                  FontWeight.bold,
-                  color:
-                  Color(0xff003366),
-                ),
-              ),
+
               const Spacer(),
               // ------------------------------------------------
               // ADD USER
