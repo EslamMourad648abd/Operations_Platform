@@ -99,7 +99,7 @@ class AppRouter {
   // ============================================================
 
   static final GoRouter router = GoRouter(
-    initialLocation: home,
+    initialLocation: login,
 
     debugLogDiagnostics: true,
 
