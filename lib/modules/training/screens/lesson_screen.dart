@@ -193,7 +193,11 @@ class _LessonScreenState extends State<LessonScreen> {
           processingAction = false;
         });
 
-        context.go(quizPath);
+        // IMPORTANT:
+        // Push quiz on top of lesson instead of replacing
+        // the current route. This allows the user to return
+        // to this lesson and then back to CourseDetails.
+        await context.push(quizPath);
 
         if (!mounted) return;
 
@@ -280,7 +284,9 @@ class _LessonScreenState extends State<LessonScreen> {
     );
     debugPrint('================================');
 
-    context.go(reviewPath);
+    // IMPORTANT:
+    // Push review instead of replacing this lesson.
+    await context.push(reviewPath);
 
     if (!mounted) return;
 
@@ -300,11 +306,14 @@ class _LessonScreenState extends State<LessonScreen> {
     );
     debugPrint('================================');
 
+    // The new router keeps CourseDetails underneath LessonScreen.
+    // Therefore normal pop is now the correct behavior.
     if (context.canPop()) {
       context.pop();
       return;
     }
 
+    // Safety fallback in case the lesson was opened directly.
     context.go(
       AppRouter.coursePath(
         widget.lesson.courseId,
@@ -374,11 +383,13 @@ class _LessonScreenState extends State<LessonScreen> {
       buttonAction = _completeLesson;
     }
 
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xffF5F8FC),
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xff003366),
-        foregroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
         leading: IconButton(
           onPressed: _goBack,
@@ -422,8 +433,9 @@ class _LessonScreenState extends State<LessonScreen> {
                 ),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: theme.cardTheme.color,
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: theme.dividerColor),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
@@ -443,7 +455,7 @@ class _LessonScreenState extends State<LessonScreen> {
             // LESSON DESCRIPTION
             // ==================================================
 
-            _buildDescriptionCard(),
+            _buildDescriptionCard(context),
 
             const SizedBox(
               height: 20,
@@ -454,15 +466,16 @@ class _LessonScreenState extends State<LessonScreen> {
             // ==================================================
 
             _buildCard(
+              context,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     "Lesson Completion",
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xff003366),
+                      color: theme.colorScheme.primary,
                     ),
                   ),
 
@@ -471,7 +484,7 @@ class _LessonScreenState extends State<LessonScreen> {
                   ),
 
                   if (loadingProgress)
-                    const CircularProgressIndicator()
+                    CircularProgressIndicator(color: theme.colorScheme.primary)
                   else
                     SizedBox(
                       height: 46,
@@ -498,8 +511,8 @@ class _LessonScreenState extends State<LessonScreen> {
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
-                          const Color(0xff003366),
-                          foregroundColor: Colors.white,
+                          theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.onPrimary,
                         ),
                       ),
                     ),
@@ -516,15 +529,16 @@ class _LessonScreenState extends State<LessonScreen> {
             // ==================================================
 
             _buildCard(
+              context,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     "Lesson Progress",
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xff003366),
+                      color: theme.colorScheme.primary,
                     ),
                   ),
 
@@ -535,6 +549,8 @@ class _LessonScreenState extends State<LessonScreen> {
                   LinearProgressIndicator(
                     value: lessonProgress,
                     minHeight: 8,
+                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    color: theme.colorScheme.primary,
                   ),
 
                   const SizedBox(
@@ -543,6 +559,7 @@ class _LessonScreenState extends State<LessonScreen> {
 
                   Text(
                     progressText,
+                    style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                   ),
                 ],
               ),
@@ -557,28 +574,28 @@ class _LessonScreenState extends State<LessonScreen> {
   // LESSON DESCRIPTION CARD
   // ============================================================
 
-  Widget _buildDescriptionCard() {
+  Widget _buildDescriptionCard(BuildContext context) {
+    final theme = Theme.of(context);
     return _buildCard(
+      context,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(
                 Icons.description_outlined,
-                color: Color(0xff003366),
+                color: theme.colorScheme.primary,
               ),
-
-              SizedBox(
+              const SizedBox(
                 width: 10,
               ),
-
               Text(
                 "Lesson Description",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xff003366),
+                  color: theme.colorScheme.primary,
                 ),
               ),
             ],
@@ -590,10 +607,10 @@ class _LessonScreenState extends State<LessonScreen> {
 
           Text(
             widget.lesson.description,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               height: 1.6,
-              color: Color(0xff4A5568),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -605,17 +622,19 @@ class _LessonScreenState extends State<LessonScreen> {
   // CARD
   // ============================================================
 
-  Widget _buildCard({
+  Widget _buildCard(
+    BuildContext context, {
     required Widget child,
   }) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xffE4E9F0),
+          color: theme.dividerColor,
         ),
       ),
       child: child,

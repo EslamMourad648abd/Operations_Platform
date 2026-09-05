@@ -64,28 +64,20 @@ class _CourseDetailsState
   void initState() {
     super.initState();
 
-    _celebrationController =
-        AnimationController(
-          vsync: this,
-          duration:
-          const Duration(milliseconds: 900),
-        );
+    _celebrationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
 
-    _scaleAnimation =
-        CurvedAnimation(
-          parent:
-          _celebrationController,
-          curve:
-          Curves.elasticOut,
-        );
+    _scaleAnimation = CurvedAnimation(
+      parent: _celebrationController,
+      curve: Curves.elasticOut,
+    );
 
-    _fadeAnimation =
-        CurvedAnimation(
-          parent:
-          _celebrationController,
-          curve:
-          Curves.easeOut,
-        );
+    _fadeAnimation = CurvedAnimation(
+      parent: _celebrationController,
+      curve: Curves.easeOut,
+    );
 
     _loadData();
   }
@@ -103,11 +95,9 @@ class _CourseDetailsState
   String _formatDuration(
       int seconds,
       ) {
-    final minutes =
-        seconds ~/ 60;
+    final minutes = seconds ~/ 60;
 
-    final remainingSeconds =
-        seconds % 60;
+    final remainingSeconds = seconds % 60;
 
     return '${minutes.toString().padLeft(2, '0')}:'
         '${remainingSeconds.toString().padLeft(2, '0')}';
@@ -119,24 +109,19 @@ class _CourseDetailsState
 
   Future<void> _loadData() async {
     try {
-      final loadedLessons =
-      await repository.getLessons(
+      final loadedLessons = await repository.getLessons(
         widget.course.id,
       );
 
       int calculatedDuration = 0;
 
-      for (final lesson
-      in loadedLessons) {
-        calculatedDuration +=
-            lesson.duration;
+      for (final lesson in loadedLessons) {
+        calculatedDuration += lesson.duration;
       }
 
-      final user =
-          FirebaseAuth.instance.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
 
-      final Map<String, Map<String, bool>>
-      progressMap = {};
+      final Map<String, Map<String, bool>> progressMap = {};
 
       double totalLessonProgress = 0;
 
@@ -144,8 +129,7 @@ class _CourseDetailsState
 
       if (user != null) {
         final progressSnapshot =
-        await FirebaseFirestore
-            .instance
+        await FirebaseFirestore.instance
             .collection("users")
             .doc(user.uid)
             .collection("training_progress")
@@ -153,135 +137,102 @@ class _CourseDetailsState
             .collection("lessons")
             .get(
           const GetOptions(
-            source:
-            Source.server,
+            source: Source.server,
           ),
         );
 
-        final Map<String,
-            Map<String, dynamic>>
+        final Map<String, Map<String, dynamic>>
         firestoreProgress = {};
 
-        for (final doc
-        in progressSnapshot.docs) {
-          firestoreProgress[doc.id] =
-              doc.data();
+        for (final doc in progressSnapshot.docs) {
+          firestoreProgress[doc.id] = doc.data();
         }
 
-        for (final lesson
-        in loadedLessons) {
-          final data =
-              firestoreProgress[
-              lesson.id] ??
-                  {};
+        for (final lesson in loadedLessons) {
+          final data = firestoreProgress[lesson.id] ?? {};
 
           final rawCompleted =
               data["completed"] == true;
 
           final quizSubmitted =
-              data["quizSubmitted"] ==
-                  true;
+              data["quizSubmitted"] == true;
 
           final videoCompleted =
-              data["videoCompleted"] ==
-                  true;
+              data["videoCompleted"] == true;
 
           final effectiveCompleted =
           lesson.quizEnabled
               ? rawCompleted
-              : (rawCompleted ||
-              videoCompleted);
+              : (rawCompleted || videoCompleted);
 
-          double lessonProgressValue =
-          0;
+          double lessonProgressValue = 0;
 
           if (lesson.quizEnabled) {
             if (videoCompleted) {
-              lessonProgressValue +=
-              0.5;
+              lessonProgressValue += 0.5;
             }
 
             if (quizSubmitted) {
-              lessonProgressValue +=
-              0.5;
+              lessonProgressValue += 0.5;
             }
 
             if (rawCompleted) {
-              lessonProgressValue =
-              1;
+              lessonProgressValue = 1;
             }
           } else {
             if (effectiveCompleted) {
-              lessonProgressValue =
-              1;
+              lessonProgressValue = 1;
             }
           }
 
-          totalLessonProgress +=
-              lessonProgressValue;
+          totalLessonProgress += lessonProgressValue;
 
           progressMap[lesson.id] = {
-            "completed":
-            effectiveCompleted,
-            "quizSubmitted":
-            lesson.quizEnabled
+            "completed": effectiveCompleted,
+            "quizSubmitted": lesson.quizEnabled
                 ? quizSubmitted
                 : false,
-            "videoCompleted":
-            videoCompleted,
+            "videoCompleted": videoCompleted,
           };
         }
 
         final courseProgressDoc =
-        await FirebaseFirestore
-            .instance
+        await FirebaseFirestore.instance
             .collection("users")
             .doc(user.uid)
             .collection("training_progress")
             .doc(widget.course.id)
             .get(
           const GetOptions(
-            source:
-            Source.server,
+            source: Source.server,
           ),
         );
 
-        if (courseProgressDoc
-            .exists) {
-          final data =
-          courseProgressDoc
-              .data();
+        if (courseProgressDoc.exists) {
+          final data = courseProgressDoc.data();
 
           celebrationShown =
-              data?[
-              "completionCelebrationShown"] ==
+              data?["completionCelebrationShown"] ==
                   true;
         }
       }
 
-      final newProgress =
-      loadedLessons.isEmpty
+      final newProgress = loadedLessons.isEmpty
           ? 0.0
-          : totalLessonProgress /
-          loadedLessons.length;
+          : totalLessonProgress / loadedLessons.length;
 
       if (!mounted) return;
 
       setState(() {
-        lessons =
-            loadedLessons;
+        lessons = loadedLessons;
 
-        lessonProgress =
-            progressMap;
+        lessonProgress = progressMap;
 
-        totalDuration =
-            calculatedDuration;
+        totalDuration = calculatedDuration;
 
-        progress =
-            newProgress;
+        progress = newProgress;
 
-        loadingProgress =
-        false;
+        loadingProgress = false;
 
         _completionCelebrationShown =
             celebrationShown;
@@ -299,15 +250,12 @@ class _CourseDetailsState
         loadingProgress = false;
       });
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-          Text(
+          content: Text(
             "Failed to load course data: $e",
           ),
-          backgroundColor:
-          Colors.red,
+          backgroundColor: Colors.red,
         ),
       );
     }
@@ -322,10 +270,8 @@ class _CourseDetailsState
       return false;
     }
 
-    for (final lesson
-    in lessons) {
-      final status =
-      lessonProgress[lesson.id];
+    for (final lesson in lessons) {
+      final status = lessonProgress[lesson.id];
 
       if (status == null ||
           status["completed"] != true) {
@@ -339,15 +285,12 @@ class _CourseDetailsState
   void _checkCompletionTransition() {
     if (!mounted) return;
 
-    final currentCompleted =
-        _courseCompleted;
+    final currentCompleted = _courseCompleted;
 
     if (!_completionStateInitialized) {
-      _completionStateInitialized =
-      true;
+      _completionStateInitialized = true;
 
-      _previousCourseCompleted =
-          currentCompleted;
+      _previousCourseCompleted = currentCompleted;
 
       return;
     }
@@ -356,16 +299,14 @@ class _CourseDetailsState
         !_previousCourseCompleted &&
             currentCompleted;
 
-    _previousCourseCompleted =
-        currentCompleted;
+    _previousCourseCompleted = currentCompleted;
 
     if (!justCompleted ||
         _completionCelebrationShown) {
       return;
     }
 
-    WidgetsBinding.instance
-        .addPostFrameCallback(
+    WidgetsBinding.instance.addPostFrameCallback(
           (_) async {
         if (!mounted) return;
 
@@ -396,8 +337,7 @@ class _CourseDetailsState
           .doc(widget.course.id)
           .set(
         {
-          "completionCelebrationShown":
-          true,
+          "completionCelebrationShown": true,
           "completed": true,
           "completedAt":
           FieldValue.serverTimestamp(),
@@ -410,8 +350,7 @@ class _CourseDetailsState
       if (!mounted) return;
 
       setState(() {
-        _completionCelebrationShown =
-        true;
+        _completionCelebrationShown = true;
       });
     } catch (e) {
       debugPrint(
@@ -434,8 +373,7 @@ class _CourseDetailsState
     if (firstCompletion) {
       _celebrationController.reset();
 
-      await _celebrationController
-          .forward();
+      await _celebrationController.forward();
 
       if (!mounted) return;
     }
@@ -448,18 +386,13 @@ class _CourseDetailsState
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder:
-            (dialogContext) {
+        builder: (dialogContext) {
           return _CertificateDialog(
             course: widget.course,
-            certificateService:
-            certificateService,
-            firstCompletion:
-            firstCompletion,
-            scaleAnimation:
-            _scaleAnimation,
-            fadeAnimation:
-            _fadeAnimation,
+            certificateService: certificateService,
+            firstCompletion: firstCompletion,
+            scaleAnimation: _scaleAnimation,
+            fadeAnimation: _fadeAnimation,
           );
         },
       );
@@ -472,9 +405,9 @@ class _CourseDetailsState
     }
   }
 
-// ============================================================
-// OPEN LESSON
-// ============================================================
+  // ============================================================
+  // OPEN LESSON
+  // ============================================================
 
   Future<void> _openLesson(
       LessonModel lesson,
@@ -494,11 +427,6 @@ class _CourseDetailsState
     debugPrint('================================');
 
     context.go(path);
-
-    if (!mounted) return;
-
-    // Reload lesson/video/quiz progress after returning
-    await _loadData();
   }
 
   // ============================================================
@@ -509,19 +437,18 @@ class _CourseDetailsState
   Widget build(
       BuildContext context,
       ) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor:
-      const Color(0xffF5F8FC),
-
+      theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor:
-        const Color(0xff003366),
+        theme.colorScheme.primary,
         foregroundColor:
-        Colors.white,
-
+        theme.colorScheme.onPrimary,
         leading: IconButton(
-          icon:
-          const Icon(
+          icon: const Icon(
             Icons.arrow_back,
           ),
           onPressed: () {
@@ -534,31 +461,29 @@ class _CourseDetailsState
             }
           },
         ),
-
-        title:
-        Text(widget.course.title),
+        title: Text(
+          widget.course.title,
+        ),
       ),
-
       body: loadingProgress
-          ? const Center(
+          ? Center(
         child:
-        CircularProgressIndicator(),
+        CircularProgressIndicator(color: theme.colorScheme.primary),
       )
           : SingleChildScrollView(
         padding:
         const EdgeInsets.all(24),
-
         child: Column(
           crossAxisAlignment:
           CrossAxisAlignment.start,
           children: [
             Text(
               widget.course.title,
-              style:
-              const TextStyle(
+              style: TextStyle(
                 fontSize: 28,
                 fontWeight:
                 FontWeight.bold,
+                color: theme.colorScheme.onSurface,
               ),
             ),
 
@@ -568,11 +493,9 @@ class _CourseDetailsState
 
             Text(
               widget.course.description,
-              style:
-              const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color:
-                Colors.grey,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
 
@@ -580,13 +503,13 @@ class _CourseDetailsState
               height: 28,
             ),
 
-            const Text(
+            Text(
               "Course Progress",
-              style:
-              TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight:
                 FontWeight.bold,
+                color: theme.colorScheme.onSurface,
               ),
             ),
 
@@ -603,7 +526,7 @@ class _CourseDetailsState
             ),
 
             if (_courseCompleted)
-              _buildCertificateCard(),
+              _buildCertificateCard(context),
 
             if (_courseCompleted)
               const SizedBox(
@@ -615,8 +538,7 @@ class _CourseDetailsState
                 _InfoCard(
                   icon:
                   Icons.menu_book,
-                  title:
-                  "Lessons",
+                  title: "Lessons",
                   value:
                   lessons.length
                       .toString(),
@@ -629,8 +551,7 @@ class _CourseDetailsState
                 _InfoCard(
                   icon:
                   Icons.timer,
-                  title:
-                  "Duration",
+                  title: "Duration",
                   value:
                   _formatDuration(
                     totalDuration,
@@ -643,13 +564,13 @@ class _CourseDetailsState
               height: 35,
             ),
 
-            const Text(
+            Text(
               "Lessons",
-              style:
-              TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight:
                 FontWeight.bold,
+                color: theme.colorScheme.onSurface,
               ),
             ),
 
@@ -658,12 +579,13 @@ class _CourseDetailsState
             ),
 
             if (lessons.isEmpty)
-              const Padding(
+              Padding(
                 padding:
-                EdgeInsets.all(30),
+                const EdgeInsets.all(30),
                 child: Center(
                   child: Text(
                     "No lessons available",
+                    style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                   ),
                 ),
               )
@@ -721,19 +643,20 @@ class _CourseDetailsState
   // CERTIFICATE CARD
   // ============================================================
 
-  Widget _buildCertificateCard() {
+  Widget _buildCertificateCard(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding:
       const EdgeInsets.all(22),
       decoration:
       BoxDecoration(
-        color: Colors.white,
+        color: theme.cardTheme.color,
         borderRadius:
         BorderRadius.circular(16),
         border: Border.all(
           color:
-          const Color(0xffD7E7F5),
+          theme.dividerColor,
         ),
       ),
       child: Column(
@@ -741,14 +664,14 @@ class _CourseDetailsState
         CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
+            children: [
               Icon(
                 Icons.workspace_premium,
                 color:
-                Color(0xff003366),
+                theme.colorScheme.primary,
                 size: 30,
               ),
-              SizedBox(
+              const SizedBox(
                 width: 12,
               ),
               Expanded(
@@ -758,24 +681,21 @@ class _CourseDetailsState
                   children: [
                     Text(
                       "Course Completed!",
-                      style:
-                      TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight:
                         FontWeight.bold,
                         color:
-                        Color(0xff003366),
+                        theme.colorScheme.primary,
                       ),
                     ),
-                    SizedBox(
+                    const SizedBox(
                       height: 4,
                     ),
-                    Text(
+                    const Text(
                       "Certificate available",
-                      style:
-                      TextStyle(
-                        color:
-                        Colors.green,
+                      style: TextStyle(
+                        color: Colors.green,
                         fontSize: 13,
                       ),
                     ),
@@ -789,9 +709,9 @@ class _CourseDetailsState
             height: 12,
           ),
 
-          const Text(
-            "Congratulations! You have successfully "
-                "completed all lessons in this course.",
+          Text(
+            "Congratulations! You have successfully completed all lessons in this course.",
+            style: TextStyle(color: theme.colorScheme.onSurface),
           ),
 
           const SizedBox(
@@ -825,7 +745,8 @@ class _CourseDetailsState
                 ),
               )
                   : const Icon(
-                Icons.workspace_premium,
+                Icons
+                    .workspace_premium,
               ),
               label:
               Text(
@@ -836,11 +757,9 @@ class _CourseDetailsState
               style:
               ElevatedButton.styleFrom(
                 backgroundColor:
-                const Color(
-                  0xff003366,
-                ),
+                theme.colorScheme.primary,
                 foregroundColor:
-                Colors.white,
+                theme.colorScheme.onPrimary,
                 disabledBackgroundColor:
                 Colors.grey,
                 disabledForegroundColor:
@@ -913,8 +832,7 @@ class _CertificateDialogState
 
   Future<void> _generateCertificate() async {
     try {
-      final url =
-      await widget
+      final url = await widget
           .certificateService
           .generateCertificate(
         courseId:
@@ -967,9 +885,11 @@ class _CertificateDialogState
   Widget build(
       BuildContext context,
       ) {
+    final theme = Theme.of(context);
+
     return Dialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.white,
+      backgroundColor: theme.cardTheme.color,
+      surfaceTintColor: theme.cardTheme.color,
       elevation: 12,
       insetPadding:
       const EdgeInsets.symmetric(
@@ -1014,16 +934,18 @@ class _CertificateDialogState
                   widget.firstCompletion
                       ? FadeTransition(
                     opacity:
-                    widget.fadeAnimation,
+                    widget
+                        .fadeAnimation,
                     child:
                     ScaleTransition(
                       scale:
-                      widget.scaleAnimation,
+                      widget
+                          .scaleAnimation,
                       child:
-                      _buildHeaderIcon(),
+                      _buildHeaderIcon(context),
                     ),
                   )
-                      : _buildHeaderIcon(),
+                      : _buildHeaderIcon(context),
 
                   const SizedBox(
                     width: 14,
@@ -1039,12 +961,12 @@ class _CertificateDialogState
                               ? "Course Completed!"
                               : "Course Completed",
                           style:
-                          const TextStyle(
+                          TextStyle(
                             fontSize: 23,
                             fontWeight:
                             FontWeight.w700,
                             color:
-                            Color(0xff003366),
+                            theme.colorScheme.primary,
                           ),
                         ),
                         const SizedBox(
@@ -1054,12 +976,13 @@ class _CertificateDialogState
                           widget.course.title,
                           maxLines: 1,
                           overflow:
-                          TextOverflow.ellipsis,
+                          TextOverflow
+                              .ellipsis,
                           style:
-                          const TextStyle(
+                          TextStyle(
                             fontSize: 14,
                             color:
-                            Colors.grey,
+                            theme.colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -1076,16 +999,18 @@ class _CertificateDialogState
                       ).pop();
                     },
                     icon:
-                    const Icon(
+                    Icon(
                       Icons.close,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const Divider(
+            Divider(
               height: 1,
+              color: theme.dividerColor,
             ),
 
             Expanded(
@@ -1107,26 +1032,25 @@ class _CertificateDialogState
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.celebration,
                               size: 20,
                               color:
-                              Color(0xff003366),
+                              theme.colorScheme.primary,
                             ),
                             const SizedBox(
                               width: 8,
                             ),
                             Expanded(
-                              child:
-                              Text(
+                              child: Text(
                                 generating
                                     ? "Your certificate is being prepared..."
                                     : "Congratulations! Your certificate is ready.",
                                 style:
-                                const TextStyle(
+                                TextStyle(
                                   fontSize: 14,
                                   color:
-                                  Colors.grey,
+                                  theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                 ),
                               ),
                             ),
@@ -1136,7 +1060,7 @@ class _CertificateDialogState
 
                     Expanded(
                       child:
-                      _buildCertificateArea(),
+                      _buildCertificateArea(context),
                     ),
 
                     const SizedBox(
@@ -1162,6 +1086,10 @@ class _CertificateDialogState
                               context,
                             ).pop();
                           },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: theme.dividerColor),
+                            foregroundColor: theme.colorScheme.onSurface,
+                          ),
                           child:
                           const Text(
                             "Close",
@@ -1179,42 +1107,44 @@ class _CertificateDialogState
     );
   }
 
-  Widget _buildHeaderIcon() {
+  Widget _buildHeaderIcon(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: 54,
       height: 54,
       decoration:
-      const BoxDecoration(
+      BoxDecoration(
         color:
-        Color(0xffEAF4FF),
+        theme.colorScheme.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       child:
-      const Icon(
+      Icon(
         Icons.workspace_premium,
         size: 32,
         color:
-        Color(0xff003366),
+        theme.colorScheme.primary,
       ),
     );
   }
 
-  Widget _buildCertificateArea() {
+  Widget _buildCertificateArea(BuildContext context) {
+    final theme = Theme.of(context);
     if (generating) {
       return Container(
         width: double.infinity,
         decoration:
         BoxDecoration(
           color:
-          const Color(0xffF8FBFE),
+          theme.colorScheme.surface.withValues(alpha: 0.5),
           borderRadius:
           BorderRadius.circular(16),
           border: Border.all(
             color:
-            const Color(0xffE2EDF6),
+            theme.dividerColor,
           ),
         ),
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisSize:
             MainAxisSize.min,
@@ -1225,21 +1155,20 @@ class _CertificateDialogState
                 child:
                 CircularProgressIndicator(
                   color:
-                  Color(0xff003366),
+                  theme.colorScheme.primary,
                 ),
               ),
-              SizedBox(
+              const SizedBox(
                 height: 20,
               ),
               Text(
                 "Preparing your certificate",
-                style:
-                TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight:
                   FontWeight.w600,
                   color:
-                  Color(0xff003366),
+                  theme.colorScheme.primary,
                 ),
               ),
             ],
@@ -1254,21 +1183,22 @@ class _CertificateDialogState
         decoration:
         BoxDecoration(
           color:
-          const Color(0xfffff7f7),
+          Colors.red.withValues(alpha: 0.05),
           borderRadius:
           BorderRadius.circular(16),
+          border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
         ),
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisSize:
             MainAxisSize.min,
             children: [
-              Icon(
+              const Icon(
                 Icons.error_outline,
                 size: 48,
                 color: Colors.red,
               ),
-              SizedBox(
+              const SizedBox(
                 height: 12,
               ),
               Text(
@@ -1278,6 +1208,7 @@ class _CertificateDialogState
                   fontSize: 17,
                   fontWeight:
                   FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
             ],
@@ -1293,7 +1224,7 @@ class _CertificateDialogState
         BorderRadius.circular(16),
         child: Container(
           width: double.infinity,
-          color: Colors.white,
+          color: Colors.white, // IFrame background is usually white, might look awkward in dark mode but PDF is usually white.
           child:
           HtmlElementView(
             viewType:
@@ -1327,27 +1258,29 @@ class _InfoCard
   Widget build(
       BuildContext context,
       ) {
+    final theme = Theme.of(context);
     return Expanded(
       child: Container(
         padding:
         const EdgeInsets.all(16),
         decoration:
         BoxDecoration(
-          color: Colors.white,
+          color: theme.cardTheme.color,
           borderRadius:
           BorderRadius.circular(16),
+          border: Border.all(color: theme.dividerColor),
         ),
         child: Column(
           children: [
-            Icon(icon),
+            Icon(icon, color: theme.colorScheme.primary),
             const SizedBox(
               height: 8,
             ),
             Text(
               title,
               style:
-              const TextStyle(
-                color: Colors.grey,
+              TextStyle(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(
@@ -1356,10 +1289,11 @@ class _InfoCard
             Text(
               value,
               style:
-              const TextStyle(
+              TextStyle(
                 fontSize: 18,
                 fontWeight:
                 FontWeight.bold,
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ],

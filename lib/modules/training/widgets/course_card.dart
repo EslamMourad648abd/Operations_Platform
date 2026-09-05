@@ -44,6 +44,7 @@ class _CourseCardState extends State<CourseCard> {
   @override
   Widget build(BuildContext context) {
     final progressPercentage = widget.progress.round();
+    final theme = Theme.of(context);
 
     final formattedDuration =
     _formatDuration(widget.duration);
@@ -85,15 +86,16 @@ class _CourseCardState extends State<CourseCard> {
           ),
 
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.cardTheme.color,
 
             borderRadius:
             BorderRadius.circular(20),
+            border: Border.all(color: theme.dividerColor),
 
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(
-                  _hovering ? .15 : .08,
+                color: Colors.black.withValues(
+                  alpha: _hovering ? .15 : .08,
                 ),
                 blurRadius:
                 _hovering ? 18 : 10,
@@ -122,14 +124,14 @@ class _CourseCardState extends State<CourseCard> {
                     radius: 34,
 
                     backgroundColor:
-                    const Color(0xff003366)
-                        .withOpacity(.08),
+                    theme.colorScheme.primary
+                        .withValues(alpha: .08),
 
-                    child: const Icon(
+                    child: Icon(
                       Icons.school,
                       size: 34,
                       color:
-                      Color(0xff003366),
+                      theme.colorScheme.primary,
                     ),
                   ),
                 ),
@@ -150,12 +152,12 @@ class _CourseCardState extends State<CourseCard> {
                   overflow:
                   TextOverflow.ellipsis,
 
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight:
                     FontWeight.bold,
                     color:
-                    Color(0xff003366),
+                    theme.colorScheme.primary,
                   ),
                 ),
 
@@ -175,8 +177,8 @@ class _CourseCardState extends State<CourseCard> {
                   overflow:
                   TextOverflow.ellipsis,
 
-                  style: const TextStyle(
-                    color: Colors.grey,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     height: 1.4,
                   ),
                 ),
@@ -191,11 +193,11 @@ class _CourseCardState extends State<CourseCard> {
 
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.menu_book,
                       size: 18,
                       color:
-                      Color(0xff003366),
+                      theme.colorScheme.primary,
                     ),
 
                     const SizedBox(
@@ -207,6 +209,7 @@ class _CourseCardState extends State<CourseCard> {
                         "${widget.lessonsCount} Lessons",
                         overflow:
                         TextOverflow.ellipsis,
+                        style: TextStyle(color: theme.colorScheme.onSurface),
                       ),
                     ),
 
@@ -214,11 +217,11 @@ class _CourseCardState extends State<CourseCard> {
                       width: 12,
                     ),
 
-                    const Icon(
+                    Icon(
                       Icons.schedule,
                       size: 18,
                       color:
-                      Color(0xff003366),
+                      theme.colorScheme.primary,
                     ),
 
                     const SizedBox(
@@ -227,6 +230,7 @@ class _CourseCardState extends State<CourseCard> {
 
                     Text(
                       formattedDuration,
+                      style: TextStyle(color: theme.colorScheme.onSurface),
                     ),
                   ],
                 ),
@@ -239,12 +243,13 @@ class _CourseCardState extends State<CourseCard> {
                 // PROGRESS TITLE
                 // ==================================================
 
-                const Text(
+                Text(
                   "Progress",
 
                   style: TextStyle(
                     fontWeight:
                     FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
 
@@ -272,11 +277,11 @@ class _CourseCardState extends State<CourseCard> {
                     minHeight: 8,
 
                     backgroundColor:
-                    Colors.grey.shade200,
+                    theme.colorScheme.primary.withValues(alpha: 0.1),
 
                     valueColor:
-                    const AlwaysStoppedAnimation(
-                      Color(0xff003366),
+                    AlwaysStoppedAnimation(
+                      theme.colorScheme.primary,
                     ),
                   ),
                 ),
@@ -296,9 +301,9 @@ class _CourseCardState extends State<CourseCard> {
                   child: Text(
                     "$progressPercentage%",
 
-                    style: const TextStyle(
+                    style: TextStyle(
                       color:
-                      Color(0xff003366),
+                      theme.colorScheme.primary,
                       fontWeight:
                       FontWeight.bold,
                     ),
@@ -323,10 +328,10 @@ class _CourseCardState extends State<CourseCard> {
                     style:
                     ElevatedButton.styleFrom(
                       backgroundColor:
-                      const Color(0xff003366),
+                      theme.colorScheme.primary,
 
                       foregroundColor:
-                      Colors.white,
+                      theme.colorScheme.onPrimary,
 
                       padding:
                       const EdgeInsets.symmetric(

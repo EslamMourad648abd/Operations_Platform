@@ -120,111 +120,38 @@ class LessonTile extends StatelessWidget {
 
 
     return Card(
-
-
-      elevation:2,
-
-
-      margin:
-      const EdgeInsets.only(
-        bottom:12,
-      ),
-
-
-
-      child:
-
-
-      ListTile(
-
-
-
-        leading:
-
-        CircleAvatar(
-
-
-          backgroundColor:
-          iconColor,
-
-
-          child:
-
-          Icon(
-
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: iconColor.withValues(alpha: 0.1),
+          child: Icon(
             icon,
-
-            color:
-            Colors.white,
-
+            color: iconColor,
+            size: 20,
           ),
-
         ),
-
-
-
-
-        title:
-
-        Text(
-
+        title: Text(
           lesson.title,
-
-          style:
-
-          const TextStyle(
-
-            fontWeight:
-            FontWeight.w600,
-
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
           ),
-
         ),
-
-
-
-
-        subtitle:
-
-        Text(
-
+        subtitle: Text(
           status,
-
-          style:
-
-          TextStyle(
-
-            color:
-            iconColor,
-
-            fontSize:13,
-
+          style: TextStyle(
+            color: iconColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
           ),
-
         ),
-
-
-
-
-        trailing:
-
-        const Icon(
-
+        trailing: Icon(
           Icons.arrow_forward_ios,
-
-          size:16,
-
+          size: 14,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
         ),
-
-
-
-
-        onTap:
-        onPressed,
-
+        onTap: onPressed,
       ),
-
-
     );
 
 

@@ -2,51 +2,213 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../modules/operations/onboarding/screens/client/client_activity.dart';
+import '../modules/operations/onboarding/screens/client/client_overview.dart';
+import '../modules/training/screens/training_certificates.dart';
+import '../modules/training/screens/training_courses_screen.dart';
 import '../services/auth_service.dart';
+
+// ============================================================
+// PLATFORM
+// ============================================================
+
 import '../platform/dashboard.dart';
-import '../modules/login.dart';
-import '../modules/bbc_api.dart';
+
+// ============================================================
+// LOGIN
+// ============================================================
+
+import '../modules/login/login.dart';
+
+// ============================================================
+// BBC API
+// ============================================================
+
+import '../modules/bbc_api_tool/bbc_api.dart';
+
+// ============================================================
+// TRAINING
+// ============================================================
+
+import '../modules/training/screens/training_shell.dart';
 import '../modules/training/screens/training_dashboard.dart';
 import '../modules/training/screens/course_details.dart';
 import '../modules/training/screens/lesson_screen.dart';
 import '../modules/training/screens/quiz_screen.dart';
 import '../modules/training/screens/quiz_review_screen.dart';
+
 import '../modules/training/models/course_model.dart';
 import '../modules/training/models/lesson_model.dart';
+
 import '../modules/training/repositories/firebase_training_repository.dart';
-import '../admin/super_admin_console.dart';
+
+// ============================================================
+// SUPER ADMIN
+// ============================================================
+
+import '../admin_console/screens/super_admin_console.dart';
+
+// ============================================================
+// OPERATIONS / ONBOARDING
+// ============================================================
+
+import '../modules/operations/onboarding/screens/client/client_channels.dart';
+import '../modules/operations/onboarding/screens/client/client_activation.dart';
+
+import '../modules/operations/onboarding/screens/onboarding_shell.dart';
+import '../modules/operations/onboarding/screens/onboarding_dashboard.dart';
+import '../modules/operations/onboarding/screens/clients.dart';
+import '../modules/operations/onboarding/screens/onboarding_tasks.dart';
+import '../modules/operations/onboarding/screens/onboarding_reports.dart';
+
+// ============================================================
+// CLIENT WORKSPACE
+// ============================================================
+
+import '../modules/operations/onboarding/screens/client/client_workspace.dart';
+import '../modules/operations/onboarding/screens/client/client_verification.dart';
+import '../modules/operations/onboarding/screens/client/client_chatbot.dart';
+import '../modules/operations/onboarding/screens/client/client_group.dart';
+// ============================================================
+// APP ROUTER
+// ============================================================
 
 class AppRouter {
+  // ============================================================
+  // OPERATIONS / ONBOARDING
+  // ============================================================
+
+  static const operations =
+      '/operations';
+
+  static const onboarding =
+      '/operations/onboarding';
+
+  static const onboardingClients =
+      '/operations/onboarding/clients';
+
+  static const onboardingTasks =
+      '/operations/onboarding/tasks';
+
+  static const onboardingReports =
+      '/operations/onboarding/reports';
+
+  // ============================================================
+  // CLIENT WORKSPACE
+  // ============================================================
+
+  static const onboardingClient =
+      '/operations/onboarding/client/:clientId';
+
+  static const clientOverview =
+      '/operations/onboarding/client/:clientId/overview';
+
+  static const clientActivation =
+      '/operations/onboarding/client/:clientId/activation';
+
+  static const clientChannels =
+      '/operations/onboarding/client/:clientId/channels';
+
+  static const clientVerification =
+      '/operations/onboarding/client/:clientId/verification';
+
+  static const clientChatbot =
+      '/operations/onboarding/client/:clientId/chatbot';
+
+  static const clientGroup =
+      '/operations/onboarding/client/:clientId/group';
+
+  static const clientActivity =
+      '/operations/onboarding/client/:clientId/activity';
+
+  // ============================================================
+  // CLIENT URL HELPERS
+  // ============================================================
+
+  static String onboardingClientPath(
+      String clientId,
+      ) {
+    return '/operations/onboarding/client/'
+        '${Uri.encodeComponent(clientId)}';
+  }
+
+  static String clientOverviewPath(
+      String clientId,
+      ) {
+    return '${onboardingClientPath(clientId)}/overview';
+  }
+
+  static String clientActivationPath(
+      String clientId,
+      ) {
+    return '${onboardingClientPath(clientId)}/activation';
+  }
+
+  static String clientChannelsPath(
+      String clientId,
+      ) {
+    return '${onboardingClientPath(clientId)}/channels';
+  }
+
+  static String clientVerificationPath(
+      String clientId,
+      ) {
+    return '${onboardingClientPath(clientId)}/verification';
+  }
+
+  static String clientChatbotPath(
+      String clientId,
+      ) {
+    return '${onboardingClientPath(clientId)}/chatbot';
+  }
+
+  static String clientGroupPath(
+      String clientId,
+      ) {
+    return '${onboardingClientPath(clientId)}/group';
+  }
+
+  static String clientActivityPath(
+      String clientId,
+      ) {
+    return '${onboardingClientPath(clientId)}/activity';
+  }
+
   // ============================================================
   // MAIN ROUTES
   // ============================================================
 
-  static const login = '/login';
+  static const login =
+      '/login';
 
-  static const home = '/home';
+  static const home =
+      '/home';
 
-  static const bbcApi = '/bbc-api';
-
-  static const training = '/training';
-
-  // ============================================================
-  // ADMIN CONSOLE ROUTES
-  // ============================================================
-
-  static const adminConsole =
-      '/admin-console';
-
-  static const adminUsers =
-      '/admin-console/users';
-
-  static const adminTrainingManagement =
-      '/admin-console/training-management';
-
-  static const adminAnalytics =
-      '/admin-console/analytics';
+  static const bbcApi =
+      '/bbc-api';
 
   // ============================================================
-  // TRAINING ROUTES
+  // TRAINING ROOT
+  // ============================================================
+
+  static const training =
+      '/training';
+
+  // ============================================================
+  // TRAINING SECTIONS
+  // ============================================================
+
+  static const trainingCourses =
+      '/training/courses';
+
+  static const trainingProgress =
+      '/training/progress';
+
+  static const trainingCertificates =
+      '/training/certificates';
+
+  // ============================================================
+  // TRAINING COURSE ROUTES
   // ============================================================
 
   static const course =
@@ -62,7 +224,7 @@ class AppRouter {
       '/training/course/:courseId/lesson/:lessonId/quiz/review';
 
   // ============================================================
-  // URL HELPERS
+  // TRAINING URL HELPERS
   // ============================================================
 
   static String coursePath(
@@ -95,13 +257,32 @@ class AppRouter {
   }
 
   // ============================================================
+  // ADMIN CONSOLE ROUTES
+  // ============================================================
+
+  static const adminConsole =
+      '/admin-console';
+
+  static const adminUsers =
+      '/admin-console/users';
+
+  static const adminTrainingManagement =
+      '/admin-console/training-management';
+
+  static const adminAnalytics =
+      '/admin-console/analytics';
+
+  // ============================================================
   // ROUTER
   // ============================================================
 
-  static final GoRouter router = GoRouter(
-    initialLocation: login,
+  static final GoRouter router =
+  GoRouter(
+    initialLocation:
+    login,
 
-    debugLogDiagnostics: true,
+    debugLogDiagnostics:
+    true,
 
     // ==========================================================
     // AUTH GUARD
@@ -153,7 +334,7 @@ class AppRouter {
       }
 
       // --------------------------------------------------------
-      // ADMIN CONSOLE
+      // SUPER ADMIN CONSOLE
       // --------------------------------------------------------
 
       if (location == adminConsole ||
@@ -196,6 +377,24 @@ class AppRouter {
         return home;
       }
 
+      // --------------------------------------------------------
+      // OPERATIONS / ONBOARDING
+      // --------------------------------------------------------
+
+      if (location == operations ||
+          location.startsWith('$operations/')) {
+        if (AuthService.isSuperAdmin ||
+            AuthService.isAgent) {
+          return null;
+        }
+
+        return home;
+      }
+
+      // --------------------------------------------------------
+      // DEFAULT
+      // --------------------------------------------------------
+
       return null;
     },
 
@@ -209,9 +408,11 @@ class AppRouter {
       // ========================================================
 
       GoRoute(
-        path: login,
+        path:
+        login,
 
-        name: 'login',
+        name:
+        'login',
 
         builder: (
             context,
@@ -226,9 +427,11 @@ class AppRouter {
       // ========================================================
 
       GoRoute(
-        path: home,
+        path:
+        home,
 
-        name: 'home',
+        name:
+        'home',
 
         builder: (
             context,
@@ -243,9 +446,11 @@ class AppRouter {
       // ========================================================
 
       GoRoute(
-        path: bbcApi,
+        path:
+        bbcApi,
 
-        name: 'bbc-api',
+        name:
+        'bbc-api',
 
         builder: (
             context,
@@ -256,173 +461,273 @@ class AppRouter {
       ),
 
       // ========================================================
-      // TRAINING DASHBOARD
+      // TRAINING SHELL
       // ========================================================
 
-      GoRoute(
-        path: training,
-
-        name: 'training',
-
+      ShellRoute(
         builder: (
             context,
             state,
+            child,
             ) {
-          return const TrainingDashboard();
-        },
-      ),
-
-      // ========================================================
-      // COURSE
-      // ========================================================
-
-      GoRoute(
-        path: course,
-
-        name: 'training-course',
-
-        builder: (
-            context,
-            state,
-            ) {
-          final courseId =
-          state.pathParameters['courseId'];
-
-          if (courseId == null ||
-              courseId.isEmpty) {
-            return const _RouteErrorPage(
-              message:
-              'Course ID is missing.',
-            );
-          }
-
-          return _CourseRouteLoader(
-            courseId: courseId,
+          return TrainingShell(
+            child:
+            child,
           );
         },
+
+        routes: [
+          // ====================================================
+          // TRAINING DASHBOARD
+          // ====================================================
+
+          GoRoute(
+            path:
+            training,
+
+            name:
+            'training',
+
+            builder: (
+                context,
+                state,
+                ) {
+              return const TrainingDashboard();
+            },
+          ),
+
+          // ====================================================
+          // COURSES
+          // ====================================================
+
+          GoRoute(
+            path:
+            trainingCourses,
+
+            name:
+            'training-courses',
+
+            builder: (
+                context,
+                state,
+                ) {
+              return const TrainingCoursesScreen();
+            },
+          ),
+
+          // ====================================================
+          // MY PROGRESS
+          // ====================================================
+
+          GoRoute(
+            path:
+            trainingProgress,
+
+            name:
+            'training-progress',
+
+            builder: (
+                context,
+                state,
+                ) {
+              return const TrainingDashboard();
+            },
+          ),
+
+          // ====================================================
+          // CERTIFICATES
+          // ====================================================
+
+          GoRoute(
+            path:
+            trainingCertificates,
+
+            name:
+            'training-certificates',
+
+            builder: (
+                context,
+                state,
+                ) {
+              return const TrainingCertificates();
+            },
+          ),
+
+          // ====================================================
+          // TRAINING COURSE
+          // ====================================================
+
+          GoRoute(
+            path:
+            course,
+
+            name:
+            'training-course',
+
+            builder: (
+                context,
+                state,
+                ) {
+              final courseId =
+              state.pathParameters[
+              'courseId'];
+
+              if (courseId == null ||
+                  courseId.isEmpty) {
+                return const _RouteErrorPage(
+                  message:
+                  'Course ID is missing.',
+                );
+              }
+
+              return _CourseRouteLoader(
+                courseId:
+                courseId,
+              );
+            },
+          ),
+
+          // ====================================================
+          // TRAINING LESSON
+          // ====================================================
+
+          GoRoute(
+            path:
+            lesson,
+
+            name:
+            'training-lesson',
+
+            builder: (
+                context,
+                state,
+                ) {
+              final courseId =
+              state.pathParameters[
+              'courseId'];
+
+              final lessonId =
+              state.pathParameters[
+              'lessonId'];
+
+              if (courseId == null ||
+                  courseId.isEmpty ||
+                  lessonId == null ||
+                  lessonId.isEmpty) {
+                return const _RouteErrorPage(
+                  message:
+                  'Course or lesson ID is missing.',
+                );
+              }
+
+              return _LessonRouteLoader(
+                courseId:
+                courseId,
+
+                lessonId:
+                lessonId,
+              );
+            },
+          ),
+
+          // ====================================================
+          // TRAINING QUIZ
+          // ====================================================
+
+          GoRoute(
+            path:
+            quiz,
+
+            name:
+            'training-quiz',
+
+            builder: (
+                context,
+                state,
+                ) {
+              final courseId =
+              state.pathParameters[
+              'courseId'];
+
+              final lessonId =
+              state.pathParameters[
+              'lessonId'];
+
+              if (courseId == null ||
+                  courseId.isEmpty ||
+                  lessonId == null ||
+                  lessonId.isEmpty) {
+                return const _RouteErrorPage(
+                  message:
+                  'Course or lesson ID is missing.',
+                );
+              }
+
+              return QuizScreen(
+                courseId:
+                courseId,
+
+                lessonId:
+                lessonId,
+              );
+            },
+          ),
+
+          // ====================================================
+          // TRAINING QUIZ REVIEW
+          // ====================================================
+
+          GoRoute(
+            path:
+            quizReview,
+
+            name:
+            'training-quiz-review',
+
+            builder: (
+                context,
+                state,
+                ) {
+              final courseId =
+              state.pathParameters[
+              'courseId'];
+
+              final lessonId =
+              state.pathParameters[
+              'lessonId'];
+
+              if (courseId == null ||
+                  courseId.isEmpty ||
+                  lessonId == null ||
+                  lessonId.isEmpty) {
+                return const _RouteErrorPage(
+                  message:
+                  'Course or lesson ID is missing.',
+                );
+              }
+
+              return QuizReviewScreen(
+                courseId:
+                courseId,
+
+                lessonId:
+                lessonId,
+              );
+            },
+          ),
+        ],
       ),
 
       // ========================================================
-      // LESSON
+      // SUPER ADMIN CONSOLE
       // ========================================================
 
       GoRoute(
-        path: lesson,
+        path:
+        adminConsole,
 
-        name: 'training-lesson',
-
-        builder: (
-            context,
-            state,
-            ) {
-          final courseId =
-          state.pathParameters['courseId'];
-
-          final lessonId =
-          state.pathParameters['lessonId'];
-
-          if (courseId == null ||
-              courseId.isEmpty ||
-              lessonId == null ||
-              lessonId.isEmpty) {
-            return const _RouteErrorPage(
-              message:
-              'Course or lesson ID is missing.',
-            );
-          }
-
-          return _LessonRouteLoader(
-            courseId: courseId,
-            lessonId: lessonId,
-          );
-        },
-      ),
-
-      // ========================================================
-      // QUIZ
-      // ========================================================
-
-      GoRoute(
-        path: quiz,
-
-        name: 'training-quiz',
-
-        builder: (
-            context,
-            state,
-            ) {
-          final courseId =
-          state.pathParameters['courseId'];
-
-          final lessonId =
-          state.pathParameters['lessonId'];
-
-          if (courseId == null ||
-              courseId.isEmpty ||
-              lessonId == null ||
-              lessonId.isEmpty) {
-            return const _RouteErrorPage(
-              message:
-              'Course or lesson ID is missing.',
-            );
-          }
-
-          return QuizScreen(
-            courseId: courseId,
-            lessonId: lessonId,
-          );
-        },
-      ),
-
-      // ========================================================
-      // QUIZ REVIEW
-      // ========================================================
-
-      GoRoute(
-        path: quizReview,
-
-        name: 'training-quiz-review',
-
-        builder: (
-            context,
-            state,
-            ) {
-          final courseId =
-          state.pathParameters['courseId'];
-
-          final lessonId =
-          state.pathParameters['lessonId'];
-
-          if (courseId == null ||
-              courseId.isEmpty ||
-              lessonId == null ||
-              lessonId.isEmpty) {
-            return const _RouteErrorPage(
-              message:
-              'Course or lesson ID is missing.',
-            );
-          }
-
-          return QuizReviewScreen(
-            courseId: courseId,
-            lessonId: lessonId,
-          );
-        },
-      ),
-
-      // ========================================================
-      // ADMIN CONSOLE
-      //
-      // Base URL:
-      // /admin-console
-      //
-      // Opens Users by default.
-      // ========================================================
-
-      GoRoute(
-        path: adminConsole,
-
-        name: 'admin-console',
+        name:
+        'admin-console',
 
         redirect: (
             context,
@@ -444,9 +749,11 @@ class AppRouter {
       // ========================================================
 
       GoRoute(
-        path: adminUsers,
+        path:
+        adminUsers,
 
-        name: 'admin-users',
+        name:
+        'admin-users',
 
         builder: (
             context,
@@ -461,9 +768,11 @@ class AppRouter {
       // ========================================================
 
       GoRoute(
-        path: adminTrainingManagement,
+        path:
+        adminTrainingManagement,
 
-        name: 'admin-training-management',
+        name:
+        'admin-training-management',
 
         builder: (
             context,
@@ -478,9 +787,11 @@ class AppRouter {
       // ========================================================
 
       GoRoute(
-        path: adminAnalytics,
+        path:
+        adminAnalytics,
 
-        name: 'admin-analytics',
+        name:
+        'admin-analytics',
 
         builder: (
             context,
@@ -488,6 +799,410 @@ class AppRouter {
             ) {
           return const PlatformAdminConsole();
         },
+      ),
+
+      // ========================================================
+      // ONBOARDING SHELL
+      // ========================================================
+
+      ShellRoute(
+        builder: (
+            context,
+            state,
+            child,
+            ) {
+          return OnboardingShell(
+            child:
+            child,
+          );
+        },
+
+        routes: [
+          // ====================================================
+          // OPERATIONS ROOT
+          // ====================================================
+
+          GoRoute(
+            path:
+            operations,
+
+            name:
+            'operations',
+
+            redirect: (
+                context,
+                state,
+                ) {
+              return onboarding;
+            },
+          ),
+
+          // ====================================================
+          // ONBOARDING DASHBOARD
+          // ====================================================
+
+          GoRoute(
+            path:
+            onboarding,
+
+            name:
+            'onboarding',
+
+            builder: (
+                context,
+                state,
+                ) {
+              return const OnboardingDashboard();
+            },
+          ),
+
+          // ====================================================
+          // CLIENTS
+          // ====================================================
+
+          GoRoute(
+            path:
+            onboardingClients,
+
+            name:
+            'onboarding-clients',
+
+            builder: (
+                context,
+                state,
+                ) {
+              return const OnboardingClientsScreen();
+            },
+          ),
+
+          // ====================================================
+          // TASKS
+          //
+          // IMPORTANT:
+          //
+          // Tasks remain user-level and are NOT part of the
+          // individual client workspace.
+          //
+          // ====================================================
+
+          GoRoute(
+            path:
+            onboardingTasks,
+
+            name:
+            'onboarding-tasks',
+
+            builder: (
+                context,
+                state,
+                ) {
+              return const OnboardingTasks();
+            },
+          ),
+
+          // ====================================================
+          // REPORTS
+          // ====================================================
+
+          GoRoute(
+            path:
+            onboardingReports,
+
+            name:
+            'onboarding-reports',
+
+            builder: (
+                context,
+                state,
+                ) {
+              return const OnboardingReports();
+            },
+          ),
+        ],
+      ),
+
+      // ========================================================
+      // CLIENT WORKSPACE
+      // ========================================================
+
+      ShellRoute(
+        builder: (
+            context,
+            state,
+            child,
+            ) {
+          final clientId =
+          state.pathParameters[
+          'clientId'];
+
+          if (clientId == null ||
+              clientId.isEmpty) {
+            return const _RouteErrorPage(
+              message:
+              'Client ID is missing.',
+            );
+          }
+
+          return ClientWorkspace(
+            clientId:
+            clientId,
+
+            child:
+            child,
+          );
+        },
+
+        routes: [
+          // ====================================================
+          // CLIENT ROOT
+          // ====================================================
+
+          GoRoute(
+            path:
+            onboardingClient,
+
+            name:
+            'onboarding-client',
+
+            redirect: (
+                context,
+                state,
+                ) {
+              final clientId =
+              state.pathParameters[
+              'clientId'];
+
+              if (clientId == null ||
+                  clientId.isEmpty) {
+                return home;
+              }
+
+              return clientOverviewPath(
+                clientId,
+              );
+            },
+
+            builder: (
+                context,
+                state,
+                ) {
+              return const SizedBox.shrink();
+            },
+          ),
+
+          // ====================================================
+          // OVERVIEW
+          // ====================================================
+
+          GoRoute(
+            path:
+            clientOverview,
+
+            name:
+            'client-overview',
+
+            builder: (
+                context,
+                state,
+                ) {
+              final clientId =
+              state.pathParameters[
+              'clientId'];
+
+              if (clientId == null ||
+                  clientId.isEmpty) {
+                return const _RouteErrorPage(
+                  message:
+                  'Client ID is missing.',
+                );
+              }
+
+              return ClientOverviewScreen(
+                clientId:
+                clientId,
+              );
+            },
+          ),
+
+          // ====================================================
+          // ACTIVATION
+          // ====================================================
+
+          GoRoute(
+            path:
+            clientActivation,
+
+            name:
+            'client-activation',
+
+            builder: (
+                context,
+                state,
+                ) {
+              final clientId =
+              state.pathParameters[
+              'clientId'];
+
+              if (clientId == null ||
+                  clientId.isEmpty) {
+                return const _RouteErrorPage(
+                  message:
+                  'Client ID is missing.',
+                );
+              }
+
+              return ClientActivationScreen(
+                clientId:
+                clientId,
+              );
+            },
+          ),
+
+          // ====================================================
+          // CHANNELS
+          // ====================================================
+
+          GoRoute(
+            path:
+            clientChannels,
+
+            name:
+            'client-channels',
+
+            builder: (
+                context,
+                state,
+                ) {
+              final clientId =
+              state.pathParameters[
+              'clientId'];
+
+              if (clientId == null ||
+                  clientId.isEmpty) {
+                return const _RouteErrorPage(
+                  message:
+                  'Client ID is missing.',
+                );
+              }
+
+              return ClientChannelsScreen(
+                clientId:
+                clientId,
+              );
+            },
+          ),
+
+          // ====================================================
+// VERIFICATION
+// ====================================================
+
+          GoRoute(
+            path:
+            clientVerification,
+
+            name:
+            'client-verification',
+
+            builder: (
+                context,
+                state,
+                ) {
+              final clientId =
+              state.pathParameters[
+              'clientId'];
+
+              if (clientId == null ||
+                  clientId.isEmpty) {
+                return const _RouteErrorPage(
+                  message:
+                  'Client ID is missing.',
+                );
+              }
+
+              return ClientVerificationScreen(
+                clientId:
+                clientId,
+              );
+            },
+          ),
+
+          GoRoute(
+            path: clientChatbot,
+            name: 'client-chatbot',
+            builder: (
+                context,
+                state,
+                ) {
+              final clientId =
+              state.pathParameters['clientId'];
+
+              if (clientId == null ||
+                  clientId.isEmpty) {
+                return const Scaffold(
+                  body: Center(
+                    child: Text(
+                      'Client ID is missing.',
+                    ),
+                  ),
+                );
+              }
+
+              return ClientChatbotScreen(
+                clientId: clientId,
+              );
+            },
+          ),
+
+          GoRoute(
+            path: clientGroup,
+            name: 'client-group',
+            builder: (
+                context,
+                state,
+                ) {
+              final clientId = state.pathParameters['clientId'];
+
+              if (clientId == null || clientId.isEmpty) {
+                return const Scaffold(
+                  body: Center(
+                    child: Text('Client ID is missing.'),
+                  ),
+                );
+              }
+
+              return ClientGroupScreen(
+                clientId: clientId,
+              );
+            },
+          ),
+
+          GoRoute(
+            path: AppRouter.clientActivity,
+            name: 'client-activity',
+            builder: (
+                context,
+                state,
+                ) {
+              final clientId =
+              state.pathParameters['clientId'];
+
+              if (clientId == null ||
+                  clientId.trim().isEmpty) {
+                return const Scaffold(
+                  body: Center(
+                    child: Text(
+                      'Client ID is missing.',
+                    ),
+                  ),
+                );
+              }
+
+              return ClientActivityScreen(
+                clientId: clientId,
+              );
+            },
+          ),
+        ],
       ),
     ],
 
@@ -503,12 +1218,15 @@ class AppRouter {
         backgroundColor:
         const Color(0xffF5F8FC),
 
-        body: Center(
-          child: Padding(
+        body:
+        Center(
+          child:
+          Padding(
             padding:
             const EdgeInsets.all(24),
 
-            child: Column(
+            child:
+            Column(
               mainAxisSize:
               MainAxisSize.min,
 
@@ -525,7 +1243,9 @@ class AppRouter {
 
                 const Text(
                   'Page not found',
-                  style: TextStyle(
+
+                  style:
+                  TextStyle(
                     fontSize: 24,
                     fontWeight:
                     FontWeight.bold,
@@ -538,11 +1258,14 @@ class AppRouter {
 
                 Text(
                   state.uri.toString(),
+
                   textAlign:
                   TextAlign.center,
+
                   style:
                   const TextStyle(
-                    color: Colors.grey,
+                    color:
+                    Colors.grey,
                   ),
                 ),
 
@@ -552,7 +1275,9 @@ class AppRouter {
 
                 ElevatedButton(
                   onPressed: () {
-                    context.go(home);
+                    context.go(
+                      home,
+                    );
                   },
 
                   child:
@@ -582,7 +1307,8 @@ class _CourseRouteLoader
   });
 
   @override
-  State<_CourseRouteLoader> createState() =>
+  State<_CourseRouteLoader>
+  createState() =>
       _CourseRouteLoaderState();
 }
 
@@ -594,7 +1320,8 @@ class _CourseRouteLoaderState
 
   CourseModel? _course;
 
-  bool _loading = true;
+  bool _loading =
+  true;
 
   String? _error;
 
@@ -613,17 +1340,23 @@ class _CourseRouteLoaderState
       CourseModel? found;
 
       for (final course in courses) {
-        if (course.id == widget.courseId) {
-          found = course;
+        if (course.id ==
+            widget.courseId) {
+          found =
+              course;
           break;
         }
       }
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       if (found == null) {
         setState(() {
-          _loading = false;
+          _loading =
+          false;
+
           _error =
           'Course not found.';
         });
@@ -632,14 +1365,21 @@ class _CourseRouteLoaderState
       }
 
       setState(() {
-        _course = found;
-        _loading = false;
+        _course =
+            found;
+
+        _loading =
+        false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
-        _loading = false;
+        _loading =
+        false;
+
         _error =
         'Failed to load course: $e';
       });
@@ -658,12 +1398,14 @@ class _CourseRouteLoaderState
         _course == null) {
       return _RouteErrorPage(
         message:
-        _error ?? 'Course not found.',
+        _error ??
+            'Course not found.',
       );
     }
 
     return CourseDetails(
-      course: _course!,
+      course:
+      _course!,
     );
   }
 }
@@ -675,6 +1417,7 @@ class _CourseRouteLoaderState
 class _LessonRouteLoader
     extends StatefulWidget {
   final String courseId;
+
   final String lessonId;
 
   const _LessonRouteLoader({
@@ -683,7 +1426,8 @@ class _LessonRouteLoader
   });
 
   @override
-  State<_LessonRouteLoader> createState() =>
+  State<_LessonRouteLoader>
+  createState() =>
       _LessonRouteLoaderState();
 }
 
@@ -695,7 +1439,8 @@ class _LessonRouteLoaderState
 
   LessonModel? _lesson;
 
-  bool _loading = true;
+  bool _loading =
+  true;
 
   String? _error;
 
@@ -716,17 +1461,23 @@ class _LessonRouteLoaderState
       LessonModel? found;
 
       for (final lesson in lessons) {
-        if (lesson.id == widget.lessonId) {
-          found = lesson;
+        if (lesson.id ==
+            widget.lessonId) {
+          found =
+              lesson;
           break;
         }
       }
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       if (found == null) {
         setState(() {
-          _loading = false;
+          _loading =
+          false;
+
           _error =
           'Lesson not found.';
         });
@@ -735,14 +1486,21 @@ class _LessonRouteLoaderState
       }
 
       setState(() {
-        _lesson = found;
-        _loading = false;
+        _lesson =
+            found;
+
+        _loading =
+        false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
-        _loading = false;
+        _loading =
+        false;
+
         _error =
         'Failed to load lesson: $e';
       });
@@ -761,15 +1519,233 @@ class _LessonRouteLoaderState
         _lesson == null) {
       return _RouteErrorPage(
         message:
-        _error ?? 'Lesson not found.',
+        _error ??
+            'Lesson not found.',
       );
     }
 
     return LessonScreen(
-      lesson: _lesson!,
+      lesson:
+      _lesson!,
     );
   }
 }
+
+// ============================================================
+// CLIENT PLACEHOLDERS
+// ============================================================
+
+/*
+class _ClientOverviewPlaceholder
+    extends StatelessWidget {
+  const _ClientOverviewPlaceholder();
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return const _ClientPlaceholderContent(
+      icon:
+      Icons.dashboard_outlined,
+      title:
+      'Client Overview',
+      description:
+      'Client overview information will appear here.',
+    );
+  }
+}
+
+class _ClientTasksPlaceholder
+    extends StatelessWidget {
+  const _ClientTasksPlaceholder();
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return const _ClientPlaceholderContent(
+      icon:
+      Icons.task_alt_outlined,
+      title:
+      'Client Tasks',
+      description:
+      'Client-specific onboarding tasks will appear here.',
+    );
+  }
+}
+
+class _ClientChannelsPlaceholder
+    extends StatelessWidget {
+  const _ClientChannelsPlaceholder();
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return const _ClientPlaceholderContent(
+      icon:
+      Icons.hub_outlined,
+      title:
+      'Channels',
+      description:
+      'Client communication channels will appear here.',
+    );
+  }
+}
+
+class _ClientVerificationPlaceholder
+    extends StatelessWidget {
+  const _ClientVerificationPlaceholder();
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return const _ClientPlaceholderContent(
+      icon:
+      Icons.verified_user_outlined,
+      title:
+      'Verification',
+      description:
+      'Client verification information will appear here.',
+    );
+  }
+}
+
+class _ClientChatbotPlaceholder
+    extends StatelessWidget {
+  const _ClientChatbotPlaceholder();
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return const _ClientPlaceholderContent(
+      icon:
+      Icons.smart_toy_outlined,
+      title:
+      'Chatbot',
+      description:
+      'Client chatbot configuration will appear here.',
+    );
+  }
+}
+
+class _ClientGroupPlaceholder
+    extends StatelessWidget {
+  const _ClientGroupPlaceholder();
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return const _ClientPlaceholderContent(
+      icon:
+      Icons.groups_outlined,
+      title:
+      'Group',
+      description:
+      'Client group configuration will appear here.',
+    );
+  }
+}
+
+class _ClientActivityPlaceholder
+    extends StatelessWidget {
+  const _ClientActivityPlaceholder();
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return const _ClientPlaceholderContent(
+      icon:
+      Icons.history_outlined,
+      title:
+      'Activity',
+      description:
+      'Client activity and audit history will appear here.',
+    );
+  }
+}
+*/
+
+/*
+class _ClientPlaceholderContent
+    extends StatelessWidget {
+  final IconData icon;
+
+  final String title;
+
+  final String description;
+
+  const _ClientPlaceholderContent({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return Center(
+      child:
+      Padding(
+        padding:
+        const EdgeInsets.all(32),
+
+        child:
+        Column(
+          mainAxisSize:
+          MainAxisSize.min,
+
+          children: [
+            Icon(
+              icon,
+              size: 56,
+              color:
+              const Color(0xff003366),
+            ),
+
+            const SizedBox(
+              height: 16,
+            ),
+
+            Text(
+              title,
+
+              style:
+              const TextStyle(
+                fontSize: 22,
+                fontWeight:
+                FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(
+              height: 8,
+            ),
+
+            Text(
+              description,
+
+              textAlign:
+              TextAlign.center,
+
+              style:
+              const TextStyle(
+                color:
+                Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+*/
 
 // ============================================================
 // LOADING PAGE
@@ -783,15 +1759,17 @@ class _RouteLoadingPage
   Widget build(
       BuildContext context,
       ) {
-    return const Scaffold(
+    final theme = Theme.of(context);
+    return Scaffold(
       backgroundColor:
-      Color(0xffF5F8FC),
+      theme.colorScheme.surface,
 
-      body: Center(
+      body:
+      Center(
         child:
         CircularProgressIndicator(
           color:
-          Color(0xff003366),
+          theme.colorScheme.primary,
         ),
       ),
     );
@@ -814,16 +1792,20 @@ class _RouteErrorPage
   Widget build(
       BuildContext context,
       ) {
+    final theme = Theme.of(context);
     return Scaffold(
       backgroundColor:
-      const Color(0xffF5F8FC),
+      theme.colorScheme.surface,
 
-      body: Center(
-        child: Padding(
+      body:
+      Center(
+        child:
+        Padding(
           padding:
           const EdgeInsets.all(24),
 
-          child: Column(
+          child:
+          Column(
             mainAxisSize:
             MainAxisSize.min,
 
@@ -840,11 +1822,14 @@ class _RouteErrorPage
 
               Text(
                 message,
+
                 textAlign:
                 TextAlign.center,
+
                 style:
-                const TextStyle(
+                TextStyle(
                   fontSize: 18,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
 
@@ -858,7 +1843,10 @@ class _RouteErrorPage
                     AppRouter.training,
                   );
                 },
-
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                ),
                 child:
                 const Text(
                   'Back to Training',

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../admin/services/training_admin_service.dart';
+import '../../../admin_console/services/training_admin_service.dart';
 import '../../../router/app_router.dart';
 import '../models/quiz_model.dart';
 import '../models/quiz_question_model.dart';
@@ -144,8 +144,7 @@ class _QuizScreenState
       return;
     }
 
-    if (selectedAnswers
-        .contains(null)) {
+    if (selectedAnswers.contains(null)) {
       ScaffoldMessenger.of(context)
           .showSnackBar(
         const SnackBar(
@@ -173,8 +172,7 @@ class _QuizScreenState
     try {
       int correct = 0;
 
-      final List<
-          Map<String, dynamic>>
+      final List<Map<String, dynamic>>
       answers = [];
 
       for (int i = 0;
@@ -235,20 +233,49 @@ class _QuizScreenState
       });
 
       // --------------------------------------------------------
-      // REPLACE QUIZ WITH REVIEW
+      // OPEN REVIEW
       //
-      // This is deliberate.
+      // IMPORTANT:
+      // Push the review screen instead of replacing the quiz.
       //
-      // Browser Back / GoRouter Back now returns to Lesson,
-      // not to the editable quiz.
+      // Stack:
+      //
+      // CourseDetails
+      //      ↓
+      // LessonScreen
+      //      ↓
+      // QuizScreen
+      //      ↓
+      // QuizReviewScreen
+      //
+      // Closing review returns to QuizScreen.
+      // Back from QuizScreen then returns to LessonScreen.
       // --------------------------------------------------------
 
-      context.pushReplacement(
-        AppRouter.quizReviewPath(
-          widget.courseId,
-          widget.lessonId,
-        ),
+      final reviewPath =
+      AppRouter.quizReviewPath(
+        widget.courseId,
+        widget.lessonId,
       );
+
+      debugPrint('================================');
+      debugPrint('QUIZ SUBMITTED');
+      debugPrint(
+        'COURSE ID: ${widget.courseId}',
+      );
+      debugPrint(
+        'LESSON ID: ${widget.lessonId}',
+      );
+      debugPrint(
+        'REVIEW ROUTE: $reviewPath',
+      );
+      debugPrint(
+        'CURRENT URL: '
+            '${GoRouterState.of(context).uri}',
+      );
+      debugPrint('================================');
+
+      await context.push(reviewPath);
     } catch (e) {
       debugPrint(
         "QUIZ SUBMIT ERROR: $e",
@@ -282,29 +309,32 @@ class _QuizScreenState
   Widget build(
       BuildContext context,
       ) {
+    final theme = Theme.of(context);
+
     if (loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor:
-        Color(0xffF5F8FC),
+        theme.colorScheme.surface,
         body: Center(
           child:
-          CircularProgressIndicator(),
+          CircularProgressIndicator(color: theme.colorScheme.primary),
         ),
       );
     }
 
     if (alreadySubmitted) {
-      return _buildAlreadySubmitted();
+      return _buildAlreadySubmitted(context);
     }
 
     if (quiz == null) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor:
-        Color(0xffF5F8FC),
+        theme.colorScheme.surface,
         body: Center(
           child:
           Text(
             "Quiz not available",
+            style: TextStyle(color: theme.colorScheme.onSurface),
           ),
         ),
       );
@@ -312,13 +342,12 @@ class _QuizScreenState
 
     return Scaffold(
       backgroundColor:
-      const Color(0xffF5F8FC),
-
+      theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor:
-        const Color(0xff003366),
+        theme.colorScheme.primary,
         foregroundColor:
-        Colors.white,
+        theme.colorScheme.onPrimary,
         title:
         const Text(
           "Lesson Quiz",
@@ -334,9 +363,8 @@ class _QuizScreenState
           ),
         ),
       ),
-
       body:
-      _buildQuiz(),
+      _buildQuiz(context),
     );
   }
 
@@ -344,16 +372,16 @@ class _QuizScreenState
   // ALREADY SUBMITTED
   // ============================================================
 
-  Widget _buildAlreadySubmitted() {
+  Widget _buildAlreadySubmitted(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       backgroundColor:
-      const Color(0xffF5F8FC),
-
+      theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor:
-        const Color(0xff003366),
+        theme.colorScheme.primary,
         foregroundColor:
-        Colors.white,
+        theme.colorScheme.onPrimary,
         title:
         const Text(
           "Lesson Quiz",
@@ -369,7 +397,6 @@ class _QuizScreenState
           ),
         ),
       ),
-
       body: Center(
         child: Padding(
           padding:
@@ -384,12 +411,10 @@ class _QuizScreenState
                 color:
                 Colors.green,
               ),
-
               const SizedBox(
                 height: 20,
               ),
-
-              const Text(
+              Text(
                 "Quiz Already Submitted",
                 style:
                 TextStyle(
@@ -397,35 +422,38 @@ class _QuizScreenState
                   fontWeight:
                   FontWeight.bold,
                   color:
-                  Color(0xff003366),
+                  theme.colorScheme.primary,
                 ),
               ),
-
               const SizedBox(
                 height: 10,
               ),
-
-              const Text(
-                "This quiz has already been submitted. "
-                    "You can review your answers.",
+              Text(
+                "This quiz has already been submitted. You can review your answers.",
                 textAlign:
                 TextAlign.center,
+                style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.8)),
               ),
-
               const SizedBox(
                 height: 25,
               ),
-
               ElevatedButton.icon(
-                onPressed: () {
-                  context.go(
-                    AppRouter
-                        .quizReviewPath(
-                      widget.courseId,
-                      widget.lessonId,
-                    ),
+                onPressed: () async {
+                  final reviewPath =
+                  AppRouter
+                      .quizReviewPath(
+                    widget.courseId,
+                    widget.lessonId,
+                  );
+
+                  await context.push(
+                    reviewPath,
                   );
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                ),
                 icon:
                 const Icon(
                   Icons.visibility,
@@ -446,12 +474,14 @@ class _QuizScreenState
   // QUIZ
   // ============================================================
 
-  Widget _buildQuiz() {
+  Widget _buildQuiz(BuildContext context) {
+    final theme = Theme.of(context);
     if (quiz!.questions.isEmpty) {
-      return const Center(
+      return Center(
         child:
         Text(
           "This quiz has no questions.",
+          style: TextStyle(color: theme.colorScheme.onSurface),
         ),
       );
     }
@@ -471,37 +501,35 @@ class _QuizScreenState
             "Question ${currentIndex + 1} / "
                 "${quiz!.questions.length}",
             style:
-            const TextStyle(
+            TextStyle(
               color:
-              Color(0xff003366),
+              theme.colorScheme.primary,
               fontSize: 16,
               fontWeight:
               FontWeight.bold,
             ),
           ),
-
           const SizedBox(
             height: 20,
           ),
-
           LinearProgressIndicator(
             value:
             (currentIndex + 1) /
                 quiz!.questions.length,
             minHeight: 7,
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+            color: theme.colorScheme.primary,
           ),
-
           const SizedBox(
             height: 20,
           ),
-
           Container(
             width: double.infinity,
             padding:
             const EdgeInsets.all(22),
             decoration:
             BoxDecoration(
-              color: Colors.white,
+              color: theme.cardTheme.color,
               borderRadius:
               BorderRadius.circular(
                 16,
@@ -509,27 +537,24 @@ class _QuizScreenState
               border:
               Border.all(
                 color:
-                const Color(
-                  0xffE4E9F0,
-                ),
+                theme.dividerColor,
               ),
             ),
             child:
             Text(
               question.question,
               style:
-              const TextStyle(
+              TextStyle(
                 fontSize: 18,
                 fontWeight:
                 FontWeight.bold,
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ),
-
           const SizedBox(
             height: 20,
           ),
-
           ...List.generate(
             question.options.length,
                 (index) {
@@ -563,21 +588,17 @@ class _QuizScreenState
                   decoration:
                   BoxDecoration(
                     color: selected
-                        ? const Color(
-                        0xff003366)
-                        : Colors.white,
+                        ? theme.colorScheme.primary
+                        : theme.cardTheme.color,
                     borderRadius:
                     BorderRadius.circular(
                       12,
                     ),
                     border:
                     Border.all(
-                      color:
-                      selected
-                          ? const Color(
-                          0xff003366)
-                          : const Color(
-                          0xffE4E9F0),
+                      color: selected
+                          ? theme.colorScheme.primary
+                          : theme.dividerColor,
                     ),
                   ),
                   child:
@@ -590,15 +611,12 @@ class _QuizScreenState
                             : Icons
                             .radio_button_off,
                         color: selected
-                            ? Colors.white
-                            : const Color(
-                            0xff003366),
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.primary,
                       ),
-
                       const SizedBox(
                         width: 12,
                       ),
-
                       Expanded(
                         child:
                         Text(
@@ -607,9 +625,8 @@ class _QuizScreenState
                           style:
                           TextStyle(
                             color: selected
-                                ? Colors.white
-                                : Colors
-                                .black87,
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSurface.withValues(alpha: 0.8),
                           ),
                         ),
                       ),
@@ -619,11 +636,9 @@ class _QuizScreenState
               );
             },
           ),
-
           const SizedBox(
             height: 20,
           ),
-
           Row(
             mainAxisAlignment:
             MainAxisAlignment
@@ -639,12 +654,16 @@ class _QuizScreenState
                     currentIndex--;
                   });
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.cardTheme.color,
+                  foregroundColor: theme.colorScheme.onSurface,
+                  side: BorderSide(color: theme.dividerColor),
+                ),
                 child:
                 const Text(
                   "Previous",
                 ),
               ),
-
               currentIndex ==
                   quiz!.questions
                       .length -
@@ -654,6 +673,10 @@ class _QuizScreenState
                 submitting
                     ? null
                     : _submitQuiz,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                ),
                 icon:
                 submitting
                     ? const SizedBox(
@@ -686,6 +709,10 @@ class _QuizScreenState
                     currentIndex++;
                   });
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                ),
                 child:
                 const Text(
                   "Next",

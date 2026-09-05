@@ -1,0 +1,2811 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:universal_html/html.dart' as html;
+
+import '../models/client_model.dart';
+import '../repositories/onboarding_repository.dart';
+import '../widgets/client_card.dart';
+import '../../../../services/localization_service.dart';
+import '../../../../services/user_display_name_resolver.dart';
+import '../../../../services/auth_service.dart';
+
+class OnboardingClientsScreen extends StatefulWidget {
+  const OnboardingClientsScreen({super.key});
+
+  @override
+  State<OnboardingClientsScreen> createState() =>
+      _OnboardingClientsScreenState();
+}
+
+class _OnboardingClientsScreenState
+    extends State<OnboardingClientsScreen> {
+  final OnboardingRepository _repository =
+  OnboardingRepository();
+
+  late final Stream<List<ClientModel>> _clientsStream;
+
+  final UserDisplayNameResolver _resolver =
+  UserDisplayNameResolver();
+
+  // Full list of agents for search mapping
+  final Map<String, String> _agentNames = {};
+  StreamSubscription? _agentsSub;
+
+  // Filtered list of agents for reassignment
+  final Map<String, String> _onboardingAgentNames = {};
+  StreamSubscription? _onboardingAgentsSub;
+
+  String _search = '';
+  List<ClientModel>? _displayedClients;
+
+  // ===========================================================================
+  // EMBEDDED OPERATION PANEL
+  // ===========================================================================
+
+  bool _operationRunning = false;
+  bool _operationCancelling = false;
+  bool _cancelOperationRequested = false;
+
+  final ValueNotifier<_OperationPanelData> _operationPanel =
+  ValueNotifier(const _OperationPanelData.hidden());
+
+  @override
+  void initState() {
+    super.initState();
+
+    _clientsStream = _repository.watchClients();
+
+    // 1. Fetch ALL agents for mapping names in UI and Search
+    _agentsSub =
+        _repository.watchAgents().listen((agents) {
+          if (!mounted) return;
+
+          setState(() {
+            _agentNames
+              ..clear()
+              ..addAll(agents);
+          });
+        });
+
+    // 2. Fetch ONLY onboarding agents for the Reassign Dropdown
+    _onboardingAgentsSub =
+        _repository.watchAgents(role: 'Onboarding_Agent').listen((agents) {
+          if (!mounted) return;
+
+          setState(() {
+            _onboardingAgentNames
+              ..clear()
+              ..addAll(agents);
+          });
+        });
+  }
+
+  @override
+  void dispose() {
+    _agentsSub?.cancel();
+    _onboardingAgentsSub?.cancel();
+    _operationPanel.dispose();
+    super.dispose();
+  }
+
+  Future<String> _resolveUserName(String uid) {
+    return _resolver.resolve(uid);
+  }
+
+  // ===========================================================================
+  // HELPERS
+  // ===========================================================================
+
+  String _normalize(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll(
+      RegExp(r'\s+'),
+      ' ',
+    );
+  }
+
+  bool get _isSuperAdmin {
+    return AuthService.isSuperAdmin;
+  }
+
+  // ===========================================================================
+  // OPERATION PANEL HELPERS
+  // ===========================================================================
+
+  void _startOperationPanel({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required int total,
+  }) {
+    if (!mounted) return;
+
+    _operationRunning = true;
+    _operationCancelling = false;
+    _cancelOperationRequested = false;
+
+    _operationPanel.value = _OperationPanelData(
+      title: title,
+      processed: 0,
+      total: total,
+      progress: 0,
+      cancelling: false,
+      status: '',
+      resultMessage: null,
+      error: false,
+      skippedRows: null,
+    );
+
+    setState(() {});
+  }
+
+  void _updateOperationProgress({
+    required int processed,
+    required int total,
+    String? status,
+  }) {
+    if (!mounted) return;
+
+    _operationPanel.value = _operationPanel.value.copyWith(
+      processed: processed,
+      total: total,
+      progress: total == 0
+          ? 1
+          : (processed / total).clamp(0.0, 1.0).toDouble(),
+      status: status,
+    );
+  }
+
+  void _requestOperationCancel() {
+    if (!_operationRunning || _operationCancelling) return;
+
+    _cancelOperationRequested = true;
+    _operationCancelling = true;
+
+    _operationPanel.value = _operationPanel.value.copyWith(
+      cancelling: true,
+      status: 'Cancelling...',
+    );
+  }
+
+  void _finishOperationPanel({
+    required String title,
+    required String message,
+    bool error = false,
+    List<List<String>>? skippedRows,
+  }) {
+    if (!mounted) return;
+
+    _operationRunning = false;
+    _operationCancelling = false;
+
+    _operationPanel.value = _OperationPanelData(
+      title: _operationPanel.value.title,
+      processed: _operationPanel.value.processed,
+      total: _operationPanel.value.total,
+      progress: 1,
+      cancelling: false,
+      status: '',
+      resultMessage: message,
+      error: error,
+      skippedRows: skippedRows,
+    );
+
+    setState(() {});
+  }
+
+  void _clearOperationPanel() {
+    if (!mounted) return;
+
+    _operationRunning = false;
+    _operationCancelling = false;
+    _cancelOperationRequested = false;
+    _operationPanel.value = const _OperationPanelData.hidden();
+
+    setState(() {});
+  }
+
+  void _downloadSkippedCsv(List<List<String>> rows) {
+    String csvContent = rows.map((row) {
+      return row.map((field) {
+        String escapedField = field.replaceAll('"', '""');
+        return '"$escapedField"';
+      }).join(',');
+    }).join('\n');
+
+    final bytes = utf8.encode(csvContent);
+    final blob = html.Blob([bytes], 'text/csv;charset=utf-8;');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', 'skipped_clients.csv')
+      ..click();
+    html.Url.revokeObjectUrl(url);
+  }
+
+  Widget _buildOperationPanel() {
+    return ValueListenableBuilder<_OperationPanelData>(
+      valueListenable: _operationPanel,
+      builder: (context, data, _) {
+        final theme = Theme.of(context);
+        final colors = theme.colorScheme;
+        final result = !_operationRunning && data.resultMessage != null;
+        final accent = data.error ? colors.error : colors.primary;
+        final percentage = (data.progress * 100).round();
+
+        final isDelete = data.title.toLowerCase().contains('delete');
+        final headerIcon = isDelete ? Icons.delete_sweep_rounded : Icons.cloud_upload_rounded;
+
+        if (!_operationRunning && !result) {
+          return const SizedBox.shrink();
+        }
+
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 450),
+            child: Material(
+              elevation: 8,
+              color: colors.surface,
+              shadowColor: colors.shadow.withValues(alpha: 0.2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(
+                  color: data.error
+                      ? colors.error.withValues(alpha: 0.3)
+                      : colors.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: result
+                    ? Row(
+                  children: [
+                    Icon(
+                      data.error
+                          ? Icons.error_outline_rounded
+                          : Icons.check_circle_outline_rounded,
+                      size: 20,
+                      color: accent,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        data.resultMessage!,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colors.onSurface,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (data.skippedRows != null && data.skippedRows!.isNotEmpty)
+                      Tooltip(
+                        message: 'Download Skipped Records',
+                        child: InkWell(
+                          onTap: () => _downloadSkippedCsv(data.skippedRows!),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.download_rounded,
+                              size: 16,
+                              color: colors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: _clearOperationPanel,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: colors.onSurface.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+                    : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            data.cancelling
+                                ? '${data.title} (Stopping...)'
+                                : '${data.title}  •  ${data.processed} / ${data.total}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: colors.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: data.cancelling ? null : _requestOperationCancel,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Icon(
+                          headerIcon,
+                          size: 18,
+                          color: colors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: data.progress,
+                              minHeight: 5,
+                              backgroundColor: colors.surfaceContainerHighest,
+                              color: accent,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 34,
+                          child: Text(
+                            '$percentage%',
+                            textAlign: TextAlign.right,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: accent,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    final l10n =
+    AppLocalizations.of(
+      context,
+    );
+
+    final theme =
+    Theme.of(context);
+
+    return Scaffold(
+      backgroundColor:
+      theme.colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor:
+        theme.colorScheme.surface,
+        elevation: 0,
+        title: Row(
+          children: [
+            Text(
+              l10n?.translate(
+                'clients',
+              ) ??
+                  'Clients',
+              style:
+              const TextStyle(
+                fontWeight:
+                FontWeight.bold,
+              ),
+            ),
+            const SizedBox(
+              width: 12,
+            ),
+
+            // ACCOUNT COUNTER
+            StreamBuilder<
+                List<ClientModel>>(
+              stream: _clientsStream,
+              builder:
+                  (
+                  context,
+                  snapshot,
+                  ) {
+                final count =
+                    snapshot
+                        .data
+                        ?.length ??
+                        0;
+
+                return Container(
+                  padding:
+                  const EdgeInsets
+                      .symmetric(
+                    horizontal:
+                    10,
+                    vertical: 5,
+                  ),
+                  decoration:
+                  BoxDecoration(
+                    color: theme
+                        .colorScheme
+                        .primary
+                        .withValues(
+                      alpha:
+                      0.10,
+                    ),
+                    borderRadius:
+                    BorderRadius
+                        .circular(
+                      20,
+                    ),
+                  ),
+                  child:
+                  Text(
+                    '$count accounts',
+                    style:
+                    TextStyle(
+                      color: theme
+                          .colorScheme
+                          .primary,
+                      fontSize:
+                      13,
+                      fontWeight:
+                      FontWeight
+                          .w700,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          // =====================================================================
+          // BULK DELETE
+          // =====================================================================
+
+          if (_isSuperAdmin)
+            StreamBuilder<
+                List<ClientModel>>(
+              stream: _clientsStream,
+              builder:
+                  (
+                  context,
+                  snapshot,
+                  ) {
+                final clients =
+                    snapshot
+                        .data ??
+                        [];
+
+                if (clients
+                    .isEmpty) {
+                  return const SizedBox
+                      .shrink();
+                }
+
+                return Padding(
+                  padding:
+                  const EdgeInsets
+                      .only(
+                    right: 8,
+                  ),
+                  child:
+                  TextButton
+                      .icon(
+                    onPressed:
+                        () =>
+                        _bulkDeleteAll(
+                          clients,
+                        ),
+                    icon:
+                    const Icon(
+                      Icons
+                          .delete_sweep,
+                      color: Colors
+                          .redAccent,
+                      size: 20,
+                    ),
+                    label:
+                    const Text(
+                      'Bulk Delete',
+                      style:
+                      TextStyle(
+                        color: Colors
+                            .redAccent,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+          // =====================================================================
+          // IMPORT
+          // =====================================================================
+
+          if (_isSuperAdmin)
+            Padding(
+              padding:
+              const EdgeInsets
+                  .only(
+                right: 8,
+              ),
+              child:
+              OutlinedButton
+                  .icon(
+                onPressed:
+                _showImportDialog,
+                icon:
+                const Icon(
+                  Icons.upload_file,
+                  size: 18,
+                ),
+                label:
+                const Text(
+                  'Import',
+                ),
+                style:
+                OutlinedButton
+                    .styleFrom(
+                  side: BorderSide(
+                    color: theme
+                        .colorScheme
+                        .primary
+                        .withValues(
+                      alpha:
+                      0.5,
+                    ),
+                  ),
+                  foregroundColor:
+                  theme
+                      .colorScheme
+                      .primary,
+                ),
+              ),
+            ),
+
+          // =====================================================================
+          // CREATE CLIENT
+          // =====================================================================
+
+          Padding(
+            padding:
+            const EdgeInsets
+                .only(
+              right: 16,
+            ),
+            child:
+            ElevatedButton
+                .icon(
+              onPressed:
+              _showCreateClientDialog,
+              icon:
+              const Icon(
+                Icons.add,
+              ),
+              label:
+              Text(
+                l10n?.translate(
+                  'new_client',
+                ) ??
+                    'New Client',
+              ),
+              style:
+              ElevatedButton
+                  .styleFrom(
+                backgroundColor:
+                theme
+                    .colorScheme
+                    .primary,
+                foregroundColor:
+                theme
+                    .colorScheme
+                    .onPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                _buildSearch(
+                  l10n,
+                  theme,
+                ),
+                const SizedBox(
+                  height: 20,
+                ),
+                Expanded(
+                  child: StreamBuilder<
+                      List<ClientModel>>(
+                    stream: _repository
+                        .watchClients(),
+                    builder:
+                        (
+                        context,
+                        snapshot,
+                        ) {
+                      if (snapshot
+                          .connectionState ==
+                          ConnectionState
+                              .waiting) {
+                        return Center(
+                          child:
+                          CircularProgressIndicator(
+                            color: theme
+                                .colorScheme
+                                .primary,
+                          ),
+                        );
+                      }
+
+                      if (snapshot
+                          .hasError) {
+                        return const Center(
+                          child: Text(
+                            'Error loading clients.',
+                          ),
+                        );
+                      }
+
+                      final streamedClients =
+                          snapshot.data ??
+                              [];
+
+                      if (!_operationRunning) {
+                        _displayedClients = streamedClients;
+                      }
+
+                      final clients = _operationRunning
+                          ? (_displayedClients ?? streamedClients)
+                          : streamedClients;
+
+                      final q =
+                      _normalize(
+                        _search,
+                      );
+
+                      final filtered =
+                      clients.where(
+                            (client) {
+                          if (q.isEmpty) {
+                            return true;
+                          }
+
+                          final assigneeName =
+                          _normalize(
+                            _agentNames[
+                            client
+                                .assignedTo] ??
+                                '',
+                          );
+
+                          return _normalize(
+                            client
+                                .companyName,
+                          )
+                              .contains(
+                            q,
+                          ) ||
+                              _normalize(
+                                client
+                                    .accNumber,
+                              ).contains(
+                                q,
+                              ) ||
+                              _normalize(
+                                client
+                                    .assignedTo,
+                              ).contains(
+                                q,
+                              ) ||
+                              assigneeName
+                                  .contains(
+                                q,
+                              );
+                        },
+                      ).toList();
+
+                      if (filtered
+                          .isEmpty) {
+                        return _EmptyClients(
+                          hasSearch: _search
+                              .trim()
+                              .isNotEmpty,
+                          onCreate:
+                          _showCreateClientDialog,
+                        );
+                      }
+
+                      return ListView
+                          .separated(
+                        padding: EdgeInsets.only(
+                          bottom: _operationRunning ? 90 : 24,
+                        ),
+                        itemCount:
+                        filtered.length,
+                        separatorBuilder:
+                            (
+                            _,
+                            __,
+                            ) =>
+                        const SizedBox(
+                          height: 12,
+                        ),
+                        itemBuilder:
+                            (
+                            context,
+                            index,
+                            ) {
+                          final client =
+                          filtered[
+                          index];
+
+                          return Row(
+                            key: ValueKey(client.id),
+                            crossAxisAlignment:
+                            CrossAxisAlignment
+                                .start,
+                            children: [
+                              Expanded(
+                                child:
+                                ClientCard(
+                                  client:
+                                  client,
+                                  resolveUserName:
+                                  _resolveUserName,
+                                  onDelete:
+                                  _isSuperAdmin
+                                      ? () =>
+                                      _deleteClient(
+                                        client,
+                                      )
+                                      : null,
+                                ),
+                              ),
+
+                              // SUPER ADMIN REASSIGN
+                              if (_isSuperAdmin) ...[
+                                const SizedBox(
+                                  width: 8,
+                                ),
+                                Tooltip(
+                                  message:
+                                  'Reassign Client',
+                                  child:
+                                  Material(
+                                    color: theme
+                                        .colorScheme
+                                        .surface,
+                                    borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                      10,
+                                    ),
+                                    child:
+                                    InkWell(
+                                      borderRadius:
+                                      BorderRadius
+                                          .circular(
+                                        10,
+                                      ),
+                                      onTap:
+                                          () =>
+                                          _showReassignClientDialog(
+                                            client,
+                                          ),
+                                      child:
+                                      Container(
+                                        width:
+                                        44,
+                                        height:
+                                        44,
+                                        decoration:
+                                        BoxDecoration(
+                                          borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                            10,
+                                          ),
+                                          border:
+                                          Border.all(
+                                            color:
+                                            theme.dividerColor,
+                                          ),
+                                        ),
+                                        child:
+                                        Icon(
+                                          Icons
+                                              .edit_outlined,
+                                          size:
+                                          19,
+                                          color: theme
+                                              .colorScheme
+                                              .primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ValueListenableBuilder<_OperationPanelData>(
+            valueListenable: _operationPanel,
+            builder: (context, data, _) {
+              if (!_operationRunning && data.resultMessage == null) {
+                return const SizedBox.shrink();
+              }
+
+              return Positioned(
+                left: 24,
+                right: 24,
+                bottom: 16,
+                child: _buildOperationPanel(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // DELETE SINGLE CLIENT
+  // ===========================================================================
+
+  Future<void> _deleteClient(ClientModel client) async {
+    if (!_isSuperAdmin) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Delete Client'),
+        content: Text(
+          'Are you sure you want to delete ${client.companyName}? '
+              'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(c, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _repository.deleteClient(client.id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Client deleted.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Delete failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ===========================================================================
+  // BULK DELETE
+  // ===========================================================================
+
+  Future<void> _bulkDeleteAll(List<ClientModel> clients) async {
+    if (!_isSuperAdmin || clients.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final colors = theme.colorScheme;
+
+        return AlertDialog(
+          title: const Text('Delete all clients?'),
+          content: Text(
+            'This will permanently delete ${clients.length} client records. '
+                'This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.error,
+                foregroundColor: colors.onError,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete all'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final ids = clients.map((client) => client.id).toList();
+    final total = ids.length;
+
+    _startOperationPanel(
+      title: 'Deleting clients',
+      subtitle: 'Removing client records in batches',
+      icon: Icons.delete_sweep_rounded,
+      total: total,
+    );
+
+    try {
+      final deleted = await _repository.bulkDeleteClients(
+        ids,
+        isCancelled: () => _cancelOperationRequested,
+        onProgress: (deletedCount, totalCount) {
+          _updateOperationProgress(
+            processed: deletedCount,
+            total: totalCount,
+            status: 'Deleting...',
+          );
+        },
+      );
+
+      if (!mounted) return;
+
+      if (_cancelOperationRequested) {
+        _finishOperationPanel(
+          title: 'Delete cancelled',
+          message:
+          '$deleted of $total client records were deleted before the operation was stopped.',
+        );
+        return;
+      }
+
+      _finishOperationPanel(
+        title: 'Delete completed',
+        message:
+        '$deleted client${deleted == 1 ? '' : 's'} deleted successfully.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      _finishOperationPanel(
+        title: 'Delete failed',
+        message: 'Failed to delete clients. Please try again.',
+        error: true,
+      );
+    }
+  }
+
+  // ===========================================================================
+  // REASSIGN CLIENT
+  // ===========================================================================
+
+  Future<void> _showReassignClientDialog(ClientModel client) async {
+    if (!_isSuperAdmin) return;
+
+    // Use ONLY the onboarding agents list for the dropdown
+    final agents = Map<String, String>.from(_onboardingAgentNames);
+
+    if (agents.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No onboarding agents are available for reassignment.'),
+        ),
+      );
+      return;
+    }
+
+    String selectedUid = client.assignedTo;
+
+    // If the currently assigned user is not in the filtered list, default to unassigned
+    if (!agents.containsKey(selectedUid)) {
+      selectedUid = '';
+    }
+
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final sortedAgents = agents.entries.toList()
+              ..sort(
+                    (a, b) => a.value.toLowerCase().compareTo(
+                  b.value.toLowerCase(),
+                ),
+              );
+
+            return AlertDialog(
+              title: const Text('Reassign Client'),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      client.companyName.isNotEmpty
+                          ? client.companyName
+                          : client.accNumber,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'ACC: ${client.accNumber}',
+                      style: TextStyle(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.65),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    DropdownButtonFormField<String>(
+                      initialValue:
+                      selectedUid.isEmpty ? null : selectedUid,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Assigned User',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: '',
+                          child: Text('Unassigned'),
+                        ),
+                        ...sortedAgents.map(
+                              (entry) => DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(
+                              entry.value,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedUid = value ?? '';
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(
+                    dialogContext,
+                    selectedUid,
+                  ),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null) return;
+
+    try {
+      await _repository.updateAssignedTo(client.id, result);
+
+      if (!mounted) return;
+
+      final assignedName = result.isEmpty
+          ? 'Unassigned'
+      // Check from the full list in case we re-assigned to someone else somehow
+          : (_agentNames[result] ?? result);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${client.companyName} reassigned to $assignedName.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reassignment failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ===========================================================================
+  // SEARCH
+  // ===========================================================================
+
+  Widget _buildSearch(
+      AppLocalizations? l10n,
+      ThemeData theme,
+      ) {
+    return Card(
+      elevation: 0,
+      shape:
+      RoundedRectangleBorder(
+        borderRadius:
+        BorderRadius.circular(
+          12,
+        ),
+        side: BorderSide(
+          color:
+          theme.dividerColor,
+        ),
+      ),
+      child: TextField(
+        onChanged: (value) {
+          setState(() {
+            _search = value;
+          });
+        },
+        decoration:
+        InputDecoration(
+          hintText:
+          l10n?.translate(
+            'search_clients_hint',
+          ) ??
+              'Search by name, ACC or assignee...',
+          prefixIcon:
+          const Icon(
+            Icons.search,
+          ),
+          border:
+          InputBorder.none,
+          contentPadding:
+          const EdgeInsets
+              .symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // IMPORT DIALOG
+  // ===========================================================================
+
+  Future<void> _showImportDialog() async {
+    if (!_isSuperAdmin) return;
+
+    List<List<String>> csvData =
+    [];
+
+    List<String> headers = [];
+
+    Map<String, int?> mapping =
+    {};
+
+    String fileName = '';
+
+    bool fileLoaded = false;
+
+    // These correspond to the actual CSV columns.
+    final fields =
+    <String, String>{
+      'companyName':
+      'Company Name',
+      'accNumber':
+      'ACC Number',
+      'systemType':
+      'System Type',
+      'activationStatus':
+      'Activation Status',
+      'groupStatus':
+      'Group Status',
+      'chatbotStatus':
+      'Chatbot Status',
+      'verificationStatus':
+      'Verification Status',
+      'activationDate':
+      'Activation Date',
+      'groupDuration':
+      'Group Duration (Days)',
+      'verificationDate':
+      'Verification Date',
+      'verificationTicket':
+      'Verification Ticket Number',
+      'crmComment':
+      'CRM Comment',
+      'eng':
+      'Assigned Agent (ENG)',
+      'months':
+      'Months',
+      'enteredDate':
+      'Entered Date',
+    };
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (dialogContext) {
+        return StatefulBuilder(
+          builder: (
+              context,
+              setS,
+              ) {
+            void pickFile() {
+              final uploadInput =
+              html.FileUploadInputElement();
+
+              uploadInput.accept =
+              '.csv';
+
+              uploadInput.click();
+
+              uploadInput.onChange
+                  .listen((_) {
+                final files =
+                    uploadInput.files;
+
+                if (files == null ||
+                    files.isEmpty) {
+                  return;
+                }
+
+                final file =
+                    files.first;
+
+                final reader =
+                html.FileReader();
+
+                reader.onLoadEnd
+                    .listen((_) {
+                  final result =
+                      reader.result;
+
+                  if (result
+                  is! String) {
+                    return;
+                  }
+
+                  final rows =
+                  _parseCsv(
+                    result,
+                  );
+
+                  if (rows.isEmpty) {
+                    ScaffoldMessenger
+                        .of(
+                      context,
+                    ).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'The CSV file is empty.',
+                        ),
+                        backgroundColor:
+                        Colors.red,
+                      ),
+                    );
+
+                    return;
+                  }
+
+                  final detectedHeaders =
+                  rows.first
+                      .map(
+                    _cleanHeader,
+                  )
+                      .toList();
+
+                  final detectedMapping =
+                  _buildExactColumnMapping(
+                    detectedHeaders,
+                  );
+
+                  setS(() {
+                    csvData =
+                        rows;
+
+                    headers =
+                        detectedHeaders;
+
+                    fileName =
+                        file.name;
+
+                    fileLoaded =
+                    true;
+
+                    mapping =
+                        detectedMapping;
+                  });
+                });
+
+                reader.readAsText(
+                  file,
+                );
+              });
+            }
+
+            final hasRequiredAcc =
+                mapping[
+                'accNumber'] !=
+                    null;
+
+            return AlertDialog(
+              title:
+              const Text(
+                'Import Clients from CSV',
+              ),
+              content:
+              SizedBox(
+                width: 680,
+                child:
+                Column(
+                  mainAxisSize:
+                  MainAxisSize
+                      .min,
+                  crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+                  children: [
+                    if (!fileLoaded) ...[
+                      const Text(
+                        'Select the CSV file exported from Google Sheets.',
+                      ),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      const Text(
+                        'ACC Number is required. '
+                            'Company Name will be mapped automatically '
+                            'when the CSV contains a Company Name column.',
+                        style:
+                        TextStyle(
+                          fontSize:
+                          12,
+                          color: Colors
+                              .grey,
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 24,
+                      ),
+                      Center(
+                        child:
+                        ElevatedButton
+                            .icon(
+                          onPressed:
+                          pickFile,
+                          icon:
+                          const Icon(
+                            Icons
+                                .file_upload,
+                          ),
+                          label:
+                          const Text(
+                            'Choose CSV File',
+                          ),
+                          style:
+                          ElevatedButton
+                              .styleFrom(
+                            padding:
+                            const EdgeInsets
+                                .symmetric(
+                              horizontal:
+                              24,
+                              vertical:
+                              20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons
+                                .insert_drive_file,
+                            color: Colors
+                                .green,
+                          ),
+                          const SizedBox(
+                            width: 8,
+                          ),
+                          Expanded(
+                            child:
+                            Text(
+                              fileName,
+                              style:
+                              const TextStyle(
+                                fontWeight:
+                                FontWeight
+                                    .bold,
+                              ),
+                              overflow:
+                              TextOverflow
+                                  .ellipsis,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed:
+                                () {
+                              setS(() {
+                                fileLoaded =
+                                false;
+                                csvData =
+                                [];
+                                headers =
+                                [];
+                                mapping =
+                                {};
+                                fileName =
+                                '';
+                              });
+                            },
+                            child:
+                            const Text(
+                              'Change',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(
+                        height:
+                        32,
+                      ),
+                      const Text(
+                        'CSV Column Mapping',
+                        style:
+                        TextStyle(
+                          fontWeight:
+                          FontWeight
+                              .bold,
+                          fontSize:
+                          16,
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 6,
+                      ),
+                      const Text(
+                        'Mappings are matched by exact column names. '
+                            'ACC only matches ACC/account-number columns, '
+                            'so comments cannot accidentally become ACC.',
+                        style:
+                        TextStyle(
+                          fontSize:
+                          12,
+                          color: Colors
+                              .grey,
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 16,
+                      ),
+                      Flexible(
+                        child:
+                        ListView(
+                          shrinkWrap:
+                          true,
+                          children:
+                          fields
+                              .entries
+                              .map(
+                                (
+                                field,
+                                ) {
+                              final selected =
+                              mapping[
+                              field.key];
+
+                              return Padding(
+                                padding:
+                                const EdgeInsets
+                                    .only(
+                                  bottom:
+                                  9,
+                                ),
+                                child:
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      flex:
+                                      2,
+                                      child:
+                                      Row(
+                                        children: [
+                                          if (field.key ==
+                                              'accNumber')
+                                            const Icon(
+                                              Icons
+                                                  .star,
+                                              size:
+                                              10,
+                                              color:
+                                              Colors.red,
+                                            ),
+                                          if (field.key ==
+                                              'accNumber')
+                                            const SizedBox(
+                                              width:
+                                              4,
+                                            ),
+                                          Expanded(
+                                            child:
+                                            Text(
+                                              field.value,
+                                              style:
+                                              const TextStyle(
+                                                fontSize:
+                                                13,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      width:
+                                      12,
+                                    ),
+                                    Expanded(
+                                      flex:
+                                      3,
+                                      child:
+                                      DropdownButtonFormField<
+                                          int?>(
+                                        initialValue:
+                                        selected,
+                                        isExpanded:
+                                        true,
+                                        decoration:
+                                        const InputDecoration(
+                                          contentPadding:
+                                          EdgeInsets
+                                              .symmetric(
+                                            horizontal:
+                                            10,
+                                            vertical:
+                                            8,
+                                          ),
+                                          border:
+                                          OutlineInputBorder(),
+                                        ),
+                                        items: [
+                                          const DropdownMenuItem<
+                                              int?>(
+                                            value:
+                                            null,
+                                            child:
+                                            Text(
+                                              'None',
+                                              style:
+                                              TextStyle(
+                                                color:
+                                                Colors.grey,
+                                              ),
+                                            ),
+                                          ),
+                                          ...List.generate(
+                                            headers
+                                                .length,
+                                                (
+                                                i,
+                                                ) =>
+                                                DropdownMenuItem<
+                                                    int?>(
+                                                  value:
+                                                  i,
+                                                  child:
+                                                  Text(
+                                                    headers[i].isEmpty
+                                                        ? '(Empty column)'
+                                                        : headers[i],
+                                                    overflow:
+                                                    TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                          ),
+                                        ],
+                                        onChanged:
+                                            (
+                                            value,
+                                            ) {
+                                          setS(() {
+                                            mapping[
+                                            field.key] =
+                                                value;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ).toList(),
+                        ),
+                      ),
+                      if (!hasRequiredAcc) ...[
+                        const SizedBox(
+                          height:
+                          8,
+                        ),
+                        Container(
+                          padding:
+                          const EdgeInsets
+                              .all(
+                            10,
+                          ),
+                          decoration:
+                          BoxDecoration(
+                            color: Colors
+                                .red
+                                .withValues(
+                              alpha:
+                              0.08,
+                            ),
+                            borderRadius:
+                            BorderRadius
+                                .circular(
+                              8,
+                            ),
+                          ),
+                          child:
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons
+                                    .warning_amber,
+                                color: Colors
+                                    .red,
+                                size:
+                                18,
+                              ),
+                              SizedBox(
+                                width:
+                                8,
+                              ),
+                              Expanded(
+                                child:
+                                Text(
+                                  'ACC Number is not mapped. '
+                                      'Please map the ACC column before importing.',
+                                  style:
+                                  TextStyle(
+                                    color:
+                                    Colors.red,
+                                    fontSize:
+                                    12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      Navigator.pop(
+                        dialogContext,
+                      ),
+                  child:
+                  const Text(
+                    'Cancel',
+                  ),
+                ),
+                if (fileLoaded)
+                  ElevatedButton
+                      .icon(
+                    onPressed:
+                    hasRequiredAcc
+                        ? () {
+                      Navigator
+                          .pop(
+                        dialogContext,
+                      );
+
+                      _startCsvImport(
+                        csvData:
+                        csvData,
+                        mapping:
+                        mapping,
+                      );
+                    }
+                        : null,
+                    icon:
+                    const Icon(
+                      Icons
+                          .play_arrow,
+                    ),
+                    label:
+                    const Text(
+                      'Start Import',
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ===========================================================================
+  // HEADER CLEANING
+  // ===========================================================================
+
+  String _cleanHeader(
+      String value,
+      ) {
+    return value
+        .replaceFirst(
+      '\uFEFF',
+      '',
+    )
+        .trim()
+        .toLowerCase()
+        .replaceAll(
+      RegExp(r'\s+'),
+      ' ',
+    );
+  }
+
+  // ===========================================================================
+  // EXACT COLUMN MAPPING
+  // ===========================================================================
+
+  Map<String, int?>
+  _buildExactColumnMapping(
+      List<String> headers,
+      ) {
+    final mapping =
+    <String, int?>{
+      'companyName':
+      null,
+      'accNumber':
+      null,
+      'systemType':
+      null,
+      'activationStatus':
+      null,
+      'groupStatus':
+      null,
+      'chatbotStatus':
+      null,
+      'verificationStatus':
+      null,
+      'activationDate':
+      null,
+      'groupDuration':
+      null,
+      'verificationDate':
+      null,
+      'verificationTicket':
+      null,
+      'crmComment':
+      null,
+      'eng':
+      null,
+      'months':
+      null,
+      'enteredDate':
+      null,
+    };
+
+    int? findExact(
+        List<String> candidates,
+        ) {
+      for (final candidate
+      in candidates) {
+        final normalized =
+        _cleanHeader(
+          candidate,
+        );
+
+        final index =
+        headers.indexWhere(
+              (header) =>
+          header ==
+              normalized,
+        );
+
+        if (index != -1) {
+          return index;
+        }
+      }
+
+      return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // COMPANY NAME
+    // -------------------------------------------------------------------------
+
+    mapping[
+    'companyName'] =
+        findExact([
+          'Company Name',
+          'Company',
+          'Client Name',
+        ]);
+
+    // -------------------------------------------------------------------------
+    // ACC
+    //
+    // IMPORTANT:
+    // ACC ONLY MATCHES ACC-STYLE HEADERS.
+    // -------------------------------------------------------------------------
+
+    mapping[
+    'accNumber'] =
+        findExact([
+          'ACC',
+          'ACC Number',
+          'Account Number',
+          'Account No',
+          'ACC No',
+        ]);
+
+    // -------------------------------------------------------------------------
+    // SYSTEM
+    // -------------------------------------------------------------------------
+
+    mapping[
+    'systemType'] =
+        findExact([
+          'System',
+          'System Type',
+        ]);
+
+    // -------------------------------------------------------------------------
+    // STATUSES
+    // -------------------------------------------------------------------------
+
+    mapping[
+    'activationStatus'] =
+        findExact([
+          'Activation Status',
+        ]);
+
+    mapping[
+    'groupStatus'] =
+        findExact([
+          'Group Status',
+        ]);
+
+    mapping[
+    'chatbotStatus'] =
+        findExact([
+          'Chatbot Status',
+        ]);
+
+    mapping[
+    'verificationStatus'] =
+        findExact([
+          'Verification Status',
+        ]);
+
+    // -------------------------------------------------------------------------
+    // DATES
+    // -------------------------------------------------------------------------
+
+    mapping[
+    'activationDate'] =
+        findExact([
+          'Activation Date',
+        ]);
+
+    mapping[
+    'groupDuration'] =
+        findExact([
+          'No.Days (Group)',
+          'No. Days (Group)',
+          'No Days (Group)',
+          'Group Duration',
+          'Group Duration Days',
+        ]);
+
+    mapping[
+    'verificationDate'] =
+        findExact([
+          'Verification Date',
+        ]);
+
+    mapping[
+    'verificationTicket'] =
+        findExact([
+          'Verification Ticket Number',
+          'Verification Ticket',
+          'Ticket Number',
+        ]);
+
+    // -------------------------------------------------------------------------
+    // CRM COMMENT
+    // -------------------------------------------------------------------------
+
+    mapping[
+    'crmComment'] =
+        findExact([
+          'More Information',
+          'CRM Comment',
+          'Comment',
+          'Comments',
+          'Notes',
+        ]);
+
+    // -------------------------------------------------------------------------
+    // AGENT
+    // -------------------------------------------------------------------------
+
+    mapping['eng'] =
+        findExact([
+          'ENG',
+          'Agent',
+          'Assigned Agent',
+        ]);
+
+    // -------------------------------------------------------------------------
+    // MONTHS
+    // -------------------------------------------------------------------------
+
+    mapping[
+    'months'] =
+        findExact([
+          'Months',
+        ]);
+
+    // -------------------------------------------------------------------------
+    // ENTERED DATE
+    // -------------------------------------------------------------------------
+
+    mapping[
+    'enteredDate'] =
+        findExact([
+          'Entered Date',
+          'Entry Date',
+        ]);
+
+    return mapping;
+  }
+
+  String _normalizeAcc(String value) {
+    return value
+        .trim()
+        .replaceFirst(RegExp(r'\.0+$'), '')
+        .replaceAll(RegExp(r'\s+'), '')
+        .toLowerCase();
+  }
+
+  int? _parseIntFlexible(String value) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+    final direct = int.tryParse(text);
+    if (direct != null) return direct;
+    return double.tryParse(text)?.round();
+  }
+
+  DateTime? _parseCsvDate(String value) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+    final direct = DateTime.tryParse(text);
+    if (direct != null) return direct;
+    final match = RegExp(r'^(\d{1,4})[\/-](\d{1,2})[\/-](\d{1,4})$').firstMatch(text);
+    if (match == null) return null;
+    final a = int.tryParse(match.group(1)!);
+    final b = int.tryParse(match.group(2)!);
+    final c = int.tryParse(match.group(3)!);
+    if (a == null || b == null || c == null) return null;
+    if (a >= 1000) return DateTime(a, b, c);
+    final year = c < 100 ? 2000 + c : c;
+    return DateTime(year, a, b);
+  }
+
+  // ===========================================================================
+  // START CSV IMPORT
+  // ===========================================================================
+
+  Future<void> _startCsvImport({
+    required List<List<String>> csvData,
+    required Map<String, int?> mapping,
+  }) async {
+    if (!_isSuperAdmin) return;
+
+    if (csvData.length <= 1) {
+      _finishOperationPanel(
+        title: 'Nothing to import',
+        message: 'There are no data rows to import.',
+      );
+      return;
+    }
+
+    final totalRows = csvData.length - 1;
+
+    _startOperationPanel(
+      title: 'Importing clients',
+      subtitle: 'Adding clients from the CSV file in batches',
+      icon: Icons.cloud_upload_outlined,
+      total: totalRows,
+    );
+
+    int imported = 0;
+    int skippedExisting = 0;
+    int skippedInvalid = 0;
+    int failed = 0;
+    final unmatchedAgents = <String>{};
+    final List<List<String>> skippedRowsData = [];
+
+    // Add headers to skipped rows output file
+    if (csvData.isNotEmpty) {
+      skippedRowsData.add(csvData[0]);
+    }
+
+    try {
+      final existingClients = await _repository.watchClients().first;
+      final existingAccNumbers = <String>{
+        for (final client in existingClients)
+          if (_normalizeAcc(client.accNumber).isNotEmpty)
+            _normalizeAcc(client.accNumber)
+      };
+
+      // 1. Get all agents from DB for Smart Matching
+      final agents = await _repository.watchAgents().first;
+      final dbAgents = <String, String>{};
+      for (final entry in agents.entries) {
+        final uid = entry.key.trim();
+        final name = entry.value.trim();
+        if (uid.isEmpty || name.isEmpty) continue;
+        dbAgents[_normalize(name)] = uid;
+      }
+
+      final List<Map<String, dynamic>> clientsToCreate = [];
+
+      for (int i = 1; i < csvData.length; i++) {
+        if (_cancelOperationRequested) break;
+        final row = csvData[i];
+
+        String getValue(String key) {
+          final index = mapping[key];
+          if (index == null || index < 0 || index >= row.length) return '';
+          return row[index].trim();
+        }
+
+        final acc = _normalizeAcc(getValue('accNumber'));
+        if (acc.isEmpty) {
+          skippedInvalid++;
+          continue;
+        }
+        if (existingAccNumbers.contains(acc)) {
+          skippedExisting++;
+          skippedRowsData.add(row); // Save row for downloading later
+          continue;
+        }
+
+        final csvCompany = getValue('companyName');
+        final company = csvCompany.isNotEmpty ? csvCompany : 'ACC $acc';
+        final systemValue = getValue('systemType');
+        final system = systemValue.isEmpty ? 'New' : systemValue;
+        final activationStatus = getValue('activationStatus');
+        final groupStatus = getValue('groupStatus');
+        final chatbotStatus = getValue('chatbotStatus');
+        final verificationStatus = getValue('verificationStatus');
+        final activationDate = _parseCsvDate(getValue('activationDate'));
+        final verificationDate = _parseCsvDate(getValue('verificationDate'));
+        final enteredDate = _parseCsvDate(getValue('enteredDate'));
+        final groupDuration = _parseIntFlexible(getValue('groupDuration'));
+
+        // 2. SMART PARTIAL MATCHING LOGIC
+        final agentName = getValue('eng');
+        String assignedUid = '';
+
+        if (agentName.isNotEmpty) {
+          final normalizedCsvName = _normalize(agentName);
+          String? matchedUid = dbAgents[normalizedCsvName]; // Try exact match first
+
+          // Fallback: If exact match fails, try partial match (e.g. "Eslam" matches "Eng. Eslam Mourad")
+          if (matchedUid == null) {
+            for (final entry in dbAgents.entries) {
+              final dbName = entry.key; // The normalized database name
+              if (dbName.contains(normalizedCsvName) || normalizedCsvName.contains(dbName)) {
+                matchedUid = entry.value;
+                break;
+              }
+            }
+          }
+
+          if (matchedUid != null) {
+            assignedUid = matchedUid;
+          } else {
+            unmatchedAgents.add(agentName); // Track names that still couldn't be matched
+          }
+        }
+
+        clientsToCreate.add({
+          'companyName': company,
+          'accNumber': acc,
+          'systemType': system,
+          'activationStatus':
+          activationStatus.isEmpty ? 'Not Started' : activationStatus,
+          'groupStatus': groupStatus.isEmpty ? 'Not Started' : groupStatus,
+          'chatbotStatus':
+          chatbotStatus.isEmpty ? 'Not Started' : chatbotStatus,
+          'verificationStatus': verificationStatus.isEmpty
+              ? 'Not Started'
+              : verificationStatus,
+          'activationDate': activationDate != null ? Timestamp.fromDate(activationDate) : null,
+          'verificationDate': verificationDate != null ? Timestamp.fromDate(verificationDate) : null,
+          'createdAt': enteredDate != null ? Timestamp.fromDate(enteredDate) : FieldValue.serverTimestamp(),
+          'groupDurationDays': groupDuration,
+          'verificationTicketNumber': getValue('verificationTicket'),
+          'crmComment': getValue('crmComment'),
+          'months': getValue('months'),
+          'assignedTo': assignedUid,
+        });
+
+        existingAccNumbers.add(acc);
+      }
+
+      // 3. FAST BATCH WRITE (Bypasses the repository's auto-assignment constraint)
+      const int batchSize = 250;
+      final firestore = FirebaseFirestore.instance;
+
+      for (int i = 0; i < clientsToCreate.length; i += batchSize) {
+        if (_cancelOperationRequested) break;
+
+        final chunk = clientsToCreate.sublist(
+          i,
+          i + batchSize > clientsToCreate.length
+              ? clientsToCreate.length
+              : i + batchSize,
+        );
+
+        final batch = firestore.batch();
+
+        for (final clientData in chunk) {
+          final docRef = firestore.collection('clients').doc();
+          batch.set(docRef, clientData);
+        }
+
+        await batch.commit();
+
+        imported += chunk.length;
+
+        if (mounted) {
+          _updateOperationProgress(
+            processed: i + chunk.length + skippedExisting + skippedInvalid,
+            total: totalRows,
+            status: 'Importing...',
+          );
+        }
+      }
+
+      if (!mounted) return;
+
+      if (_cancelOperationRequested) {
+        _finishOperationPanel(
+          title: 'Import cancelled',
+          message:
+          '$imported client${imported == 1 ? '' : 's'} imported before the operation was stopped.',
+        );
+        return;
+      }
+
+      _updateOperationProgress(
+        processed: totalRows,
+        total: totalRows,
+        status: 'Completed',
+      );
+
+      final unmatchedText = unmatchedAgents.isEmpty
+          ? ''
+          : '\nUnmatched agents: ${unmatchedAgents.join(', ')}';
+
+      _finishOperationPanel(
+        title: 'Import completed',
+        message:
+        'Imported: $imported\n'
+            'Skipped existing: $skippedExisting\n'
+            'Skipped invalid: $skippedInvalid\n'
+            'Failed: $failed'
+            '$unmatchedText',
+        skippedRows: skippedExisting > 0 ? skippedRowsData : null,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _finishOperationPanel(
+        title: 'Import failed',
+        message: 'The CSV import could not be completed. Please try again.',
+        error: true,
+      );
+    }
+  }
+
+  // ===========================================================================
+  // CSV PARSER
+  //
+  // Supports:
+  // - commas inside quoted values
+  // - escaped quotes ("")
+  // - quoted newlines
+  // - CRLF
+  // - LF
+  // ===========================================================================
+
+  List<List<String>> _parseCsv(
+      String input,
+      ) {
+    final rows =
+    <List<String>>[];
+
+    final row =
+    <String>[];
+
+    final field =
+    StringBuffer();
+
+    bool inQuotes = false;
+
+    for (int i = 0;
+    i < input.length;
+    i++) {
+      final char =
+      input[i];
+
+      if (char == '"') {
+        // Escaped quote:
+        //
+        // ""
+        if (inQuotes &&
+            i + 1 <
+                input.length &&
+            input[i + 1] ==
+                '"') {
+          field.write(
+            '"',
+          );
+
+          i++;
+        } else {
+          inQuotes =
+          !inQuotes;
+        }
+
+        continue;
+      }
+
+      if (char == ',' &&
+          !inQuotes) {
+        row.add(
+          field.toString(),
+        );
+
+        field.clear();
+
+        continue;
+      }
+
+      if ((char == '\n' ||
+          char == '\r') &&
+          !inQuotes) {
+        // CRLF
+        if (char == '\r' &&
+            i + 1 <
+                input.length &&
+            input[i + 1] ==
+                '\n') {
+          i++;
+        }
+
+        row.add(
+          field.toString(),
+        );
+
+        field.clear();
+
+        if (row.any(
+              (value) =>
+          value
+              .trim()
+              .isNotEmpty,
+        )) {
+          rows.add(
+            List<String>.from(
+              row,
+            ),
+          );
+        }
+
+        row.clear();
+
+        continue;
+      }
+
+      field.write(
+        char,
+      );
+    }
+
+    // Final row.
+    if (field.isNotEmpty ||
+        row.isNotEmpty) {
+      row.add(
+        field.toString(),
+      );
+
+      if (row.any(
+            (value) =>
+        value
+            .trim()
+            .isNotEmpty,
+      )) {
+        rows.add(
+          List<String>.from(
+            row,
+          ),
+        );
+      }
+    }
+
+    return rows;
+  }
+
+  // ===========================================================================
+  // CREATE CLIENT
+  // ===========================================================================
+
+  Future<void>
+  _showCreateClientDialog() async {
+    final l10n =
+    AppLocalizations.of(
+      context,
+    );
+
+    final theme =
+    Theme.of(context);
+
+    final cc =
+    TextEditingController();
+
+    final ac =
+    TextEditingController();
+
+    String st = 'New';
+
+    await showDialog(
+      context: context,
+      builder:
+          (c) => StatefulBuilder(
+        builder:
+            (
+            context,
+            setS,
+            ) =>
+            AlertDialog(
+              title: Text(
+                l10n?.translate(
+                  'create_client',
+                ) ??
+                    'Create Client',
+              ),
+              content: SizedBox(
+                width: 450,
+                child: Column(
+                  mainAxisSize:
+                  MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller:
+                      cc,
+                      decoration:
+                      InputDecoration(
+                        labelText:
+                        l10n?.translate(
+                          'company_name',
+                        ) ??
+                            'Company',
+                      ),
+                    ),
+                    const SizedBox(
+                      height: 16,
+                    ),
+                    TextField(
+                      controller:
+                      ac,
+                      decoration:
+                      InputDecoration(
+                        labelText:
+                        l10n?.translate(
+                          'acc',
+                        ) ??
+                            'ACC',
+                      ),
+                    ),
+                    const SizedBox(
+                      height: 16,
+                    ),
+                    DropdownButtonFormField<
+                        String>(
+                      initialValue:
+                      st,
+                      decoration:
+                      InputDecoration(
+                        labelText:
+                        l10n?.translate(
+                          'system',
+                        ) ??
+                            'System',
+                      ),
+                      items:
+                      const [
+                        DropdownMenuItem(
+                          value:
+                          'New',
+                          child:
+                          Text(
+                            'New',
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value:
+                          'Old',
+                          child:
+                          Text(
+                            'Old',
+                          ),
+                        ),
+                      ],
+                      onChanged:
+                          (v) {
+                        if (v !=
+                            null) {
+                          setS(
+                                () {
+                              st =
+                                  v;
+                            },
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      () =>
+                      Navigator.pop(
+                        c,
+                      ),
+                  child:
+                  Text(
+                    l10n?.translate(
+                      'cancel',
+                    ) ??
+                        'Cancel',
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      () async {
+                    if (cc.text
+                        .trim()
+                        .isEmpty ||
+                        ac.text
+                            .trim()
+                            .isEmpty) {
+                      return;
+                    }
+
+                    final navigator =
+                    Navigator.of(
+                      context,
+                    );
+
+                    final messenger =
+                    ScaffoldMessenger
+                        .of(
+                      context,
+                    );
+
+                    try {
+                      await _repository
+                          .createClient(
+                        companyName:
+                        cc.text
+                            .trim(),
+                        accNumber:
+                        ac.text
+                            .trim(),
+                        systemType:
+                        st,
+                      );
+
+                      if (!mounted) {
+                        return;
+                      }
+
+                      navigator.pop();
+
+                      messenger
+                          .showSnackBar(
+                        const SnackBar(
+                          content:
+                          Text(
+                            'Client created.',
+                          ),
+                        ),
+                      );
+                    } catch (e) {
+                      if (!mounted) {
+                        return;
+                      }
+
+                      messenger
+                          .showSnackBar(
+                        SnackBar(
+                          content:
+                          Text(
+                            'Failed: $e',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  style:
+                  ElevatedButton
+                      .styleFrom(
+                    backgroundColor:
+                    theme
+                        .colorScheme
+                        .primary,
+                    foregroundColor:
+                    theme
+                        .colorScheme
+                        .onPrimary,
+                  ),
+                  child:
+                  Text(
+                    l10n?.translate(
+                      'create',
+                    ) ??
+                        'Create',
+                  ),
+                ),
+              ],
+            ),
+      ),
+    );
+
+    cc.dispose();
+    ac.dispose();
+  }
+}
+
+class _OperationPanelData {
+  final String title;
+  final int processed;
+  final int total;
+  final double progress;
+  final bool cancelling;
+  final String status;
+  final String? resultMessage;
+  final bool error;
+  final List<List<String>>? skippedRows;
+
+  const _OperationPanelData({
+    required this.title,
+    required this.processed,
+    required this.total,
+    required this.progress,
+    required this.cancelling,
+    required this.status,
+    required this.resultMessage,
+    required this.error,
+    this.skippedRows,
+  });
+
+  const _OperationPanelData.hidden()
+      : title = '',
+        processed = 0,
+        total = 0,
+        progress = 0,
+        cancelling = false,
+        status = '',
+        resultMessage = null,
+        error = false,
+        skippedRows = null;
+
+  _OperationPanelData copyWith({
+    String? title,
+    int? processed,
+    int? total,
+    double? progress,
+    bool? cancelling,
+    String? status,
+    String? resultMessage,
+    bool? error,
+    List<List<String>>? skippedRows,
+  }) {
+    return _OperationPanelData(
+      title: title ?? this.title,
+      processed: processed ?? this.processed,
+      total: total ?? this.total,
+      progress: progress ?? this.progress,
+      cancelling: cancelling ?? this.cancelling,
+      status: status ?? this.status,
+      resultMessage: resultMessage ?? this.resultMessage,
+      error: error ?? this.error,
+      skippedRows: skippedRows ?? this.skippedRows,
+    );
+  }
+}
+
+// =============================================================================
+// EMPTY CLIENTS
+// =============================================================================
+
+class _EmptyClients
+    extends StatelessWidget {
+  final bool hasSearch;
+
+  final VoidCallback onCreate;
+
+  const _EmptyClients({
+    required this.hasSearch,
+    required this.onCreate,
+  });
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    final theme =
+    Theme.of(context);
+
+    return Center(
+      child: Column(
+        mainAxisSize:
+        MainAxisSize.min,
+        children: [
+          Icon(
+            hasSearch
+                ? Icons.search_off
+                : Icons.people_outline,
+            size: 60,
+            color: theme
+                .colorScheme
+                .onSurface
+                .withValues(
+              alpha: 0.3,
+            ),
+          ),
+          const SizedBox(
+            height: 16,
+          ),
+          Text(
+            hasSearch
+                ? 'No matches.'
+                : 'No clients yet.',
+            style:
+            const TextStyle(
+              fontSize: 18,
+              fontWeight:
+              FontWeight.bold,
+            ),
+          ),
+          if (!hasSearch) ...[
+            const SizedBox(
+              height: 16,
+            ),
+            ElevatedButton.icon(
+              onPressed:
+              onCreate,
+              icon:
+              const Icon(
+                Icons.add,
+              ),
+              label:
+              const Text(
+                'Create First Client',
+              ),
+              style:
+              ElevatedButton
+                  .styleFrom(
+                backgroundColor:
+                theme
+                    .colorScheme
+                    .primary,
+                foregroundColor:
+                theme
+                    .colorScheme
+                    .onPrimary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

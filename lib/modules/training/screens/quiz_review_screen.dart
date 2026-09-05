@@ -2,13 +2,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../admin/services/training_admin_service.dart';
+import '../../../admin_console/services/training_admin_service.dart';
 import '../../../router/app_router.dart';
 import '../models/quiz_model.dart';
 import '../services/training_progress_service.dart';
 
-class QuizReviewScreen
-    extends StatefulWidget {
+class QuizReviewScreen extends StatefulWidget {
   final String courseId;
   final String lessonId;
 
@@ -19,19 +18,16 @@ class QuizReviewScreen
   });
 
   @override
-  State<QuizReviewScreen>
-  createState() =>
+  State<QuizReviewScreen> createState() =>
       _QuizReviewScreenState();
 }
 
 class _QuizReviewScreenState
     extends State<QuizReviewScreen> {
-  final TrainingProgressService
-  progressService =
+  final TrainingProgressService progressService =
   TrainingProgressService();
 
-  final TrainingAdminService
-  adminService =
+  final TrainingAdminService adminService =
   TrainingAdminService();
 
   bool loading = true;
@@ -71,13 +67,10 @@ class _QuizReviewScreenState
       }
 
       final result =
-      await progressService
-          .getQuizResult(
+      await progressService.getQuizResult(
         userId: user.uid,
-        courseId:
-        widget.courseId,
-        lessonId:
-        widget.lessonId,
+        courseId: widget.courseId,
+        lessonId: widget.lessonId,
       );
 
       if (result == null) {
@@ -90,37 +83,50 @@ class _QuizReviewScreenState
         return;
       }
 
-      score =
-      (result["score"] ?? 0)
-      as int;
+      // --------------------------------------------------------
+      // RESULT
+      // --------------------------------------------------------
 
-      passed =
-          result["passed"] ??
-              false;
+      final rawScore = result["score"];
+
+      if (rawScore is num) {
+        score = rawScore.toInt();
+      } else {
+        score = 0;
+      }
+
+      passed = result["passed"] == true;
+
+      // --------------------------------------------------------
+      // SELECTED ANSWERS
+      // --------------------------------------------------------
 
       final answers =
-          result["answers"]
-          as List<dynamic>? ??
-              [];
+          result["answers"] as List<dynamic>? ?? [];
 
-      selectedAnswers =
-          answers.map<int?>(
-                (e) {
-              if (e is Map) {
-                return e[
-                "selectedAnswer"] as int?;
-              }
+      selectedAnswers = answers.map<int?>(
+            (e) {
+          if (e is Map) {
+            final selected =
+            e["selectedAnswer"];
 
-              return null;
-            },
-          ).toList();
+            if (selected is num) {
+              return selected.toInt();
+            }
+          }
+
+          return null;
+        },
+      ).toList();
+
+      // --------------------------------------------------------
+      // LOAD QUIZ
+      // --------------------------------------------------------
 
       final loadedQuiz =
       await adminService.getQuiz(
-        courseId:
-        widget.courseId,
-        lessonId:
-        widget.lessonId,
+        courseId: widget.courseId,
+        lessonId: widget.lessonId,
       );
 
       if (!mounted) return;
@@ -143,12 +149,10 @@ class _QuizReviewScreenState
       ScaffoldMessenger.of(context)
           .showSnackBar(
         SnackBar(
-          content:
-          Text(
+          content: Text(
             "Failed to load quiz review: $e",
           ),
-          backgroundColor:
-          Colors.red,
+          backgroundColor: Colors.red,
         ),
       );
     }
@@ -159,10 +163,40 @@ class _QuizReviewScreenState
   // ============================================================
 
   void _goBack() {
+    debugPrint('================================');
+    debugPrint('QUIZ REVIEW BACK');
+    debugPrint(
+      'COURSE ID: ${widget.courseId}',
+    );
+    debugPrint(
+      'LESSON ID: ${widget.lessonId}',
+    );
+    debugPrint(
+      'CURRENT URL: '
+          '${GoRouterState.of(context).uri}',
+    );
+    debugPrint('================================');
+
+    // ----------------------------------------------------------
+    // If the review was reached through the normal flow:
+    //
+    // Lesson
+    //   ↓
+    // Quiz
+    //   ↓ pushReplacement
+    // Quiz Review
+    //
+    // pop() correctly returns to Lesson.
+    // ----------------------------------------------------------
+
     if (context.canPop()) {
       context.pop();
       return;
     }
+
+    // ----------------------------------------------------------
+    // Direct URL / refreshed browser / no navigation history.
+    // ----------------------------------------------------------
 
     context.go(
       AppRouter.lessonPath(
@@ -180,13 +214,15 @@ class _QuizReviewScreenState
   Widget build(
       BuildContext context,
       ) {
+    final theme = Theme.of(context);
+
     if (loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor:
-        Color(0xffF5F8FC),
+        theme.colorScheme.surface,
         body: Center(
           child:
-          CircularProgressIndicator(),
+          CircularProgressIndicator(color: theme.colorScheme.primary),
         ),
       );
     }
@@ -194,12 +230,12 @@ class _QuizReviewScreenState
     if (quiz == null) {
       return Scaffold(
         backgroundColor:
-        const Color(0xffF5F8FC),
+        theme.colorScheme.surface,
         appBar: AppBar(
           backgroundColor:
-          const Color(0xff003366),
+          theme.colorScheme.primary,
           foregroundColor:
-          Colors.white,
+          theme.colorScheme.onPrimary,
           title:
           const Text(
             "Quiz Review",
@@ -213,10 +249,11 @@ class _QuizReviewScreenState
             ),
           ),
         ),
-        body: const Center(
+        body: Center(
           child:
           Text(
             "Quiz data not found",
+            style: TextStyle(color: theme.colorScheme.onSurface),
           ),
         ),
       );
@@ -224,13 +261,13 @@ class _QuizReviewScreenState
 
     return Scaffold(
       backgroundColor:
-      const Color(0xffF5F8FC),
+      theme.colorScheme.surface,
 
       appBar: AppBar(
         backgroundColor:
-        const Color(0xff003366),
+        theme.colorScheme.primary,
         foregroundColor:
-        Colors.white,
+        theme.colorScheme.onPrimary,
         title:
         const Text(
           "Quiz Review",
@@ -253,13 +290,13 @@ class _QuizReviewScreenState
           crossAxisAlignment:
           CrossAxisAlignment.start,
           children: [
-            _buildResultCard(),
+            _buildResultCard(context),
 
             const SizedBox(
               height: 25,
             ),
 
-            const Text(
+            Text(
               "Review Answers",
               style:
               TextStyle(
@@ -267,7 +304,7 @@ class _QuizReviewScreenState
                 fontWeight:
                 FontWeight.bold,
                 color:
-                Color(0xff003366),
+                theme.colorScheme.primary,
               ),
             ),
 
@@ -279,9 +316,9 @@ class _QuizReviewScreenState
               quiz!.questions.length,
                   (index) {
                 return _questionCard(
+                  context,
                   index,
-                  quiz!.questions[
-                  index],
+                  quiz!.questions[index],
                 );
               },
             ),
@@ -295,19 +332,20 @@ class _QuizReviewScreenState
   // RESULT
   // ============================================================
 
-  Widget _buildResultCard() {
+  Widget _buildResultCard(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding:
       const EdgeInsets.all(25),
       decoration:
       BoxDecoration(
-        color: Colors.white,
+        color: theme.cardTheme.color,
         borderRadius:
         BorderRadius.circular(18),
         border: Border.all(
           color:
-          const Color(0xffE4E9F0),
+          theme.dividerColor,
         ),
       ),
       child: Column(
@@ -382,14 +420,14 @@ class _QuizReviewScreenState
   // ============================================================
 
   Widget _questionCard(
+      BuildContext context,
       int index,
       dynamic question,
       ) {
+    final theme = Theme.of(context);
     final selected =
-    index <
-        selectedAnswers.length
-        ? selectedAnswers[
-    index]
+    index < selectedAnswers.length
+        ? selectedAnswers[index]
         : null;
 
     final correct =
@@ -407,12 +445,12 @@ class _QuizReviewScreenState
       const EdgeInsets.all(22),
       decoration:
       BoxDecoration(
-        color: Colors.white,
+        color: theme.cardTheme.color,
         borderRadius:
         BorderRadius.circular(16),
         border: Border.all(
           color:
-          const Color(0xffE4E9F0),
+          theme.dividerColor,
         ),
       ),
       child: Column(
@@ -425,11 +463,11 @@ class _QuizReviewScreenState
                 child: Text(
                   "Question ${index + 1}",
                   style:
-                  const TextStyle(
+                  TextStyle(
                     fontWeight:
                     FontWeight.bold,
                     color:
-                    Color(0xff003366),
+                    theme.colorScheme.primary,
                   ),
                 ),
               ),
@@ -453,10 +491,11 @@ class _QuizReviewScreenState
           Text(
             question.question,
             style:
-            const TextStyle(
+            TextStyle(
               fontSize: 17,
               fontWeight:
               FontWeight.bold,
+              color: theme.colorScheme.onSurface,
             ),
           ),
 
@@ -464,12 +503,14 @@ class _QuizReviewScreenState
             height: 18,
           ),
 
-          const Text(
+          Text(
             "Your Answer:",
             style:
             TextStyle(
               fontWeight:
               FontWeight.bold,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 13,
             ),
           ),
 
@@ -480,8 +521,7 @@ class _QuizReviewScreenState
           Text(
             selected == null
                 ? "Not answered"
-                : question
-                .options[selected],
+                : question.options[selected],
             style:
             TextStyle(
               color:
@@ -497,12 +537,14 @@ class _QuizReviewScreenState
             height: 14,
           ),
 
-          const Text(
+          Text(
             "Correct Answer:",
             style:
             TextStyle(
               fontWeight:
               FontWeight.bold,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 13,
             ),
           ),
 
@@ -511,8 +553,7 @@ class _QuizReviewScreenState
           ),
 
           Text(
-            question.options[
-            correct],
+            question.options[correct],
             style:
             const TextStyle(
               color: Colors.green,

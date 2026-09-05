@@ -414,6 +414,78 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Reigon",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "[ACCESS_TOKEN]",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"messaging_product\": \"whatsapp\",\r\n  \"storage_configuration\": {\r\n    \"status\": \"IN_COUNTRY_STORAGE_ENABLED\",\r\n    \"data_localization_region\": \"DE\"\r\n  }\r\n}",							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://graph.facebook.com/v21.0/[Phone_NUMBER_ID]/settings",
+							"protocol": "https",
+							"host": [
+								"graph",
+								"facebook",
+								"com"
+							],
+							"path": [
+								"v21.0",
+								"[Phone_NUMBER_ID]",
+								"settings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Subscribe to app",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "[ACCESS_TOKEN]",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "https://graph.facebook.com/v21.0/[WABA ID]/subscribed_apps",
+							"protocol": "https",
+							"host": [
+								"graph",
+								"facebook",
+								"com"
+							],
+							"path": [
+								"v21.0",
+								"[WABA ID]",
+								"subscribed_apps"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		}

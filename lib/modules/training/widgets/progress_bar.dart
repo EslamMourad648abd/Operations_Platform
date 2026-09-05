@@ -14,7 +14,7 @@ class ProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
+    final theme = Theme.of(context);
     return Column(
 
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -25,8 +25,8 @@ class ProgressBar extends StatelessWidget {
           value:value,
           minHeight:8,
           borderRadius: BorderRadius.circular(10),
-          backgroundColor: Colors.grey.shade200,
-          color: const Color(0xff80CFFF),
+          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+          color: theme.colorScheme.primary,
         ),
 
 
@@ -35,9 +35,9 @@ class ProgressBar extends StatelessWidget {
 
         Text(
           "${(value*100).round()}%",
-          style: const TextStyle(
+          style: TextStyle(
             fontSize:12,
-            color: Colors.grey,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         )
 
