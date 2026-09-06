@@ -73,7 +73,7 @@ class _OnboardingClientsScreenState
 
     // 2. Fetch ONLY onboarding agents for the Reassign Dropdown
     _onboardingAgentsSub =
-        _repository.watchAgents(role: 'Onboarding_Agent').listen((agents) {
+        _repository.watchAgents(role: 'onboarding_agent').listen((agents) {
           if (!mounted) return;
 
           setState(() {
@@ -664,8 +664,7 @@ class _OnboardingClientsScreenState
                 Expanded(
                   child: StreamBuilder<
                       List<ClientModel>>(
-                    stream: _repository
-                        .watchClients(),
+                    stream: _clientsStream,
                     builder:
                         (
                         context,
@@ -1166,14 +1165,30 @@ class _OnboardingClientsScreenState
     if (result == null) return;
 
     try {
+      final oldUid = client.assignedTo;
       await _repository.updateAssignedTo(client.id, result);
 
       if (!mounted) return;
 
+      final oldName = _agentNames[oldUid] ?? (oldUid.isEmpty ? 'Unassigned' : oldUid);
       final assignedName = result.isEmpty
           ? 'Unassigned'
       // Check from the full list in case we re-assigned to someone else somehow
           : (_agentNames[result] ?? result);
+
+      await _repository.addActivity(
+        clientId: client.id,
+        type: 'assignment',
+        action: 'reassign',
+        title: 'Client reassigned',
+        description: 'Client was reassigned from $oldName to $assignedName.',
+        metadata: {
+          'oldAssigneeId': oldUid,
+          'newAssigneeId': result,
+          'oldAssigneeName': oldName,
+          'newAssigneeName': assignedName,
+        },
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

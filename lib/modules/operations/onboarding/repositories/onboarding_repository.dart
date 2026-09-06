@@ -91,7 +91,7 @@ class OnboardingRepository {
     return snapshot.docs.map(ActivityModel.fromFirestore).toList();
   }
 
-  Future<String> addActivity({
+  Future<Map<String, dynamic>> _buildActivityData({
     required String clientId,
     required String type,
     required String action,
@@ -145,9 +145,7 @@ class OnboardingRepository {
       }
     }
 
-    final document = _activity(clientId).doc();
-
-    await document.set({
+    return <String, dynamic>{
       'clientId': clientId,
       'type': type.trim(),
       'action': action.trim(),
@@ -157,7 +155,31 @@ class OnboardingRepository {
       'actorName': resolvedActorName,
       'metadata': Map<String, dynamic>.from(metadata),
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    };
+  }
+
+  Future<String> addActivity({
+    required String clientId,
+    required String type,
+    required String action,
+    required String title,
+    String description = '',
+    String? actorName,
+    Map<String, dynamic> metadata = const <String, dynamic>{},
+  }) async {
+    final document = _activity(clientId).doc();
+
+    final activityData = await _buildActivityData(
+      clientId: clientId,
+      type: type,
+      action: action,
+      title: title,
+      description: description,
+      actorName: actorName,
+      metadata: metadata,
+    );
+
+    await document.set(activityData);
 
     return document.id;
   }
@@ -188,6 +210,8 @@ class OnboardingRepository {
 
   String _activityTypeLabel(String type) {
     switch (type.trim().toLowerCase()) {
+      case 'channel':
+        return 'Channel';
       case 'activation':
         return 'Activation';
       case 'verification':
@@ -332,10 +356,56 @@ class OnboardingRepository {
       String clientId,
       String comment,
       ) async {
-    await _clients.doc(clientId).update({
-      'crmComment': comment.trim(),
+    final cleanClientId = clientId.trim();
+    final newComment = comment.trim();
+
+    if (cleanClientId.isEmpty) {
+      throw Exception('Client ID is required.');
+    }
+
+    if (newComment.isEmpty) {
+      throw Exception('CRM comment cannot be empty.');
+    }
+
+    final clientDocument = _clients.doc(cleanClientId);
+    final snapshot = await clientDocument.get();
+
+    if (!snapshot.exists) {
+      throw Exception('Client not found.');
+    }
+
+    final data = snapshot.data() ?? <String, dynamic>{};
+    final oldComment = data['crmComment']?.toString().trim() ?? '';
+
+    // Do not create a duplicate activity when the saved comment did not change.
+    if (oldComment == newComment) {
+      return;
+    }
+
+    final activityDocument = _activity(cleanClientId).doc();
+    final activityData = await _buildActivityData(
+      clientId: cleanClientId,
+      type: 'crm',
+      action: 'comment_submitted',
+      title: 'CRM comment submitted',
+      description: 'A CRM comment was submitted for this client.',
+      metadata: {
+        'comment': newComment,
+        if (oldComment.isNotEmpty) 'previousComment': oldComment,
+      },
+    );
+
+    // Keep the local client change and its audit event atomic.
+    final batch = _firestore.batch();
+
+    batch.update(clientDocument, {
+      'crmComment': newComment,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    batch.set(activityDocument, activityData);
+
+    await batch.commit();
   }
 
   // ============================================================
@@ -412,40 +482,94 @@ class OnboardingRepository {
     });
   }
 
-  // ============================================================
-  // CHANNELS
-  // ============================================================
+// ============================================================
+// CHANNELS
+// ============================================================
 
   Future<void> addChannel(
       String clientId,
       ChannelModel channel,
       ) async {
-    await _clients.doc(clientId).update({
+    final cleanClientId = clientId.trim();
+
+    if (cleanClientId.isEmpty) {
+      throw Exception('Client ID is required.');
+    }
+
+    final clientDocument = _clients.doc(cleanClientId);
+    final activityDocument = _activity(cleanClientId).doc();
+
+    final channelData = <String, dynamic>{
+      'id': channel.id,
+      ...channel.toMap(),
+    };
+
+    final activityData = await _buildActivityData(
+      clientId: cleanClientId,
+      type: 'channel',
+      action: 'created',
+      title: 'Channel added',
+      description: _channelActivityDescription(
+        channel,
+        action: 'added',
+      ),
+      metadata: {
+        'channelName': _channelDisplayName(channel),
+        'channelType': channel.channelType,
+        'status': channel.status,
+        'channelId': channel.id,
+        'channel': _channelActivityMetadata(channel),
+      },
+    );
+
+    // Save the channel and its audit event together.
+    // If either write fails, neither write is committed.
+    final batch = _firestore.batch();
+
+    batch.update(clientDocument, {
       'channels': FieldValue.arrayUnion([
-        {
-          'id': channel.id,
-          ...channel.toMap(),
-        },
+        channelData,
       ]),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    batch.set(activityDocument, activityData);
+
+    await batch.commit();
   }
 
   Future<void> updateChannel(
       String clientId,
       ChannelModel channel,
       ) async {
-    final snapshot = await _clients.doc(clientId).get();
+    final cleanClientId = clientId.trim();
+
+    if (cleanClientId.isEmpty) {
+      throw Exception('Client ID is required.');
+    }
+
+    final clientDocument = _clients.doc(cleanClientId);
+    final snapshot = await clientDocument.get();
 
     if (!snapshot.exists) {
       throw Exception('Client not found.');
     }
 
     final data = snapshot.data() ?? <String, dynamic>{};
-    final rawChannels = data['channels'] as List<dynamic>? ?? [];
+    final rawChannels =
+        data['channels'] as List<dynamic>? ?? <dynamic>[];
+
+    Map<String, dynamic>? oldChannelData;
+
+    final newChannelData = <String, dynamic>{
+      'id': channel.id,
+      ...channel.toMap(),
+    };
 
     final updatedChannels = rawChannels.map((raw) {
-      if (raw is! Map) return raw;
+      if (raw is! Map) {
+        return raw;
+      }
 
       final existing = Map<String, dynamic>.from(raw);
 
@@ -453,40 +577,408 @@ class OnboardingRepository {
         return existing;
       }
 
-      return {
-        'id': channel.id,
-        ...channel.toMap(),
-      };
+      oldChannelData = existing;
+      return newChannelData;
     }).toList();
 
-    await _clients.doc(clientId).update({
+    if (oldChannelData == null) {
+      throw Exception('Channel not found.');
+    }
+
+    final oldData = oldChannelData!;
+
+    final changedFields = <String, Map<String, dynamic>>{};
+
+    const trackedFields = <String>[
+      'channelType',
+      'name',
+      'status',
+      'whatsappType',
+      'channelValue',
+      'phoneNumber',
+      'phoneNumberId',
+      'fbmId',
+      'wabaId',
+      'callCenterValue',
+      'whatsappChannelToLogCalls',
+      'aiCallSummaryEnabled',
+    ];
+
+    for (final field in trackedFields) {
+      final oldValue = oldData[field];
+      final newValue = newChannelData[field];
+
+      if (_channelValuesDifferent(oldValue, newValue)) {
+        changedFields[field] = <String, dynamic>{
+          'oldValue': oldValue,
+          'newValue': newValue,
+        };
+      }
+    }
+
+    // Nothing materially changed. Do not generate a false audit event.
+    if (changedFields.isEmpty) {
+      return;
+    }
+
+    final channelName = _channelDisplayName(channel);
+    final changeSummary =
+    _channelChangeSummary(changedFields);
+
+    final activityDocument = _activity(cleanClientId).doc();
+
+    final activityData = await _buildActivityData(
+      clientId: cleanClientId,
+      type: 'channel',
+      action: 'updated',
+      title: 'Channel updated',
+      description: '$channelName was updated. $changeSummary',
+      metadata: {
+        // Keep the most useful fields first because the current
+        // Activity screen previews the first metadata entries.
+        'channelName': channelName,
+        'channelType': channel.channelType,
+        'changes': changeSummary,
+        'channelId': channel.id,
+        'changeCount': changedFields.length,
+        'changedFields': changedFields,
+        'previousChannel': _cleanActivityMap(oldData),
+        'updatedChannel': _cleanActivityMap(newChannelData),
+      },
+    );
+
+    // The channel change and the activity event are atomic.
+    // This prevents a saved change (for example Active -> Inactive)
+    // from ever existing without its corresponding audit entry.
+    final batch = _firestore.batch();
+
+    batch.update(clientDocument, {
       'channels': updatedChannels,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    batch.set(activityDocument, activityData);
+
+    await batch.commit();
   }
 
   Future<void> deleteChannel(
       String clientId,
       String channelId,
       ) async {
-    final snapshot = await _clients.doc(clientId).get();
+    final cleanClientId = clientId.trim();
+    final cleanChannelId = channelId.trim();
+
+    if (cleanClientId.isEmpty) {
+      throw Exception('Client ID is required.');
+    }
+
+    if (cleanChannelId.isEmpty) {
+      throw Exception('Channel ID is required.');
+    }
+
+    final clientDocument = _clients.doc(cleanClientId);
+    final snapshot = await clientDocument.get();
 
     if (!snapshot.exists) {
       throw Exception('Client not found.');
     }
 
     final data = snapshot.data() ?? <String, dynamic>{};
-    final rawChannels = data['channels'] as List<dynamic>? ?? [];
+    final rawChannels =
+        data['channels'] as List<dynamic>? ?? <dynamic>[];
+
+    Map<String, dynamic>? deletedChannel;
 
     final updatedChannels = rawChannels.where((raw) {
-      if (raw is! Map) return true;
-      return raw['id']?.toString() != channelId;
+      if (raw is! Map) {
+        return true;
+      }
+
+      final map = Map<String, dynamic>.from(raw);
+
+      if (map['id']?.toString() == cleanChannelId) {
+        deletedChannel = map;
+        return false;
+      }
+
+      return true;
     }).toList();
 
-    await _clients.doc(clientId).update({
+    if (deletedChannel == null) {
+      throw Exception('Channel not found.');
+    }
+
+    final channelData =
+    Map<String, dynamic>.from(deletedChannel!);
+    final channelName =
+    _channelMapDisplayName(channelData);
+
+    final activityDocument = _activity(cleanClientId).doc();
+
+    final activityData = await _buildActivityData(
+      clientId: cleanClientId,
+      type: 'channel',
+      action: 'deleted',
+      title: 'Channel deleted',
+      description:
+      '$channelName was deleted from the client.',
+      metadata: {
+        'channelName': channelName,
+        'channelType':
+        channelData['channelType']?.toString() ?? '',
+        'status':
+        channelData['status']?.toString() ?? '',
+        'channelId': cleanChannelId,
+        'deletedChannel':
+        _cleanActivityMap(channelData),
+      },
+    );
+
+    final batch = _firestore.batch();
+
+    batch.update(clientDocument, {
       'channels': updatedChannels,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    batch.set(activityDocument, activityData);
+
+    await batch.commit();
+  }
+
+// ============================================================
+// CHANNEL ACTIVITY HELPERS
+// ============================================================
+
+  Map<String, dynamic> _channelActivityMetadata(
+      ChannelModel channel,
+      ) {
+    return {
+      'channelType': channel.channelType,
+      'name': channel.name,
+      'status': channel.status,
+      'whatsappType': channel.whatsappType,
+      'channelValue': channel.channelValue,
+      'phoneNumber': channel.phoneNumber,
+      'phoneNumberId': channel.phoneNumberId,
+      'fbmId': channel.fbmId,
+      'wabaId': channel.wabaId,
+      'callCenterValue': channel.callCenterValue,
+      'whatsappChannelToLogCalls':
+      channel.whatsappChannelToLogCalls,
+      'aiCallSummaryEnabled':
+      channel.aiCallSummaryEnabled,
+    };
+  }
+
+  bool _channelValuesDifferent(
+      dynamic oldValue,
+      dynamic newValue,
+      ) {
+    if (oldValue == null && newValue == null) {
+      return false;
+    }
+
+    final oldText = oldValue?.toString().trim() ?? '';
+    final newText = newValue?.toString().trim() ?? '';
+
+    return oldText != newText;
+  }
+
+  String _channelChangeSummary(
+      Map<String, Map<String, dynamic>> changedFields,
+      ) {
+    final changes = <String>[];
+
+    for (final entry in changedFields.entries) {
+      final label = _channelFieldLabel(entry.key);
+      final oldValue =
+      _displayActivityValue(entry.value['oldValue']);
+      final newValue =
+      _displayActivityValue(entry.value['newValue']);
+
+      changes.add(
+        '$label changed from "$oldValue" to "$newValue"',
+      );
+    }
+
+    if (changes.isEmpty) {
+      return 'Channel details changed.';
+    }
+
+    return '${changes.join('. ')}.';
+  }
+
+  String _channelFieldLabel(String field) {
+    switch (field) {
+      case 'channelType':
+        return 'Channel type';
+      case 'name':
+        return 'Name';
+      case 'status':
+        return 'Status';
+      case 'whatsappType':
+        return 'WhatsApp type';
+      case 'channelValue':
+        return 'Channel value';
+      case 'phoneNumber':
+        return 'Phone number';
+      case 'phoneNumberId':
+        return 'Phone Number ID';
+      case 'fbmId':
+        return 'FBM ID';
+      case 'wabaId':
+        return 'WABA ID';
+      case 'callCenterValue':
+        return 'Call center value';
+      case 'whatsappChannelToLogCalls':
+        return 'WhatsApp channel used to log calls';
+      case 'aiCallSummaryEnabled':
+        return 'AI call summary';
+      default:
+        return field;
+    }
+  }
+
+  String _displayActivityValue(dynamic value) {
+    if (value == null) {
+      return 'empty';
+    }
+
+    final text = value.toString().trim();
+
+    if (text.isEmpty) {
+      return 'empty';
+    }
+
+    return text;
+  }
+
+  Map<String, dynamic> _cleanActivityMap(
+      Map<String, dynamic> source,
+      ) {
+    final result = <String, dynamic>{};
+
+    for (final entry in source.entries) {
+      final value = entry.value;
+
+      // These values are Firestore-safe already. Nested maps/lists
+      // are retained so the full before/after state remains auditable.
+      if (value is Map) {
+        result[entry.key] =
+        Map<String, dynamic>.from(value);
+      } else if (value is List) {
+        result[entry.key] = List<dynamic>.from(value);
+      } else {
+        result[entry.key] = value;
+      }
+    }
+
+    return result;
+  }
+
+  String _channelActivityDescription(
+      ChannelModel channel, {
+        required String action,
+      }) {
+    final name = _channelDisplayName(channel);
+
+    if (channel.channelType.trim().isEmpty) {
+      return 'Channel $name was $action.';
+    }
+
+    return '$name (${channel.channelType}) was $action.';
+  }
+
+  String _channelDisplayName(
+      ChannelModel channel,
+      ) {
+    switch (channel.channelType.trim()) {
+      case 'WhatsApp':
+        return channel.name.trim().isNotEmpty
+            ? channel.name.trim()
+            : 'WhatsApp';
+
+      case 'Instagram':
+        return channel.channelValue.trim().isNotEmpty
+            ? channel.channelValue.trim()
+            : 'Instagram';
+
+      case 'Facebook':
+        return channel.channelValue.trim().isNotEmpty
+            ? channel.channelValue.trim()
+            : 'Facebook';
+
+      case 'TikTok':
+        return channel.channelValue.trim().isNotEmpty
+            ? channel.channelValue.trim()
+            : 'TikTok';
+
+      case 'Telegram':
+        return channel.channelValue.trim().isNotEmpty
+            ? channel.channelValue.trim()
+            : 'Telegram';
+
+      case 'Website Widget':
+        return channel.channelValue.trim().isNotEmpty
+            ? channel.channelValue.trim()
+            : 'Website Widget';
+
+      case 'Bevatel Call Center':
+        return channel.callCenterValue.trim().isNotEmpty
+            ? channel.callCenterValue.trim()
+            : 'Bevatel Call Center';
+
+      default:
+        return channel.name.trim().isNotEmpty
+            ? channel.name.trim()
+            : 'Channel';
+    }
+  }
+
+  String _channelMapDisplayName(
+      Map<String, dynamic> channel,
+      ) {
+    final type =
+        channel['channelType']?.toString().trim() ?? '';
+
+    final name =
+        channel['name']?.toString().trim() ?? '';
+
+    final value =
+        channel['channelValue']?.toString().trim() ?? '';
+
+    final callCenter =
+        channel['callCenterValue']?.toString().trim() ?? '';
+
+    switch (type) {
+      case 'WhatsApp':
+        return name.isNotEmpty ? name : 'WhatsApp';
+
+      case 'Instagram':
+        return value.isNotEmpty ? value : 'Instagram';
+
+      case 'Facebook':
+        return value.isNotEmpty ? value : 'Facebook';
+
+      case 'TikTok':
+        return value.isNotEmpty ? value : 'TikTok';
+
+      case 'Telegram':
+        return value.isNotEmpty ? value : 'Telegram';
+
+      case 'Website Widget':
+        return value.isNotEmpty ? value : 'Website Widget';
+
+      case 'Bevatel Call Center':
+        return callCenter.isNotEmpty
+            ? callCenter
+            : 'Bevatel Call Center';
+
+      default:
+        return name.isNotEmpty ? name : 'Channel';
+    }
   }
 
   // ============================================================

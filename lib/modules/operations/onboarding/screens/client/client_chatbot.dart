@@ -90,10 +90,35 @@ class _ChecklistCardState extends State<_ChecklistCard> {
     ])));
   }
   Future<void> _toggle(_Item it) async {
-    if (_saving != null) return; setState(() => _saving = it.key);
-    final up = Map<String, bool>.from(widget.checklist); up[it.key] = !(up[it.key] ?? false);
-    try { await OnboardingRepository().updateClientFields(widget.clientId, {'chatbotChecklist': up, 'chatbotStatus': _derive(up)}); }
-    finally { if (mounted) setState(() => _saving = null); }
+    if (_saving != null) return;
+    final prevCk = Map<String, bool>.from(widget.checklist);
+    final up = Map<String, bool>.from(widget.checklist);
+    up[it.key] = !(up[it.key] ?? false);
+    final oldSt = _derive(prevCk);
+    final ns = _derive(up);
+
+    setState(() => _saving = it.key);
+    try {
+      final repo = OnboardingRepository();
+      await repo.updateClientFields(widget.clientId, {'chatbotChecklist': up, 'chatbotStatus': ns});
+      await repo.addActivity(
+        clientId: widget.clientId,
+        type: 'chatbot',
+        action: 'update_chatbot',
+        title: 'Chatbot checklist updated',
+        description: '${it.title} was ${up[it.key] == true ? 'completed' : 'marked incomplete'}.',
+        metadata: {
+          'changedItem': it.key,
+          'changedItemTitle': it.title,
+          'oldValue': prevCk[it.key] ?? false,
+          'newValue': up[it.key] ?? false,
+          'previousStatus': oldSt,
+          'newStatus': ns,
+        },
+      );
+    } finally {
+      if (mounted) setState(() => _saving = null);
+    }
   }
 }
 

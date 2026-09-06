@@ -94,7 +94,29 @@ class _ProgressCardState extends State<_ProgressCard> {
     return Row(children: [Expanded(child: content), if (i < _steps.length - 1) Container(width: 30, height: 2, color: curIdx > i ? theme.colorScheme.primary : theme.dividerColor)]);
   }
 
-  Future<void> _update(String s) async { if (s == _norm(widget.status)) return; setState(() => _saving = s); try { await OnboardingRepository().updateStatuses(clientId: widget.clientId, activationStatus: s); } finally { if (mounted) setState(() => _saving = null); } }
+  Future<void> _update(String s) async {
+    if (s == _norm(widget.status)) return;
+    final oldSt = widget.status;
+    setState(() => _saving = s);
+    try {
+      final repo = OnboardingRepository();
+      await repo.updateStatuses(clientId: widget.clientId, activationStatus: s);
+      await repo.addActivity(
+        clientId: widget.clientId,
+        type: 'activation',
+        action: 'status_changed',
+        title: 'Activation status changed',
+        description: 'Activation status changed from "${_disp(oldSt)}" to "${_disp(s)}".',
+        metadata: {
+          'field': 'activationStatus',
+          'oldValue': oldSt,
+          'newValue': s,
+        },
+      );
+    } finally {
+      if (mounted) setState(() => _saving = null);
+    }
+  }
 }
 
 class _InfoCard extends StatelessWidget {

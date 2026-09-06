@@ -98,15 +98,53 @@ class _LifecycleCardState extends State<_LifecycleCard> {
   }
 
   Future<void> _update(String s) async {
-    if (s == _norm(widget.client.groupStatus)) return;
+    final oldStatus = widget.client.groupStatus;
+    if (s == _norm(oldStatus)) return;
     if (s == 'not started') {
       final confirm = await _showConfirm('Reset Group', 'Reset to Not Started? This clears timestamps.');
-      if (confirm) _run(() => OnboardingRepository().updateClientFields(widget.clientId, {'groupStatus': 'Not Started', 'groupOpenedAt': null, 'groupClosedAt': null}));
+      if (confirm) {
+        _run(() async {
+          final repo = OnboardingRepository();
+          await repo.updateClientFields(widget.clientId, {'groupStatus': 'Not Started', 'groupOpenedAt': null, 'groupClosedAt': null});
+          await repo.addActivity(
+            clientId: widget.clientId,
+            type: 'group',
+            action: 'status_changed',
+            title: 'Group status reset',
+            description: 'Group status was reset to Not Started.',
+            metadata: {'oldValue': oldStatus, 'newValue': 'Not Started'},
+          );
+        });
+      }
     } else if (s == 'opened') {
-      _run(() => OnboardingRepository().updateClientFields(widget.clientId, {'groupStatus': 'Opened', 'groupOpenedAt': FieldValue.serverTimestamp(), 'groupClosedAt': null}));
+      _run(() async {
+        final repo = OnboardingRepository();
+        await repo.updateClientFields(widget.clientId, {'groupStatus': 'Opened', 'groupOpenedAt': FieldValue.serverTimestamp(), 'groupClosedAt': null});
+        await repo.addActivity(
+          clientId: widget.clientId,
+          type: 'group',
+          action: 'status_changed',
+          title: 'Group opened',
+          description: 'Group was opened.',
+          metadata: {'oldValue': oldStatus, 'newValue': 'Opened'},
+        );
+      });
     } else if (s == 'closed') {
       final confirm = await _showConfirm('Close Group', 'Confirm closing the group.');
-      if (confirm) _run(() => OnboardingRepository().updateClientFields(widget.clientId, {'groupStatus': 'Closed', 'groupClosedAt': FieldValue.serverTimestamp()}));
+      if (confirm) {
+        _run(() async {
+          final repo = OnboardingRepository();
+          await repo.updateClientFields(widget.clientId, {'groupStatus': 'Closed', 'groupClosedAt': FieldValue.serverTimestamp()});
+          await repo.addActivity(
+            clientId: widget.clientId,
+            type: 'group',
+            action: 'status_changed',
+            title: 'Group closed',
+            description: 'Group was closed.',
+            metadata: {'oldValue': oldStatus, 'newValue': 'Closed'},
+          );
+        });
+      }
     }
   }
 

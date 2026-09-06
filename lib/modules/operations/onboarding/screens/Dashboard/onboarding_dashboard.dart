@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/client_model.dart';
-import '../models/onboarding_tasks_model.dart';
-import '../repositories/onboarding_repository.dart';
-import '../widgets/client_card.dart';
-import '../../../../services/localization_service.dart';
+import 'package:go_router/go_router.dart';
+import '../../models/client_model.dart';
+import '../../models/onboarding_tasks_model.dart';
+import '../../repositories/onboarding_repository.dart';
+import '../../widgets/client_card.dart';
+import '../../../../../services/localization_service.dart';
+import '../../../../../services/auth_service.dart';
 
 class OnboardingDashboard extends StatelessWidget {
   const OnboardingDashboard({super.key});
@@ -59,12 +61,13 @@ class _DashboardContentState extends State<_DashboardContent> {
     final repository = OnboardingRepository();
     final currentUser = FirebaseAuth.instance.currentUser;
     final theme = Theme.of(context);
+    final isSupport = GoRouterState.of(context).uri.path.contains('/support');
 
     if (currentUser == null) {
       return const _DashboardMessage(
         icon: Icons.lock_outline,
         title: 'Not signed in',
-        message: 'Please sign in to view your onboarding dashboard.',
+        message: 'Please sign in to view your dashboard.',
         isError: true,
       );
     }
@@ -80,8 +83,15 @@ class _DashboardContentState extends State<_DashboardContent> {
           if (clientSnapshot.hasError) {
             return _DashboardMessage(icon: Icons.error_outline, title: 'Unable to load clients', message: '${clientSnapshot.error}', isError: true);
           }
-          final myClients = (clientSnapshot.data ?? []).where((c) => c.assignedTo.trim() == currentUser.uid).toList();
-          final allClients = clientSnapshot.data ?? [];
+          
+          var streamedClients = clientSnapshot.data ?? [];
+          
+          // SUPPORT CONTEXT: Only show Closed groups
+          if (isSupport) {
+            streamedClients = streamedClients.where((c) => _normalize(c.groupStatus) == 'closed').toList();
+          }
+
+          final myClients = streamedClients.where((c) => c.assignedTo.trim() == currentUser.uid).toList();
 
           return StreamBuilder<List<OnboardingTaskModel>>(
             stream: repository.watchMyTasks(),
@@ -92,7 +102,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               if (taskSnapshot.hasError) {
                 return _DashboardMessage(icon: Icons.error_outline, title: 'Unable to load tasks', message: '${taskSnapshot.error}', isError: true);
               }
-              return _DashboardBody(clients: myClients, allClients: allClients, tasks: taskSnapshot.data ?? [], resolveUserName: _resolveUserName);
+              return _DashboardBody(clients: myClients, tasks: taskSnapshot.data ?? [], resolveUserName: _resolveUserName, isSupport: isSupport);
             },
           );
         },
@@ -103,11 +113,11 @@ class _DashboardContentState extends State<_DashboardContent> {
 
 class _DashboardBody extends StatelessWidget {
   final List<ClientModel> clients;
-  final List<ClientModel> allClients;
   final List<OnboardingTaskModel> tasks;
   final Future<String> Function(String uid) resolveUserName;
+  final bool isSupport;
 
-  const _DashboardBody({required this.clients, required this.allClients, required this.tasks, required this.resolveUserName});
+  const _DashboardBody({required this.clients, required this.tasks, required this.resolveUserName, required this.isSupport});
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +125,6 @@ class _DashboardBody extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     final totalClients = clients.length;
-    final totalPlatformAccounts = allClients.length;
     final activeClients = clients.where(_isClientActive).length;
     final pendingActivation = clients.where((c) => _normalize(c.activationStatus) != 'activated').length;
     final pendingVerification = clients.where((c) {
@@ -134,6 +143,8 @@ class _DashboardBody extends StatelessWidget {
     final completedTasks = tasks.where((t) => t.status == 'Finished').length;
     final clientTasks = tasks.where((t) => t.clientId.trim().isNotEmpty).length;
 
+    final label = isSupport ? 'Support' : (AuthService.isSuperAdmin ? 'Operations' : 'Onboarding');
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Center(
@@ -142,16 +153,15 @@ class _DashboardBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _DashboardHeader(user: FirebaseAuth.instance.currentUser),
+              _DashboardHeader(user: FirebaseAuth.instance.currentUser, isSupport: isSupport),
               const SizedBox(height: 28),
-              _SectionTitle(title: l10n?.translate('client_overview') ?? 'Client Overview', subtitle: 'Live status of the clients currently assigned to you.'),
+              _SectionTitle(title: '$label Overview', subtitle: isSupport ? 'Live status of closed groups assigned to your support team.' : 'Live status of the clients currently assigned to you.'),
               const SizedBox(height: 14),
               _MetricGrid(cards: [
-                _MetricData(title: l10n?.translate('total_accounts') ?? 'Total Accounts', value: '$totalPlatformAccounts', subtitle: 'Currently in system', icon: Icons.account_balance_outlined, tone: _MetricTone.teal),
-                _MetricData(title: l10n?.translate('my_clients') ?? 'My Clients', value: '$totalClients', subtitle: 'Assigned to you', icon: Icons.people_outline, tone: _MetricTone.brand),
-                _MetricData(title: l10n?.translate('in_progress') ?? 'In Progress', value: '$inProgressClients', subtitle: 'Onboarding underway', icon: Icons.pending_actions_outlined, tone: _MetricTone.blue),
-                _MetricData(title: l10n?.translate('completed') ?? 'Completed', value: '$completedClients', subtitle: 'All stages completed', icon: Icons.check_circle_outline, tone: _MetricTone.green),
-                _MetricData(title: l10n?.translate('pending_activation') ?? 'Pending Activation', value: '$pendingActivation', subtitle: 'Activation required', icon: Icons.power_settings_new_outlined, tone: _MetricTone.orange),
+                _MetricData(title: isSupport ? 'Support Clients' : (l10n?.translate('my_clients') ?? 'My Clients'), value: '$totalClients', subtitle: 'Assigned to you', icon: isSupport ? Icons.support_agent_rounded : Icons.people_outline, tone: _MetricTone.brand),
+                _MetricData(title: l10n?.translate('in_progress') ?? 'In Progress', value: '$inProgressClients', subtitle: 'Work underway', icon: Icons.pending_actions_outlined, tone: _MetricTone.blue),
+                _MetricData(title: l10n?.translate('completed') ?? 'Completed', value: '$completedClients', subtitle: 'All stages finished', icon: Icons.check_circle_outline, tone: _MetricTone.green),
+                _MetricData(title: 'Pending Stages', value: '${pendingActivation + pendingVerification + pendingChatbot}', subtitle: 'Requirements remaining', icon: Icons.error_outline_rounded, tone: _MetricTone.orange),
               ]),
               const SizedBox(height: 16),
               _OperationalStatusCard(pendingVerification: pendingVerification, pendingChatbot: pendingChatbot, openedGroups: openedGroups, closedGroups: closedGroups, activeClients: activeClients),
@@ -189,18 +199,20 @@ class _DashboardBody extends StatelessWidget {
 
 class _DashboardHeader extends StatelessWidget {
   final User? user;
-  const _DashboardHeader({required this.user});
+  final bool isSupport;
+  const _DashboardHeader({required this.user, required this.isSupport});
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final name = _displayUserName(user);
     final l10n = AppLocalizations.of(context);
+    final label = isSupport ? 'Support' : (AuthService.isSuperAdmin ? 'Operations' : 'Onboarding');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('${l10n?.translate('welcome') ?? 'Welcome'}, $name', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 6),
-        Text(l10n?.translate('onboarding_dashboard_desc') ?? 'Here is your workload and client status.', style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+        Text('Here is your $label workload and client status.', style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
       ],
     );
   }
@@ -226,10 +238,10 @@ class _MetricGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
-      int columns = constraints.maxWidth >= 1400 ? 5 : constraints.maxWidth >= 1000 ? 3 : constraints.maxWidth >= 600 ? 2 : 1;
+      int columns = constraints.maxWidth >= 1200 ? 4 : constraints.maxWidth >= 800 ? 2 : 1;
       return GridView.builder(
         shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: cards.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: columns == 1 ? 4.5 : (columns == 5 ? 2.0 : 2.35)),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: columns == 1 ? 4.5 : 2.35),
         itemBuilder: (context, index) => _MetricCard(data: cards[index]),
       );
     });

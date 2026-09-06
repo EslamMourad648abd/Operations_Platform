@@ -89,12 +89,100 @@ class _InfoCard extends StatelessWidget {
   final ClientModel client; const _InfoCard({required this.client});
   @override Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return _Section(title: l?.translate('client_info') ?? 'Information', icon: Icons.info_outline, child: Column(children: [
-      _Row(l?.translate('company_name') ?? 'Name', client.companyName),
-      _Row(l?.translate('acc') ?? 'ACC', client.accNumber),
-      _Row(l?.translate('system') ?? 'System', client.systemType),
-      _Row('ID', client.id),
-    ]));
+    return _Section(
+      title: l?.translate('client_info') ?? 'Information',
+      icon: Icons.info_outline,
+      trailing: IconButton(
+        icon: const Icon(Icons.edit_outlined, size: 18),
+        onPressed: () => _showEditDialog(context),
+        tooltip: l?.translate('edit_client_info') ?? 'Edit Information',
+      ),
+      child: Column(children: [
+        _Row(l?.translate('company_name') ?? 'Name', client.companyName),
+        _Row(l?.translate('acc') ?? 'ACC', client.accNumber),
+        _Row(l?.translate('system') ?? 'System', client.systemType),
+        _Row('ID', client.id),
+      ]),
+    );
+  }
+
+  Future<void> _showEditDialog(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final cc = TextEditingController(text: client.companyName);
+    final ac = TextEditingController(text: client.accNumber);
+    String st = client.systemType;
+
+    await showDialog(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (context, setS) => AlertDialog(
+          title: Text(l?.translate('edit_client_info') ?? 'Edit Client Information'),
+          content: SizedBox(
+            width: 450,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: cc, decoration: InputDecoration(labelText: l?.translate('company_name') ?? 'Company')),
+              const SizedBox(height: 16),
+              TextField(controller: ac, decoration: InputDecoration(labelText: l?.translate('acc') ?? 'ACC')),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: st,
+                decoration: InputDecoration(labelText: l?.translate('system') ?? 'System'),
+                items: const [DropdownMenuItem(value: 'New', child: Text('New')), DropdownMenuItem(value: 'Old', child: Text('Old'))],
+                onChanged: (v) { if (v != null) setS(() => st = v); },
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: Text(l?.translate('cancel') ?? 'Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                if (cc.text.trim().isEmpty || ac.text.trim().isEmpty) return;
+                final repo = OnboardingRepository();
+                final Map<String, dynamic> updates = {};
+                final Map<String, dynamic> logMetadata = {};
+                
+                if (cc.text.trim() != client.companyName) {
+                  updates['companyName'] = cc.text.trim();
+                  logMetadata['companyName'] = {'old': client.companyName, 'new': cc.text.trim()};
+                }
+                if (ac.text.trim() != client.accNumber) {
+                  updates['accNumber'] = ac.text.trim();
+                  logMetadata['accNumber'] = {'old': client.accNumber, 'new': ac.text.trim()};
+                }
+                if (st != client.systemType) {
+                  updates['systemType'] = st;
+                  logMetadata['systemType'] = {'old': client.systemType, 'new': st};
+                }
+
+                if (updates.isNotEmpty) {
+                  try {
+                    await repo.updateClientFields(client.id, updates);
+                    await repo.addActivity(
+                      clientId: client.id, type: 'client_updated', action: 'edit_info',
+                      title: 'Client information updated',
+                      description: 'General information fields were updated.',
+                      metadata: logMetadata,
+                    );
+                    if (context.mounted) {
+                      Navigator.pop(c);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l?.translate('client_info_updated') ?? 'Client updated.')));
+                    }
+                  } catch (e) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update failed: $e'), backgroundColor: Colors.red));
+                  }
+                } else {
+                  Navigator.pop(c);
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary, foregroundColor: theme.colorScheme.onPrimary),
+              child: Text(l?.translate('save_changes') ?? 'Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    cc.dispose(); ac.dispose();
   }
 }
 
@@ -113,11 +201,90 @@ class _IntegrationCard extends StatelessWidget {
   final ClientModel client; const _IntegrationCard({required this.client});
   @override Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return _Section(title: l?.translate('integration_details') ?? 'Integration', icon: Icons.settings_input_component, child: Column(children: [
-      _Row('BM ID', client.bmId), _Row('WABA ID', client.wabaId),
-      _Row(l?.translate('phone_number_id') ?? 'Phone ID', client.phoneNumberId),
-      _Row(l?.translate('phone_number') ?? 'Phone', client.phoneNumber),
-    ]));
+    return _Section(
+      title: l?.translate('integration_details') ?? 'Integration',
+      icon: Icons.settings_input_component,
+      trailing: IconButton(
+        icon: const Icon(Icons.edit_outlined, size: 18),
+        onPressed: () => _showEditDialog(context),
+        tooltip: 'Edit Integration',
+      ),
+      child: Column(children: [
+        _Row('BM ID', client.bmId), _Row('WABA ID', client.wabaId),
+        _Row(l?.translate('phone_number_id') ?? 'Phone ID', client.phoneNumberId),
+        _Row(l?.translate('phone_number') ?? 'Phone', client.phoneNumber),
+      ]),
+    );
+  }
+
+  Future<void> _showEditDialog(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final bmc = TextEditingController(text: client.bmId);
+    final wac = TextEditingController(text: client.wabaId);
+    final pic = TextEditingController(text: client.phoneNumberId);
+    final pnc = TextEditingController(text: client.phoneNumber);
+
+    await showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Edit Integration Details'),
+        content: SizedBox(
+          width: 450,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: bmc, decoration: const InputDecoration(labelText: 'BM ID')),
+            const SizedBox(height: 16),
+            TextField(controller: wac, decoration: const InputDecoration(labelText: 'WABA ID')),
+            const SizedBox(height: 16),
+            TextField(controller: pic, decoration: InputDecoration(labelText: l?.translate('phone_number_id') ?? 'Phone ID')),
+            const SizedBox(height: 16),
+            TextField(controller: pnc, decoration: InputDecoration(labelText: l?.translate('phone_number') ?? 'Phone Number')),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(l?.translate('cancel') ?? 'Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final repo = OnboardingRepository();
+              final Map<String, dynamic> updates = {};
+              final Map<String, dynamic> logMetadata = {};
+
+              void check(String key, String oldV, String newV) {
+                if (oldV != newV) {
+                  updates[key] = newV;
+                  logMetadata[key] = {'old': oldV, 'new': newV};
+                }
+              }
+
+              check('bmId', client.bmId, bmc.text.trim());
+              check('wabaId', client.wabaId, wac.text.trim());
+              check('phoneNumberId', client.phoneNumberId, pic.text.trim());
+              check('phoneNumber', client.phoneNumber, pnc.text.trim());
+
+              if (updates.isNotEmpty) {
+                try {
+                  await repo.updateClientFields(client.id, updates);
+                  await repo.addActivity(
+                    clientId: client.id, type: 'integration_updated', action: 'edit_integration',
+                    title: 'Integration details updated',
+                    description: 'Client integration IDs and phone details were updated.',
+                    metadata: logMetadata,
+                  );
+                  if (context.mounted) Navigator.pop(c);
+                } catch (e) {
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update failed: $e'), backgroundColor: Colors.red));
+                }
+              } else {
+                Navigator.pop(c);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary, foregroundColor: theme.colorScheme.onPrimary),
+            child: Text(l?.translate('save_changes') ?? 'Save'),
+          ),
+        ],
+      ),
+    );
+    bmc.dispose(); wac.dispose(); pic.dispose(); pnc.dispose();
   }
 }
 
@@ -125,11 +292,68 @@ class _GroupCard extends StatelessWidget {
   final ClientModel client; const _GroupCard({required this.client});
   @override Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return _Section(title: l?.translate('group_info') ?? 'Group', icon: Icons.groups_outlined, child: Column(children: [
-      _Row(l?.translate('status') ?? 'Status', client.groupStatus),
-      _Row(l?.translate('opened') ?? 'Opened', _fDate(client.groupOpenedAt)),
-      _Row(l?.translate('closed') ?? 'Closed', _fDate(client.groupClosedAt)),
-    ]));
+    return _Section(
+      title: l?.translate('group_info') ?? 'Group',
+      icon: Icons.groups_outlined,
+      trailing: IconButton(
+        icon: const Icon(Icons.edit_outlined, size: 18),
+        onPressed: () => _showEditDialog(context),
+        tooltip: 'Edit Group Days',
+      ),
+      child: Column(children: [
+        _Row(l?.translate('status') ?? 'Status', client.groupStatus),
+        _Row('Duration (Days)', '${client.groupDurationDays ?? 0}'),
+        _Row(l?.translate('opened') ?? 'Opened', _fDate(client.groupOpenedAt)),
+        _Row(l?.translate('closed') ?? 'Closed', _fDate(client.groupClosedAt)),
+      ]),
+    );
+  }
+
+  Future<void> _showEditDialog(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final dc = TextEditingController(text: '${client.groupDurationDays ?? 0}');
+
+    await showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Edit Group Duration'),
+        content: SizedBox(
+          width: 400,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: dc, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Duration (Days)')),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(l?.translate('cancel') ?? 'Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final val = int.tryParse(dc.text.trim()) ?? 0;
+              if (val != client.groupDurationDays) {
+                try {
+                  final repo = OnboardingRepository();
+                  await repo.updateClientFields(client.id, {'groupDurationDays': val});
+                  await repo.addActivity(
+                    clientId: client.id, type: 'group', action: 'edit_duration',
+                    title: 'Group duration updated',
+                    description: 'Group duration was changed to $val days.',
+                    metadata: {'oldValue': client.groupDurationDays, 'newValue': val},
+                  );
+                  if (context.mounted) Navigator.pop(c);
+                } catch (e) {
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update failed: $e'), backgroundColor: Colors.red));
+                }
+              } else {
+                Navigator.pop(c);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary, foregroundColor: theme.colorScheme.onPrimary),
+            child: Text(l?.translate('save_changes') ?? 'Save'),
+          ),
+        ],
+      ),
+    );
+    dc.dispose();
   }
 }
 
@@ -165,8 +389,15 @@ class _CrmCommentCardState extends State<_CrmCommentCard> {
 
     setState(() => _submitting = true);
     try {
+      final oldComment = widget.client.crmComment;
       await _crmService.submitComment(accountNumber: accountNumber, comment: comment);
       await OnboardingRepository().updateCrmComment(widget.client.id, comment);
+      await OnboardingRepository().addActivity(
+        clientId: widget.client.id, type: 'crm', action: 'submit_comment',
+        title: 'CRM comment submitted',
+        description: 'A new comment was sent to the CRM.',
+        metadata: {'oldComment': oldComment, 'newComment': comment},
+      );
       if (!mounted) return;
       _controller.clear();
       _showMessage('CRM comment submitted successfully.');

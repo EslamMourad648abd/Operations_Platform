@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../../services/auth_service.dart';
-import '../../../../services/localization_service.dart';
-import '../models/client_model.dart';
-import '../models/onboarding_tasks_model.dart';
-import '../repositories/onboarding_repository.dart';
+import '../../../../../services/auth_service.dart';
+import '../../../../../services/localization_service.dart';
+import '../../models/client_model.dart';
+import '../../models/onboarding_tasks_model.dart';
+import '../../repositories/onboarding_repository.dart';
 
 class OnboardingReports extends StatefulWidget {
   const OnboardingReports({super.key});
@@ -29,15 +30,16 @@ class _OnboardingReportsState extends State<OnboardingReports> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
+    final location = GoRouterState.of(context).uri.path;
+    final isSupport = location.contains('/support');
+    final label = isSupport ? 'Support' : (AuthService.isSuperAdmin ? 'Operations' : 'Onboarding');
 
     if (!AuthService.isSuperAdmin) {
       return Scaffold(
         body: _ReportsMessage(
           icon: Icons.lock_outline,
           title: l10n?.translate('access_denied') ?? 'Access Denied',
-          message:
-          l10n?.translate('super_admin_only') ??
-              'Only Super Admins can view reports.',
+          message: 'Only Super Admins can view $label reports.',
           isError: false,
         ),
       );
@@ -46,52 +48,24 @@ class _OnboardingReportsState extends State<OnboardingReports> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: StreamBuilder<Map<String, String>>(
-        // ============================================================
-        // IMPORTANT:
-        // ONLY USERS WITH ROLE = onboarding_agent
-        // ============================================================
-        stream: _repository.watchAgents(
-          role: 'onboarding_agent',
-        ),
-        builder: (context, agentSnapshot) {
-          if (agentSnapshot.hasError) {
-            return _ReportsMessage(
-              icon: Icons.error_outline,
-              title: 'Error',
-              message: '${agentSnapshot.error}',
-              isError: true,
-            );
-          }
+        // 1. Fetch ALL agents for name resolution in lists (Occupancy, Activity)
+        stream: _repository.watchAgents(),
+        builder: (context, allAgentsSnapshot) {
+          final allAgents = allAgentsSnapshot.data ?? <String, String>{};
 
-          final agents = agentSnapshot.data ?? <String, String>{};
+          return StreamBuilder<Map<String, String>>(
+            // 2. Fetch ONLY onboarding agents for the Filter Dropdown
+            stream: _repository.watchAgents(
+              role: 'onboarding_agent',
+            ),
+            builder: (context, onboardingAgentsSnapshot) {
+              final onboardingAgents =
+                  onboardingAgentsSnapshot.data ?? <String, String>{};
 
-          return StreamBuilder<List<ClientModel>>(
-            stream: _repository.watchClients(),
-            builder: (context, clientSnapshot) {
-              if (clientSnapshot.connectionState ==
-                  ConnectionState.waiting) {
-                return Center(
-                  child: CircularProgressIndicator(
-                    color: theme.colorScheme.primary,
-                  ),
-                );
-              }
-
-              if (clientSnapshot.hasError) {
-                return _ReportsMessage(
-                  icon: Icons.error_outline,
-                  title: 'Error',
-                  message: '${clientSnapshot.error}',
-                  isError: true,
-                );
-              }
-
-              final clients = clientSnapshot.data ?? <ClientModel>[];
-
-              return StreamBuilder<List<OnboardingTaskModel>>(
-                stream: _repository.watchAllTasks(),
-                builder: (context, taskSnapshot) {
-                  if (taskSnapshot.connectionState ==
+              return StreamBuilder<List<ClientModel>>(
+                stream: _repository.watchClients(),
+                builder: (context, clientSnapshot) {
+                  if (clientSnapshot.connectionState ==
                       ConnectionState.waiting) {
                     return Center(
                       child: CircularProgressIndicator(
@@ -100,19 +74,47 @@ class _OnboardingReportsState extends State<OnboardingReports> {
                     );
                   }
 
-                  if (taskSnapshot.hasError) {
+                  if (clientSnapshot.hasError) {
                     return _ReportsMessage(
                       icon: Icons.error_outline,
                       title: 'Error',
-                      message: '${taskSnapshot.error}',
+                      message: '${clientSnapshot.error}',
                       isError: true,
                     );
                   }
 
-                  return _buildContent(
-                    clients,
-                    taskSnapshot.data ?? <OnboardingTaskModel>[],
-                    agents,
+                  final clients = clientSnapshot.data ?? <ClientModel>[];
+
+                  return StreamBuilder<List<OnboardingTaskModel>>(
+                    stream: _repository.watchAllTasks(),
+                    builder: (context, taskSnapshot) {
+                      if (taskSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return Center(
+                          child: CircularProgressIndicator(
+                            color: theme.colorScheme.primary,
+                          ),
+                        );
+                      }
+
+                      if (taskSnapshot.hasError) {
+                        return _ReportsMessage(
+                          icon: Icons.error_outline,
+                          title: 'Error',
+                          message: '${taskSnapshot.error}',
+                          isError: true,
+                        );
+                      }
+
+                      final tasks = taskSnapshot.data ?? <OnboardingTaskModel>[];
+
+                      return _buildContent(
+                        clients: clients,
+                        tasks: tasks,
+                        allAgents: allAgents,
+                        onboardingAgents: onboardingAgents,
+                      );
+                    },
                   );
                 },
               );
@@ -127,20 +129,21 @@ class _OnboardingReportsState extends State<OnboardingReports> {
   // MAIN CONTENT
   // ============================================================
 
-  Widget _buildContent(
-      List<ClientModel> clients,
-      List<OnboardingTaskModel> tasks,
-      Map<String, String> agents,
-      ) {
+  Widget _buildContent({
+    required List<ClientModel> clients,
+    required List<OnboardingTaskModel> tasks,
+    required Map<String, String> allAgents,
+    required Map<String, String> onboardingAgents,
+  }) {
     final filteredTasks = tasks
         .where(_taskMatchesDate)
         .where(_taskMatchesType)
-        .where((t) => _taskMatchesAgent(t, agents))
+        .where((t) => _taskMatchesAgent(t, allAgents))
         .toList();
 
     final filteredClients = clients
         .where(_clientMatchesStatus)
-        .where((c) => _clientMatchesAgent(c, agents))
+        .where((c) => _clientMatchesAgent(c, allAgents))
         .toList();
 
     final metrics = _ReportMetrics.fromData(
@@ -168,13 +171,13 @@ class _OnboardingReportsState extends State<OnboardingReports> {
 
               const SizedBox(height: 18),
 
-              _buildFilters(agents),
+              _buildFilters(onboardingAgents),
 
               const SizedBox(height: 24),
 
               _buildAgentOccupancy(
                 filteredTasks,
-                agents,
+                allAgents,
               ),
 
               const SizedBox(height: 24),
@@ -199,7 +202,7 @@ class _OnboardingReportsState extends State<OnboardingReports> {
 
               const SizedBox(height: 24),
 
-              _buildTaskDetails(filteredTasks),
+              _buildTaskDetails(filteredTasks, allAgents),
             ],
           ),
         ),
@@ -214,6 +217,9 @@ class _OnboardingReportsState extends State<OnboardingReports> {
   Widget _buildHeader() {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final location = GoRouterState.of(context).uri.path;
+    final isSupport = location.contains('/support');
+    final label = isSupport ? 'Support' : (AuthService.isSuperAdmin ? 'Operations' : 'Onboarding');
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,7 +229,7 @@ class _OnboardingReportsState extends State<OnboardingReports> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                l10n?.translate('reports') ?? 'Reports',
+                '$label Reports',
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
@@ -232,8 +238,7 @@ class _OnboardingReportsState extends State<OnboardingReports> {
               ),
               const SizedBox(height: 4),
               Text(
-                l10n?.translate('analyze_onboarding') ??
-                    'Analyze onboarding performance and workload.',
+                'Analyze $label performance and workload.',
                 style: TextStyle(
                   fontSize: 14,
                   color: theme.colorScheme.onSurface.withValues(
@@ -381,11 +386,11 @@ class _OnboardingReportsState extends State<OnboardingReports> {
   // ============================================================
 
   Widget _buildFilters(
-      Map<String, String> agents,
+      Map<String, String> onboardingAgents,
       ) {
     final l10n = AppLocalizations.of(context);
 
-    final sortedAgentNames = agents.values.toList()..sort();
+    final sortedAgentNames = onboardingAgents.values.toList()..sort();
 
     final agentNames = [
       'All',
@@ -507,17 +512,18 @@ class _OnboardingReportsState extends State<OnboardingReports> {
 
   Widget _buildAgentOccupancy(
       List<OnboardingTaskModel> tasks,
-      Map<String, String> agents,
+      Map<String, String> allAgents,
       ) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     final counts = <String, int>{};
     final occupancy = <String, Duration>{};
+    final agentTasks = <String, List<OnboardingTaskModel>>{};
 
     for (final task in tasks) {
       final agentName =
-          agents[task.assignedTo] ?? 'Unknown';
+          allAgents[task.assignedTo] ?? 'Unknown';
 
       counts[agentName] =
           (counts[agentName] ?? 0) + 1;
@@ -527,6 +533,8 @@ class _OnboardingReportsState extends State<OnboardingReports> {
             (occupancy[agentName] ?? Duration.zero) +
                 task.completedDuration!;
       }
+
+      agentTasks.putIfAbsent(agentName, () => []).add(task);
     }
 
     final sortedAgents = counts.keys.toList()
@@ -539,7 +547,7 @@ class _OnboardingReportsState extends State<OnboardingReports> {
     return _SectionCard(
       title:
       l10n?.translate('agent_occupancy') ??
-          'Agent Occupancy',
+          'Agent Occupancy & Task Tracking',
       icon: Icons.badge_outlined,
       child: sortedAgents.isEmpty
           ? _InlineEmpty(
@@ -550,6 +558,8 @@ class _OnboardingReportsState extends State<OnboardingReports> {
           : Column(
         children: sortedAgents.map(
               (agentName) {
+            final pureOccupancy = _calculatePureOccupancy(agentTasks[agentName]!);
+
             return Padding(
               padding:
               const EdgeInsets.only(
@@ -587,24 +597,39 @@ class _OnboardingReportsState extends State<OnboardingReports> {
                     '${counts[agentName]} tasks',
                   ),
 
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 24),
 
-                  SizedBox(
-                    width: 100,
-                    child: Text(
-                      _formatDuration(
-                        occupancy[agentName] ??
-                            Duration.zero,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        _formatDuration(
+                          occupancy[agentName] ??
+                              Duration.zero,
+                        ),
+                        textAlign:
+                        TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                          FontWeight.bold,
+                          color:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
                       ),
-                      textAlign:
-                      TextAlign.right,
-                      style: TextStyle(
-                        fontWeight:
-                        FontWeight.bold,
-                        color:
-                        theme.colorScheme.primary,
+                      Text(
+                        _formatDuration(pureOccupancy),
+                        textAlign:
+                        TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight:
+                          FontWeight.w900,
+                          color:
+                          theme.colorScheme.primary,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -619,17 +644,15 @@ class _OnboardingReportsState extends State<OnboardingReports> {
   // SUMMARY
   // ============================================================
 
-  Widget _buildSummary(
-      _ReportMetrics metrics,
-      ) {
+  Widget _buildSummary(_ReportMetrics metrics) {
     final l10n = AppLocalizations.of(context);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final int columns =
-        constraints.maxWidth < 700
+        constraints.maxWidth < 600
             ? 1
-            : constraints.maxWidth < 1100
+            : constraints.maxWidth < 1000
             ? 2
             : 5;
 
@@ -641,7 +664,7 @@ class _OnboardingReportsState extends State<OnboardingReports> {
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
           childAspectRatio:
-          columns == 1 ? 4.5 : (columns == 5 ? 1.9 : 2.4),
+          columns == 1 ? 4.5 : (columns == 5 ? 2.0 : 2.4),
           children: [
             _MetricCard(
               icon: Icons.people_outline,
@@ -685,10 +708,13 @@ class _OnboardingReportsState extends State<OnboardingReports> {
             ),
 
             _MetricCard(
-              icon: Icons.hourglass_full_rounded,
-              label: l10n?.translate('actual_occupancy') ?? 'Actual Occupancy',
-              value: _formatDuration(
-                metrics.actualOccupancy,
+              icon: Icons.work_history_outlined,
+              label:
+              l10n?.translate('Pure Occupancy') ??
+                  'Pure Occupancy',
+              value:
+              _formatDuration(
+                metrics.pureOccupancy,
               ),
               accent: Colors.blueAccent,
             ),
@@ -990,6 +1016,7 @@ class _OnboardingReportsState extends State<OnboardingReports> {
 
   Widget _buildTaskDetails(
       List<OnboardingTaskModel> tasks,
+      Map<String, String> allAgents,
       ) {
     final l10n = AppLocalizations.of(context);
 
@@ -1057,6 +1084,7 @@ class _OnboardingReportsState extends State<OnboardingReports> {
                     (task) =>
                     _TaskDetailRow(
                       task: task,
+                      allAgents: allAgents,
                     ),
               ),
 
@@ -1255,63 +1283,22 @@ class _OnboardingReportsState extends State<OnboardingReports> {
     );
   }
 
-  // ============================================================
-  // IMPORTANT:
-  // THE AGENT MAP ONLY CONTAINS ONBOARDING AGENTS
-  // BECAUSE watchAgents(role: 'onboarding_agent')
-  // IS USED ABOVE.
-  // ============================================================
-
-  bool _taskMatchesAgent(
-      OnboardingTaskModel task,
-      Map<String, String> agents,
-      ) {
-    if (!agents.containsKey(task.assignedTo)) {
-      return false;
-    }
-
-    if (_agentFilter == 'All') {
-      return true;
-    }
-
-    return agents[task.assignedTo] ==
-        _agentFilter;
-  }
-
-  bool _clientMatchesAgent(
-      ClientModel client,
-      Map<String, String> agents,
-      ) {
-    if (!agents.containsKey(client.assignedTo)) {
-      return false;
-    }
-
-    if (_agentFilter == 'All') {
-      return true;
-    }
-
-    return agents[client.assignedTo] ==
-        _agentFilter;
-  }
-
-  // ============================================================
-  // RESET
-  // ============================================================
-
   void _resetFilters() {
     setState(() {
+      _agentFilter = 'All';
       _taskTypeFilter = 'All';
       _clientStatusFilter = 'All';
-      _agentFilter = 'All';
-
-      _startDate = _dateOnly(
-        DateTime.now(),
-      );
-
-      _endDate = _startDate;
-
-      _rangeMode = false;
     });
+  }
+
+  bool _taskMatchesAgent(OnboardingTaskModel task, Map<String, String> allAgents) {
+    if (_agentFilter == 'All') return true;
+    return allAgents[task.assignedTo] == _agentFilter;
+  }
+
+  bool _clientMatchesAgent(ClientModel client, Map<String, String> allAgents) {
+    if (_agentFilter == 'All') return true;
+    return allAgents[client.assignedTo] == _agentFilter;
   }
 
   // ============================================================
@@ -1379,14 +1366,14 @@ class _ReportMetrics {
   final int activated;
 
   final Duration totalDuration;
-  final Duration actualOccupancy;
+  final Duration pureOccupancy;
 
   const _ReportMetrics({
     required this.clientCount,
     required this.taskCount,
     required this.completedTasks,
     required this.totalDuration,
-    required this.actualOccupancy,
+    required this.pureOccupancy,
     required this.notStarted,
     required this.inProgress,
     required this.pending,
@@ -1408,8 +1395,6 @@ class _ReportMetrics {
 
     var totalDuration =
         Duration.zero;
-
-    List<_Interval> intervals = [];
 
     for (final client in clients) {
       final statuses = [
@@ -1441,6 +1426,8 @@ class _ReportMetrics {
       }
     }
 
+    final agentTasks = <String, List<OnboardingTaskModel>>{};
+
     for (final task in tasks) {
       if (_isFinished(task)) {
         completedTasks++;
@@ -1450,76 +1437,28 @@ class _ReportMetrics {
           totalDuration +=
           task.completedDuration!;
         }
-      }
 
-      final start = task.startedAt ?? task.createdAt;
-      DateTime? end;
-
-      if (_isFinished(task)) {
-        end = task.finishedAt;
-      } else if (task.isActive) {
-        end = DateTime.now();
-      }
-
-      if (start != null && end != null) {
-        intervals.add(_Interval(start, end));
+        agentTasks.putIfAbsent(task.assignedTo, () => []).add(task);
       }
     }
 
-    final actualOcc = _calculateActualOccupancy(intervals);
+    var totalPureOccupancy = Duration.zero;
+    for (final entry in agentTasks.entries) {
+      totalPureOccupancy += _calculatePureOccupancy(entry.value);
+    }
 
     return _ReportMetrics(
       clientCount: clients.length,
       taskCount: tasks.length,
       completedTasks: completedTasks,
       totalDuration: totalDuration,
-      actualOccupancy: actualOcc,
+      pureOccupancy: totalPureOccupancy,
       notStarted: notStarted,
       inProgress: inProgress,
       pending: pending,
       activated: activated,
     );
   }
-
-  static Duration _calculateActualOccupancy(List<_Interval> intervals) {
-    if (intervals.isEmpty) return Duration.zero;
-
-    // 1. Sort by start time
-    intervals.sort((a, b) => a.start.compareTo(b.start));
-
-    List<_Interval> merged = [];
-    _Interval current = intervals.first;
-
-    for (int i = 1; i < intervals.length; i++) {
-      _Interval next = intervals[i];
-      if (next.start.isBefore(current.end)) {
-        // Overlap!
-        if (next.end.isAfter(current.end)) {
-          current = _Interval(current.start, next.end);
-        }
-      } else {
-        // No overlap
-        merged.add(current);
-        current = next;
-      }
-    }
-    merged.add(current);
-
-    Duration total = Duration.zero;
-    for (var interval in merged) {
-      final diff = interval.end.difference(interval.start);
-      if (!diff.isNegative) {
-        total += diff;
-      }
-    }
-    return total;
-  }
-}
-
-class _Interval {
-  final DateTime start;
-  final DateTime end;
-  _Interval(this.start, this.end);
 }
 
 // ================================================================
@@ -2361,9 +2300,11 @@ class _ClientProgressRow
 class _TaskDetailRow
     extends StatelessWidget {
   final OnboardingTaskModel task;
+  final Map<String, String> allAgents;
 
   const _TaskDetailRow({
     required this.task,
+    required this.allAgents,
   });
 
   @override
@@ -2376,6 +2317,8 @@ class _TaskDetailRow
 
     final finished =
     _isFinished(task);
+
+    final agentName = allAgents[task.assignedTo] ?? '—';
 
     return Container(
       padding:
@@ -2440,6 +2383,22 @@ class _TaskDetailRow
               ],
             ),
           ),
+
+          // AGENT NAME IN ACTIVITY
+          SizedBox(
+            width: 120,
+            child: Text(
+              agentName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 12),
 
           _SmallStatusChip(
             label:
@@ -2517,10 +2476,7 @@ class _SmallStatusChip
 
     return Container(
       padding:
-      const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 5,
-      ),
+      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration:
       BoxDecoration(
         color: theme
@@ -2713,7 +2669,7 @@ String _formatDuration(
     ) {
   if (duration.inHours > 0) {
     return '${duration.inHours}h '
-        '${duration.inMinutes.remainder(60).toString().padLeft(2, '0')}m';
+        '${duration.inMinutes.remainder(60)}m';
   }
 
   if (duration.inMinutes > 0) {
@@ -2843,6 +2799,58 @@ double _clientProgress(
 
   return completed /
       statuses.length;
+}
+
+Duration _calculatePureOccupancy(List<OnboardingTaskModel> tasks) {
+  final finishedTasks = tasks.where(_isFinished).toList();
+  if (finishedTasks.isEmpty) return Duration.zero;
+
+  // 1. Extract intervals and filter invalid ones
+  final intervals = <_TimeInterval>[];
+  for (final task in finishedTasks) {
+    if (task.startedAt != null && task.finishedAt != null) {
+      intervals.add(_TimeInterval(task.startedAt!, task.finishedAt!));
+    }
+  }
+
+  if (intervals.isEmpty) return Duration.zero;
+
+  // 2. Sort by start time
+  intervals.sort((a, b) => a.start.compareTo(b.start));
+
+  // 3. Merge overlapping intervals
+  final merged = <_TimeInterval>[];
+  var current = intervals.first;
+
+  for (int i = 1; i < intervals.length; i++) {
+    final next = intervals[i];
+
+    if (next.start.isBefore(current.end)) {
+      // Overlap: update current end if next end is further
+      if (next.end.isAfter(current.end)) {
+        current = _TimeInterval(current.start, next.end);
+      }
+    } else {
+      // No overlap: save current and start new
+      merged.add(current);
+      current = next;
+    }
+  }
+  merged.add(current);
+
+  // 4. Sum merged durations
+  var total = Duration.zero;
+  for (final interval in merged) {
+    total += interval.end.difference(interval.start);
+  }
+
+  return total;
+}
+
+class _TimeInterval {
+  final DateTime start;
+  final DateTime end;
+  _TimeInterval(this.start, this.end);
 }
 
 // ================================================================
