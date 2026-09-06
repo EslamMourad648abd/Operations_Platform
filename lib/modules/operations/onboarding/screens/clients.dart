@@ -443,56 +443,33 @@ class _OnboardingClientsScreenState
             ),
 
             // ACCOUNT COUNTER
-            StreamBuilder<
-                List<ClientModel>>(
+            StreamBuilder<List<ClientModel>>(
               stream: _clientsStream,
-              builder:
-                  (
-                  context,
-                  snapshot,
-                  ) {
-                final count =
-                    snapshot
-                        .data
-                        ?.length ??
-                        0;
+              builder: (context, snapshot) {
+                final allClients = snapshot.data ?? [];
+                final q = _normalize(_search);
+                
+                final filteredCount = allClients.where((client) {
+                  if (q.isEmpty) return true;
+                  final assigneeName = _normalize(_agentNames[client.assignedTo] ?? '');
+                  return _normalize(client.companyName).contains(q) ||
+                         _normalize(client.accNumber).contains(q) ||
+                         _normalize(client.assignedTo).contains(q) ||
+                         assigneeName.contains(q);
+                }).length;
 
                 return Container(
-                  padding:
-                  const EdgeInsets
-                      .symmetric(
-                    horizontal:
-                    10,
-                    vertical: 5,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  decoration:
-                  BoxDecoration(
-                    color: theme
-                        .colorScheme
-                        .primary
-                        .withValues(
-                      alpha:
-                      0.10,
-                    ),
-                    borderRadius:
-                    BorderRadius
-                        .circular(
-                      20,
-                    ),
-                  ),
-                  child:
-                  Text(
-                    '$count accounts',
-                    style:
-                    TextStyle(
-                      color: theme
-                          .colorScheme
-                          .primary,
-                      fontSize:
-                      13,
-                      fontWeight:
-                      FontWeight
-                          .w700,
+                  child: Text(
+                    '$filteredCount accounts',
+                    style: TextStyle(
+                      color: theme.colorScheme.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 );

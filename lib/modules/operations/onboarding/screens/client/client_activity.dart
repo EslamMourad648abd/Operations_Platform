@@ -335,55 +335,58 @@ class _Filters extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 250,
-              child: TextField(
-                controller: searchController,
-                onChanged: onSearchChanged,
-                decoration: InputDecoration(
-                  hintText: 'Search activity...',
-                  prefixIcon: const Icon(Icons.search, size: 19),
-                  suffixIcon: search.isEmpty
-                      ? null
-                      : IconButton(
-                    tooltip: 'Clear search',
-                    onPressed: onClear,
-                    icon: const Icon(Icons.clear, size: 18),
+        child: LayoutBuilder(builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 600;
+          final itemWidth = isCompact ? double.infinity : 200.0;
+
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: isCompact ? double.infinity : 250,
+                child: TextField(
+                  controller: searchController,
+                  onChanged: onSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Search activity...',
+                    prefixIcon: const Icon(Icons.search, size: 19),
+                    suffixIcon: search.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: onClear,
+                            icon: const Icon(Icons.clear, size: 18),
+                          ),
+                    isDense: true,
+                    border: const OutlineInputBorder(),
                   ),
-                  isDense: true,
-                  border: const OutlineInputBorder(),
                 ),
               ),
-            ),
-            _FilterDropdown(
-              label: 'Section',
-              value: categories.contains(categoryFilter)
-                  ? categoryFilter
-                  : 'all',
-              values: categories,
-              onChanged: onCategoryChanged,
-            ),
-            _FilterDropdown(
-              label: 'Action',
-              value: actions.contains(actionFilter) ? actionFilter : 'all',
-              values: actions,
-              onChanged: onActionChanged,
-            ),
-            if (categoryFilter != 'all' ||
-                actionFilter != 'all' ||
-                search.isNotEmpty)
-              TextButton.icon(
-                onPressed: onClear,
-                icon: const Icon(Icons.filter_alt_off, size: 17),
-                label: const Text('Clear filters'),
+              _FilterDropdown(
+                label: 'Section',
+                width: itemWidth,
+                value: categories.contains(categoryFilter) ? categoryFilter : 'all',
+                values: categories,
+                onChanged: onCategoryChanged,
               ),
-          ],
-        ),
+              _FilterDropdown(
+                label: 'Action',
+                width: itemWidth,
+                value: actions.contains(actionFilter) ? actionFilter : 'all',
+                values: actions,
+                onChanged: onActionChanged,
+              ),
+              if (categoryFilter != 'all' || actionFilter != 'all' || search.isNotEmpty)
+                TextButton.icon(
+                  onPressed: onClear,
+                  icon: const Icon(Icons.filter_alt_off, size: 17),
+                  label: const Text('Clear filters'),
+                ),
+            ],
+          );
+        }),
       ),
     );
   }
@@ -393,21 +396,23 @@ class _FilterDropdown extends StatelessWidget {
   final String label;
   final String value;
   final List<String> values;
+  final double width;
   final ValueChanged<String> onChanged;
 
   const _FilterDropdown({
     required this.label,
     required this.value,
     required this.values,
+    required this.width,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 180,
+      width: width,
       child: DropdownButtonFormField<String>(
-        initialValue: value,
+        value: value,
         isDense: true,
         decoration: InputDecoration(
           labelText: label,
@@ -416,13 +421,13 @@ class _FilterDropdown extends StatelessWidget {
         items: values
             .map(
               (value) => DropdownMenuItem<String>(
-            value: value,
-            child: Text(
-              _prettyLabel(value),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        )
+                value: value,
+                child: Text(
+                  _prettyLabel(value),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            )
             .toList(),
         onChanged: (value) {
           if (value != null) onChanged(value);
@@ -536,101 +541,123 @@ class _ActivityCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       elevation: 0,
       color: theme.colorScheme.surface.withValues(alpha: 0.35),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                act.title.trim().isEmpty ? 'Activity' : act.title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+      child: LayoutBuilder(builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 450;
+
+        return ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          title: isCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      act.title.trim().isEmpty ? 'Activity' : act.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _fDt(act.createdAt),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        act.title.trim().isEmpty ? 'Activity' : act.title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _fDt(act.createdAt),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              _fDt(act.createdAt),
-              style: TextStyle(
-                fontSize: 11,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (act.action.trim().isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 4),
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color:
-                    theme.colorScheme.onSurface.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    _prettyLabel(act.action),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color:
-                      theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (act.action.trim().isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _prettyLabel(act.action),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
                     ),
                   ),
-                ),
-              if (act.description.trim().isNotEmpty)
-                Text(
-                  act.description,
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.35,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Icon(
-                    Icons.person,
-                    size: 12,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                  ),
-                  const SizedBox(width: 4),
+                if (act.description.trim().isNotEmpty)
                   Text(
-                    act.actorName.trim().isEmpty ? 'System' : act.actorName,
+                    act.description,
                     style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      fontSize: 13,
+                      height: 1.35,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        children: [
-          if (metadata.isEmpty)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'No additional details recorded.',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.person,
+                      size: 12,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      act.actorName.trim().isEmpty ? 'System' : act.actorName,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            )
-          else
-            _MetadataDetails(metadata: metadata),
-        ],
-      ),
+              ],
+            ),
+          ),
+          children: [
+            if (metadata.isEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'No additional details recorded.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              )
+            else
+              _MetadataDetails(metadata: metadata),
+          ],
+        );
+      }),
     );
   }
 }
