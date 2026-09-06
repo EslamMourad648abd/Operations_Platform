@@ -215,10 +215,11 @@ class _OnboardingReportsState extends State<OnboardingReports> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return LayoutBuilder(builder: (context, constraints) {
+      final isCompact = constraints.maxWidth < 600;
+      final content = [
         Expanded(
+          flex: isCompact ? 0 : 1,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -244,13 +245,23 @@ class _OnboardingReportsState extends State<OnboardingReports> {
             ],
           ),
         ),
-
+        if (isCompact) const SizedBox(height: 16) else const SizedBox(width: 16),
         _DateRangeBadge(
           startDate: _startDate,
           endDate: _endDate,
         ),
-      ],
-    );
+      ];
+
+      return isCompact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: content,
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: content,
+            );
+    });
   }
 
   // ============================================================
@@ -264,114 +275,128 @@ class _OnboardingReportsState extends State<OnboardingReports> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            Icon(
-              Icons.calendar_month_outlined,
-              color: theme.colorScheme.primary,
-            ),
+        child: LayoutBuilder(builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 850;
 
-            const SizedBox(width: 12),
-
-            Text(
-              l10n?.translate('report_period') ?? 'Report Period',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
+          final periodLabel = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.calendar_month_outlined,
+                color: theme.colorScheme.primary,
               ),
-            ),
-
-            const SizedBox(width: 20),
-
-            SegmentedButton<bool>(
-              segments: [
-                ButtonSegment<bool>(
-                  value: false,
-                  label: Text(
-                    l10n?.translate('day') ?? 'Day',
-                  ),
-                  icon: const Icon(Icons.today),
+              const SizedBox(width: 12),
+              Text(
+                l10n?.translate('report_period') ?? 'Report Period',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
                 ),
-                ButtonSegment<bool>(
-                  value: true,
-                  label: Text(
-                    l10n?.translate('range') ?? 'Range',
+              ),
+            ],
+          );
+
+          final periodSelector = SegmentedButton<bool>(
+            segments: [
+              ButtonSegment<bool>(
+                value: false,
+                label: Text(
+                  l10n?.translate('day') ?? 'Day',
+                ),
+                icon: const Icon(Icons.today),
+              ),
+              ButtonSegment<bool>(
+                value: true,
+                label: Text(
+                  l10n?.translate('range') ?? 'Range',
+                ),
+                icon: const Icon(Icons.date_range),
+              ),
+            ],
+            selected: {_rangeMode},
+            onSelectionChanged: (selection) {
+              setState(() {
+                _rangeMode = selection.first;
+                if (!_rangeMode) {
+                  _endDate = _startDate;
+                }
+              });
+            },
+          );
+
+          final dateControls = Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              IconButton(
+                tooltip: 'Previous',
+                onPressed: _movePrevious,
+                icon: const Icon(Icons.chevron_left),
+              ),
+              OutlinedButton.icon(
+                onPressed: _pickStartDate,
+                icon: const Icon(
+                  Icons.calendar_today,
+                  size: 17,
+                ),
+                label: Text(_formatDate(_startDate)),
+              ),
+              if (_rangeMode) ...[
+                const Icon(
+                  Icons.arrow_forward,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+                OutlinedButton.icon(
+                  onPressed: _pickEndDate,
+                  icon: const Icon(
+                    Icons.event,
+                    size: 17,
                   ),
-                  icon: const Icon(Icons.date_range),
+                  label: Text(_formatDate(_endDate)),
                 ),
               ],
-              selected: {_rangeMode},
-              onSelectionChanged: (selection) {
-                setState(() {
-                  _rangeMode = selection.first;
+              IconButton(
+                tooltip: 'Next',
+                onPressed: _moveNext,
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          );
 
-                  if (!_rangeMode) {
-                    _endDate = _startDate;
-                  }
-                });
-              },
-            ),
-
-            const SizedBox(width: 16),
-
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+          if (isCompact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    IconButton(
-                      tooltip: 'Previous',
-                      onPressed: _movePrevious,
-                      icon: const Icon(
-                        Icons.chevron_left,
-                      ),
-                    ),
-
-                    OutlinedButton.icon(
-                      onPressed: _pickStartDate,
-                      icon: const Icon(
-                        Icons.calendar_today,
-                        size: 17,
-                      ),
-                      label: Text(
-                        _formatDate(_startDate),
-                      ),
-                    ),
-
-                    if (_rangeMode) ...[
-                      const Icon(
-                        Icons.arrow_forward,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-
-                      OutlinedButton.icon(
-                        onPressed: _pickEndDate,
-                        icon: const Icon(
-                          Icons.event,
-                          size: 17,
-                        ),
-                        label: Text(
-                          _formatDate(_endDate),
-                        ),
-                      ),
-                    ],
-
-                    IconButton(
-                      tooltip: 'Next',
-                      onPressed: _moveNext,
-                      icon: const Icon(
-                        Icons.chevron_right,
-                      ),
-                    ),
+                    periodLabel,
+                    periodSelector,
                   ],
                 ),
+                const SizedBox(height: 20),
+                Center(child: dateControls),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              periodLabel,
+              const SizedBox(width: 20),
+              periodSelector,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: dateControls,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        }),
       ),
     );
   }
@@ -555,59 +580,110 @@ class _OnboardingReportsState extends State<OnboardingReports> {
               const EdgeInsets.only(
                 bottom: 12,
               ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor:
-                    theme.colorScheme.primary
-                        .withValues(alpha: 0.1),
-                    child: Icon(
-                      Icons.person,
-                      size: 16,
-                      color:
-                      theme.colorScheme.primary,
-                    ),
-                  ),
+              child: LayoutBuilder(builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 500;
 
-                  const SizedBox(width: 12),
-
-                  Expanded(
-                    child: Text(
-                      agentName,
-                      style: const TextStyle(
-                        fontWeight:
-                        FontWeight.bold,
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor:
+                            theme.colorScheme.primary
+                                .withValues(alpha: 0.1),
+                            child: Icon(
+                              Icons.person,
+                              size: 16,
+                              color:
+                              theme.colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              agentName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-
-                  _SmallStatusChip(
-                    label:
-                    '${counts[agentName]} tasks',
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  SizedBox(
-                    width: 100,
-                    child: Text(
-                      _formatDuration(
-                        occupancy[agentName] ??
-                            Duration.zero,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const SizedBox(width: 40),
+                          _SmallStatusChip(
+                            label: '${counts[agentName]} tasks',
+                          ),
+                          const Spacer(),
+                          Text(
+                            _formatDuration(
+                              occupancy[agentName] ?? Duration.zero,
+                            ),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                      textAlign:
-                      TextAlign.right,
-                      style: TextStyle(
-                        fontWeight:
-                        FontWeight.bold,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundColor:
+                      theme.colorScheme.primary
+                          .withValues(alpha: 0.1),
+                      child: Icon(
+                        Icons.person,
+                        size: 16,
                         color:
                         theme.colorScheme.primary,
                       ),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        agentName,
+                        style: const TextStyle(
+                          fontWeight:
+                          FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    _SmallStatusChip(
+                      label:
+                      '${counts[agentName]} tasks',
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 100,
+                      child: Text(
+                        _formatDuration(
+                          occupancy[agentName] ??
+                              Duration.zero,
+                        ),
+                        textAlign:
+                        TextAlign.right,
+                        style: TextStyle(
+                          fontWeight:
+                          FontWeight.bold,
+                          color:
+                          theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }),
             );
           },
         ).toList(),
@@ -2242,114 +2318,220 @@ class _ClientProgressRow
       const EdgeInsets.only(
         bottom: 14,
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration:
-            BoxDecoration(
-              color: theme
-                  .colorScheme
-                  .primary
-                  .withValues(
-                alpha: 0.1,
-              ),
-              borderRadius:
-              BorderRadius.circular(
-                9,
-              ),
-            ),
-            child: Icon(
-              Icons.business_outlined,
-              size: 19,
-              color:
-              theme.colorScheme.primary,
-            ),
-          ),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 600;
 
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Text(
-                  client.companyName
-                      .isEmpty
-                      ? client.accNumber
-                      : client.companyName,
-                  style:
-                  const TextStyle(
-                    fontSize: 13,
-                    fontWeight:
-                    FontWeight.bold,
-                  ),
-                ),
-
-                Text(
-                  'ACC: ${client.accNumber}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme
-                        .colorScheme
-                        .onSurface
-                        .withValues(
-                      alpha: 0.6,
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration:
+                    BoxDecoration(
+                      color: theme
+                          .colorScheme
+                          .primary
+                          .withValues(
+                        alpha: 0.1,
+                      ),
+                      borderRadius:
+                      BorderRadius.circular(
+                        9,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.business_outlined,
+                      size: 19,
+                      color:
+                      theme.colorScheme.primary,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          SizedBox(
-            width: 160,
-            child:
-            ClipRRect(
-              borderRadius:
-              BorderRadius.circular(
-                8,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          client.companyName
+                              .isEmpty
+                              ? client.accNumber
+                              : client.companyName,
+                          style:
+                          const TextStyle(
+                            fontSize: 13,
+                            fontWeight:
+                            FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'ACC: ${client.accNumber}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme
+                                .colorScheme
+                                .onSurface
+                                .withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${(progress * 100).round()}%',
+                    style:
+                    const TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                      FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-              child:
-              LinearProgressIndicator(
-                value: progress,
-                minHeight: 7,
-                backgroundColor:
-                theme
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius:
+                BorderRadius.circular(
+                  8,
+                ),
+                child:
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 7,
+                  backgroundColor:
+                  theme
+                      .colorScheme
+                      .primary
+                      .withValues(
+                    alpha: 0.1,
+                  ),
+                  color: progress >= 1
+                      ? Colors.green
+                      : theme
+                      .colorScheme
+                      .primary,
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration:
+              BoxDecoration(
+                color: theme
                     .colorScheme
                     .primary
                     .withValues(
                   alpha: 0.1,
                 ),
-                color: progress >= 1
-                    ? Colors.green
-                    : theme
-                    .colorScheme
-                    .primary,
+                borderRadius:
+                BorderRadius.circular(
+                  9,
+                ),
+              ),
+              child: Icon(
+                Icons.business_outlined,
+                size: 19,
+                color:
+                theme.colorScheme.primary,
               ),
             ),
-          ),
 
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-          SizedBox(
-            width: 45,
-            child: Text(
-              '${(progress * 100).round()}%',
-              textAlign:
-              TextAlign.right,
-              style:
-              const TextStyle(
-                fontSize: 12,
-                fontWeight:
-                FontWeight.bold,
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    client.companyName
+                        .isEmpty
+                        ? client.accNumber
+                        : client.companyName,
+                    style:
+                    const TextStyle(
+                      fontSize: 13,
+                      fontWeight:
+                      FontWeight.bold,
+                    ),
+                  ),
+
+                  Text(
+                    'ACC: ${client.accNumber}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme
+                          .colorScheme
+                          .onSurface
+                          .withValues(
+                        alpha: 0.6,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
+
+            SizedBox(
+              width: 160,
+              child:
+              ClipRRect(
+                borderRadius:
+                BorderRadius.circular(
+                  8,
+                ),
+                child:
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 7,
+                  backgroundColor:
+                  theme
+                      .colorScheme
+                      .primary
+                      .withValues(
+                    alpha: 0.1,
+                  ),
+                  color: progress >= 1
+                      ? Colors.green
+                      : theme
+                      .colorScheme
+                      .primary,
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            SizedBox(
+              width: 45,
+              child: Text(
+                '${(progress * 100).round()}%',
+                textAlign:
+                TextAlign.right,
+                style:
+                const TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                  FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      }),
     );
   }
 }
@@ -2391,109 +2573,187 @@ class _TaskDetailRow
           ),
         ),
       ),
-      child: Row(
-        children: [
-          Icon(
-            finished
-                ? Icons.check_circle
-                : Icons.radio_button_checked,
-            size: 20,
-            color: finished
-                ? Colors.green
-                : theme
-                .colorScheme
-                .primary,
-          ),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 700;
 
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.task,
-                  style:
-                  const TextStyle(
-                    fontSize: 13,
-                    fontWeight:
-                    FontWeight.bold,
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    finished
+                        ? Icons.check_circle
+                        : Icons.radio_button_checked,
+                    size: 20,
+                    color: finished
+                        ? Colors.green
+                        : theme.colorScheme.primary,
                   ),
-                ),
-
-                Text(
-                  _taskContext(
-                    task,
-                    context,
-                  ),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme
-                        .colorScheme
-                        .onSurface
-                        .withValues(
-                      alpha: 0.6,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          task.task,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          _taskContext(task, context),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          _SmallStatusChip(
-            label:
-            l10n?.translate(
-              task.taskType
-                  .toLowerCase()
-                  .replaceAll(
-                ' ',
-                '_',
+                ],
               ),
-            ) ??
-                task.taskType,
-          ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const SizedBox(width: 32),
+                  _SmallStatusChip(
+                    label: l10n?.translate(
+                          task.taskType.toLowerCase().replaceAll(' ', '_'),
+                        ) ??
+                        task.taskType,
+                  ),
+                  const Spacer(),
+                  Text(
+                    _formatTime(task.startedAt),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    task.completedDuration == null
+                        ? '—'
+                        : _formatDuration(task.completedDuration!),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        }
 
-          const SizedBox(width: 12),
-
-          Text(
-            _formatTime(
-              task.startedAt,
-            ),
-            style: TextStyle(
-              fontSize: 11,
-              color: theme
+        return Row(
+          children: [
+            Icon(
+              finished
+                  ? Icons.check_circle
+                  : Icons.radio_button_checked,
+              size: 20,
+              color: finished
+                  ? Colors.green
+                  : theme
                   .colorScheme
-                  .onSurface
-                  .withValues(
-                alpha: 0.6,
+                  .primary,
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task.task,
+                    style:
+                    const TextStyle(
+                      fontSize: 13,
+                      fontWeight:
+                      FontWeight.bold,
+                    ),
+                  ),
+
+                  Text(
+                    _taskContext(
+                      task,
+                      context,
+                    ),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme
+                          .colorScheme
+                          .onSurface
+                          .withValues(
+                        alpha: 0.6,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
 
-          const SizedBox(width: 16),
+            _SmallStatusChip(
+              label:
+              l10n?.translate(
+                task.taskType
+                    .toLowerCase()
+                    .replaceAll(
+                  ' ',
+                  '_',
+                ),
+              ) ??
+                  task.taskType,
+            ),
 
-          SizedBox(
-            width: 70,
-            child: Text(
-              task.completedDuration ==
-                  null
-                  ? '—'
-                  : _formatDuration(
-                task.completedDuration!,
+            const SizedBox(width: 12),
+
+            Text(
+              _formatTime(
+                task.startedAt,
               ),
-              textAlign:
-              TextAlign.right,
-              style:
-              const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                fontWeight:
-                FontWeight.bold,
+                color: theme
+                    .colorScheme
+                    .onSurface
+                    .withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
-          ),
-        ],
-      ),
+
+            const SizedBox(width: 16),
+
+            SizedBox(
+              width: 70,
+              child: Text(
+                task.completedDuration ==
+                    null
+                    ? '—'
+                    : _formatDuration(
+                  task.completedDuration!,
+                ),
+                textAlign:
+                TextAlign.right,
+                style:
+                const TextStyle(
+                  fontSize: 11,
+                  fontWeight:
+                  FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      }),
     );
   }
 }

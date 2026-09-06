@@ -481,13 +481,20 @@ class _TaskTypeCard extends StatelessWidget {
       subtitle: l10n?.translate('task_distribution_desc') ?? 'Task workload by operational type.',
       icon: Icons.assignment_outlined,
       child: Column(children: [
-        Row(children: [
-          Expanded(child: _SmallSummary(label: l10n?.translate('all_tasks') ?? 'All Tasks', value: '${tasks.length}', icon: Icons.assignment_outlined)),
-          const SizedBox(width: 12),
-          Expanded(child: _SmallSummary(label: l10n?.translate('client_tasks') ?? 'Client Tasks', value: '$clientTasks', icon: Icons.business_outlined)),
-          const SizedBox(width: 12),
-          Expanded(child: _SmallSummary(label: l10n?.translate('internal') ?? 'Internal', value: '$internalTasks', icon: Icons.apartment_outlined)),
-        ]),
+        LayoutBuilder(builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 650;
+          final items = [
+            _SmallSummary(label: l10n?.translate('all_tasks') ?? 'All Tasks', value: '${tasks.length}', icon: Icons.assignment_outlined),
+            _SmallSummary(label: l10n?.translate('client_tasks') ?? 'Client Tasks', value: '$clientTasks', icon: Icons.business_outlined),
+            _SmallSummary(label: l10n?.translate('internal') ?? 'Internal', value: '$internalTasks', icon: Icons.apartment_outlined),
+          ];
+
+          if (isCompact) {
+            return Column(children: items.map((i) => Padding(padding: const EdgeInsets.only(bottom: 12), child: i)).toList());
+          }
+
+          return Row(children: items.map((i) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: i))).toList());
+        }),
         const SizedBox(height: 18),
         if (typeCounts.isEmpty) _InlineEmpty(message: l10n?.translate('no_task_history') ?? 'No task history yet.')
         else ...typeCounts.entries.map((e) => Padding(padding: const EdgeInsets.only(bottom: 12), child: _TaskTypeProgress(label: e.key, count: e.value, percentage: tasks.isEmpty ? 0 : e.value / tasks.length))),

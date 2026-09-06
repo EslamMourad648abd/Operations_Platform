@@ -82,9 +82,11 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
+                        LayoutBuilder(builder: (context, constraints) {
+                          final isCompact = constraints.maxWidth < 600;
+                          final content = [
                             Expanded(
+                              flex: isCompact ? 0 : 1,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -107,13 +109,23 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
                                 ],
                               ),
                             ),
+                            if (isCompact) const SizedBox(height: 16) else const SizedBox(width: 12),
                             _CountBadge(
                               count: filtered.length,
                               totalCount: allActivities.length,
                               filtered: filtered.length != allActivities.length,
                             ),
-                          ],
-                        ),
+                          ];
+
+                          return isCompact
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: content,
+                                )
+                              : Row(
+                                  children: content,
+                                );
+                        }),
                         const SizedBox(height: 28),
                         _SummaryCard(client: client),
                         const SizedBox(height: 20),
@@ -228,46 +240,49 @@ class _SItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
-      width: 200,
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(9),
+    return LayoutBuilder(builder: (context, constraints) {
+      final isCompact = constraints.maxWidth < 250;
+      return SizedBox(
+        width: isCompact ? double.infinity : 200,
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(i, size: 18, color: theme.colorScheme.primary),
             ),
-            child: Icon(i, size: 18, color: theme.colorScheme.primary),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
                   ),
-                ),
-                Text(
-                  v.trim().isEmpty ? '—' : v,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+                  Text(
+                    v.trim().isEmpty ? '—' : v,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    });
   }
 }
 
@@ -672,32 +687,62 @@ class _MetadataRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 155,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+    return LayoutBuilder(builder: (context, constraints) {
+      final isCompact = constraints.maxWidth < 450;
+
+      if (isCompact) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(height: 4),
+            SelectableText(
+              value,
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        );
+      }
+
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 155,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: SelectableText(
-            value,
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.35,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+              ),
             ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
+    });
   }
 }
 

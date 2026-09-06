@@ -272,13 +272,20 @@ class _SummaryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return Row(children: [
-      Expanded(child: _SummaryCard(icon: Icons.today_outlined, label: l?.translate('tasks_today') ?? 'Tasks Today', value: '$totalToday')),
-      const SizedBox(width: 12),
-      Expanded(child: _SummaryCard(icon: Icons.check_circle_outline, label: l?.translate('completed_today') ?? 'Completed', value: '$completedToday')),
-      const SizedBox(width: 12),
-      Expanded(child: _SummaryCard(icon: Icons.layers_outlined, label: l?.translate('active_tasks_label') ?? 'Active', value: '$activeTaskCount')),
-    ]);
+    return LayoutBuilder(builder: (context, constraints) {
+      final isCompact = constraints.maxWidth < 700;
+      final items = [
+        _SummaryCard(icon: Icons.today_outlined, label: l?.translate('tasks_today') ?? 'Tasks Today', value: '$totalToday'),
+        _SummaryCard(icon: Icons.check_circle_outline, label: l?.translate('completed_today') ?? 'Completed', value: '$completedToday'),
+        _SummaryCard(icon: Icons.layers_outlined, label: l?.translate('active_tasks_label') ?? 'Active', value: '$activeTaskCount'),
+      ];
+
+      if (isCompact) {
+        return Column(children: items.map((i) => Padding(padding: const EdgeInsets.only(bottom: 12), child: i)).toList());
+      }
+
+      return Row(children: items.map((i) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: i))).toList());
+    });
   }
 }
 
@@ -312,18 +319,46 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
     final elapsed = widget.task.startedAt == null ? Duration.zero : DateTime.now().difference(widget.task.startedAt!);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: .3))),
-      child: Padding(padding: const EdgeInsets.all(20), child: Row(children: [
-        Container(width: 46, height: 46, decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: .1), shape: BoxShape.circle), child: Icon(Icons.play_arrow_rounded, color: theme.colorScheme.primary)),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [Text(l?.translate('running') ?? 'RUNNING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)), const SizedBox(width: 8), _TypeChip(label: l?.translate(widget.task.taskType.toLowerCase().replaceAll(' ', '_')) ?? widget.task.taskType)]),
-          Text(widget.task.task, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Text(_taskContext(widget.task, context), style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
-        ])),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(_formatDuration(elapsed), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)), Text(l?.translate('elapsed') ?? 'Elapsed', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))]),
-        const SizedBox(width: 18),
-        ElevatedButton(onPressed: widget.onFinish, child: Text(l?.translate('finish') ?? 'Finish')),
-      ])),
+      child: Padding(padding: const EdgeInsets.all(20), child: LayoutBuilder(builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 600;
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(width: 40, height: 40, decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: .1), shape: BoxShape.circle), child: Icon(Icons.play_arrow_rounded, color: theme.colorScheme.primary)),
+                const SizedBox(width: 14),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [Text(l?.translate('running') ?? 'RUNNING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)), const SizedBox(width: 8), _TypeChip(label: l?.translate(widget.task.taskType.toLowerCase().replaceAll(' ', '_')) ?? widget.task.taskType)]),
+                  Text(widget.task.task, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ])),
+              ]),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_formatDuration(elapsed), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)), Text(l?.translate('elapsed') ?? 'Elapsed', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))]),
+                  ElevatedButton(onPressed: widget.onFinish, child: Text(l?.translate('finish') ?? 'Finish')),
+                ],
+              ),
+            ],
+          );
+        }
+
+        return Row(children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: .1), shape: BoxShape.circle), child: Icon(Icons.play_arrow_rounded, color: theme.colorScheme.primary)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [Text(l?.translate('running') ?? 'RUNNING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)), const SizedBox(width: 8), _TypeChip(label: l?.translate(widget.task.taskType.toLowerCase().replaceAll(' ', '_')) ?? widget.task.taskType)]),
+            Text(widget.task.task, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(_taskContext(widget.task, context), style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+          ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(_formatDuration(elapsed), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)), Text(l?.translate('elapsed') ?? 'Elapsed', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))]),
+          const SizedBox(width: 18),
+          ElevatedButton(onPressed: widget.onFinish, child: Text(l?.translate('finish') ?? 'Finish')),
+        ]);
+      })),
     );
   }
 }
@@ -335,16 +370,44 @@ class _TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context); final theme = Theme.of(context);
     final finished = task.status == 'Finished';
-    return Card(child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [
-      Icon(finished ? Icons.check_circle : Icons.radio_button_checked, color: finished ? Colors.green : theme.colorScheme.primary, size: 22),
-      const SizedBox(width: 14),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(task.task, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), Text(_taskContext(task, context), style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))])),
-      _TypeChip(label: l?.translate(task.taskType.toLowerCase().replaceAll(' ', '_')) ?? task.taskType),
-      const SizedBox(width: 14),
-      Text(_formatTime(task.startedAt), style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
-      const SizedBox(width: 14),
-      Text(task.completedDuration == null ? '—' : _formatDuration(task.completedDuration!), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-    ])));
+    return Card(
+      child: Padding(padding: const EdgeInsets.all(16), child: LayoutBuilder(builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 600;
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(finished ? Icons.check_circle : Icons.radio_button_checked, color: finished ? Colors.green : theme.colorScheme.primary, size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Text(task.task, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
+              ]),
+              const SizedBox(height: 10),
+              Row(children: [
+                const SizedBox(width: 32),
+                _TypeChip(label: l?.translate(task.taskType.toLowerCase().replaceAll(' ', '_')) ?? task.taskType),
+                const Spacer(),
+                Text(_formatTime(task.startedAt), style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+                const SizedBox(width: 12),
+                Text(task.completedDuration == null ? '—' : _formatDuration(task.completedDuration!), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ]),
+            ],
+          );
+        }
+
+        return Row(children: [
+          Icon(finished ? Icons.check_circle : Icons.radio_button_checked, color: finished ? Colors.green : theme.colorScheme.primary, size: 22),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(task.task, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), Text(_taskContext(task, context), style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))])),
+          _TypeChip(label: l?.translate(task.taskType.toLowerCase().replaceAll(' ', '_')) ?? task.taskType),
+          const SizedBox(width: 14),
+          Text(_formatTime(task.startedAt), style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+          const SizedBox(width: 14),
+          Text(task.completedDuration == null ? '—' : _formatDuration(task.completedDuration!), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        ]);
+      })),
+    );
   }
 }
 
