@@ -254,13 +254,13 @@ class _OnboardingReportsState extends State<OnboardingReports> {
 
       return isCompact
           ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: content,
-            )
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: content,
+      )
           : Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: content,
-            );
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: content,
+      );
     });
   }
 
@@ -1342,10 +1342,6 @@ class _OnboardingReportsState extends State<OnboardingReports> {
       OnboardingTaskModel task,
       Map<String, String> agents,
       ) {
-    if (!agents.containsKey(task.assignedTo)) {
-      return false;
-    }
-
     if (_agentFilter == 'All') {
       return true;
     }
@@ -1358,10 +1354,6 @@ class _OnboardingReportsState extends State<OnboardingReports> {
       ClientModel client,
       Map<String, String> agents,
       ) {
-    if (!agents.containsKey(client.assignedTo)) {
-      return false;
-    }
-
     if (_agentFilter == 'All') {
       return true;
     }
@@ -2622,8 +2614,8 @@ class _TaskDetailRow
                   const SizedBox(width: 32),
                   _SmallStatusChip(
                     label: l10n?.translate(
-                          task.taskType.toLowerCase().replaceAll(' ', '_'),
-                        ) ??
+                      task.taskType.toLowerCase().replaceAll(' ', '_'),
+                    ) ??
                         task.taskType,
                   ),
                   const Spacer(),
