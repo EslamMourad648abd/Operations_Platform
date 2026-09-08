@@ -292,78 +292,74 @@ class _TrainingCertificatesState
 
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
+    return LayoutBuilder(builder: (context, constraints) {
+      final isCompact = constraints.maxWidth < 650;
+
+      final headerContent = [
         Expanded(
+          flex: isCompact ? 0 : 1,
           child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Certificates',
                 style: TextStyle(
                   fontSize: 30,
-                  fontWeight:
-                  FontWeight.w700,
+                  fontWeight: FontWeight.w700,
                   color: theme.colorScheme.onSurface,
                 ),
               ),
-              const SizedBox(
-                height: 6,
-              ),
+              const SizedBox(height: 6),
               Text(
                 'View and access the certificates you have earned.',
                 style: TextStyle(
                   fontSize: 15,
-                  color:
-                  theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             ],
           ),
         ),
-
+        if (isCompact) const SizedBox(height: 16) else const SizedBox(width: 16),
         Container(
-          padding:
-          const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 9,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withValues(
-              alpha: 0.07,
-            ),
-            borderRadius:
-            BorderRadius.circular(9),
+            color: theme.colorScheme.primary.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(9),
           ),
           child: Row(
-            mainAxisSize:
-            MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.workspace_premium_outlined,
                 size: 18,
                 color: theme.colorScheme.primary,
               ),
-              const SizedBox(
-                width: 7,
-              ),
+              const SizedBox(width: 7),
               Text(
                 '${_certificates.length} '
-                    '${_certificates.length == 1 ? 'Certificate' : 'Certificates'}',
-                style:
-                TextStyle(
+                '${_certificates.length == 1 ? 'Certificate' : 'Certificates'}',
+                style: TextStyle(
                   fontSize: 12,
-                  fontWeight:
-                  FontWeight.w600,
+                  fontWeight: FontWeight.w600,
                   color: theme.colorScheme.primary,
                 ),
               ),
             ],
           ),
         ),
-      ],
-    );
+      ];
+
+      return isCompact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: headerContent,
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: headerContent,
+            );
+    });
   }
 
   // ============================================================

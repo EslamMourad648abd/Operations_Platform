@@ -315,11 +315,10 @@ class _LoginPageState extends State<LoginPage> {
           // ========================================================
           Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
-                  maxWidth: 500,
-                  minWidth: 320,
+                  maxWidth: 480,
                 ),
                 child: Card(
                   elevation: 20,
@@ -331,185 +330,189 @@ class _LoginPageState extends State<LoginPage> {
                       width: 1,
                     ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 36,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // ==============================================
-                        // LOGO + TITLE
-                        // ==============================================
-                        Column(
-                          children: [
-                            Image.asset(
-                              'assets/logo.png',
-                              height: 140,
-                              fit: BoxFit.contain,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              l10n?.translate('sign_in_title') ?? 'Sign in to BBC Operations Platform',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xff38BDF8) : const Color(0xFF1F5B8A),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
+                  child: LayoutBuilder(builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 400;
 
-                        // ==============================================
-                        // FORM
-                        // ==============================================
-                        Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                    return Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isCompact ? 24 : 40,
+                        vertical: isCompact ? 28 : 36,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // ==============================================
+                          // LOGO + TITLE
+                          // ==============================================
+                          Column(
                             children: [
-                              // ======================================
-                              // EMAIL
-                              // ======================================
-                              Text(
-                                l10n?.translate('email') ?? 'Email',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white70 : const Color(0xFF6B7B8B),
-                                ),
+                              Image.asset(
+                                'assets/logo.png',
+                                height: isCompact ? 100 : 140,
+                                fit: BoxFit.contain,
                               ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _emailCtrl,
-                                keyboardType: TextInputType.emailAddress,
-                                textInputAction: TextInputAction.next,
-                                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFEEF6FB),
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                                  hintText: 'Enter your email',
-                                  hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
-                                  ),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return l10n?.translate('email_required') ?? 'Email is required';
-                                  }
-                                  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim())) {
-                                    return l10n?.translate('valid_email') ?? 'Enter a valid email';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 20),
-
-                              // ======================================
-                              // PASSWORD
-                              // ======================================
-                              Text(
-                                l10n?.translate('password') ?? 'Password',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white70 : const Color(0xFF6B7B8B),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _passwordCtrl,
-                                obscureText: _obscure,
-                                textInputAction: TextInputAction.done,
-                                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                                onFieldSubmitted: (_) { if (!_isSubmitting) _submit(); },
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFEEF6FB),
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                                  hintText: 'Enter your password',
-                                  hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscure ? Icons.visibility : Icons.visibility_off,
-                                      color: Colors.grey,
-                                      size: 20,
-                                    ),
-                                    onPressed: _togglePassword,
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
-                                  ),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return l10n?.translate('password_required') ?? 'Password is required';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 28),
-
-                              // ======================================
-                              // LOGIN BUTTON
-                              // ======================================
-                              ElevatedButton(
-                                onPressed: _isSubmitting ? null : _submit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF38BDF8),
-                                  foregroundColor: Colors.white,
-                                  disabledBackgroundColor: const Color(0xFF38BDF8).withValues(alpha: 0.5),
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  elevation: 4,
-                                ),
-                                child: _isSubmitting
-                                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                    : Text(
-                                        l10n?.translate('login') ?? 'Login',
-                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                      ),
-                              ),
-
-                              // ======================================
-                              // FORGOT PASSWORD
-                              // ======================================
                               const SizedBox(height: 12),
-                              TextButton(
-                                onPressed: _isSubmitting ? null : _resetPassword,
-                                child: Text(
-                                  l10n?.translate('forgot_password') ?? 'Forgot Password?',
-                                  style: TextStyle(
-                                    color: isDark ? const Color(0xff38BDF8) : const Color(0xFF1F5B8A),
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              Text(
+                                l10n?.translate('sign_in_title') ?? 'Sign in to BBC Operations Platform',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: isCompact ? 19 : 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xff38BDF8) : const Color(0xFF1F5B8A),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                          const SizedBox(height: 32),
+
+                          // ==============================================
+                          // FORM
+                          // ==============================================
+                          Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // ======================================
+                                // EMAIL
+                                // ======================================
+                                Text(
+                                  l10n?.translate('email') ?? 'Email',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white70 : const Color(0xFF6B7B8B),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _emailCtrl,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFEEF6FB),
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                    hintText: 'Enter your email',
+                                    hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                                    ),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return l10n?.translate('email_required') ?? 'Email is required';
+                                    }
+                                    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim())) {
+                                      return l10n?.translate('valid_email') ?? 'Enter a valid email';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+
+                                // ======================================
+                                // PASSWORD
+                                // ======================================
+                                Text(
+                                  l10n?.translate('password') ?? 'Password',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white70 : const Color(0xFF6B7B8B),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _passwordCtrl,
+                                  obscureText: _obscure,
+                                  textInputAction: TextInputAction.done,
+                                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                                  onFieldSubmitted: (_) { if (!_isSubmitting) _submit(); },
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFEEF6FB),
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                    hintText: 'Enter your password',
+                                    hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscure ? Icons.visibility : Icons.visibility_off,
+                                        color: Colors.grey,
+                                        size: 20,
+                                      ),
+                                      onPressed: _togglePassword,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                                    ),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return l10n?.translate('password_required') ?? 'Password is required';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 28),
+
+                                // ======================================
+                                // LOGIN BUTTON
+                                // ======================================
+                                ElevatedButton(
+                                  onPressed: _isSubmitting ? null : _submit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF38BDF8),
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    elevation: 4,
+                                  ),
+                                  child: _isSubmitting
+                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                      : Text(
+                                          l10n?.translate('login') ?? 'Login',
+                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                        ),
+                                ),
+
+                                // ======================================
+                                // FORGOT PASSWORD
+                                // ======================================
+                                const SizedBox(height: 12),
+                                TextButton(
+                                  onPressed: _isSubmitting ? null : _resetPassword,
+                                  child: Text(
+                                    l10n?.translate('forgot_password') ?? 'Forgot Password?',
+                                    style: TextStyle(
+                                      color: isDark ? const Color(0xff38BDF8) : const Color(0xFF1F5B8A),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                 ),
               ),
             ),

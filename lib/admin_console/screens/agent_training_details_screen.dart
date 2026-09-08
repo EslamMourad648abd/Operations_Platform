@@ -407,31 +407,27 @@ class AgentTrainingDetailsScreen extends StatelessWidget {
         ),
         shape: Border(bottom: BorderSide(color: theme.dividerColor)),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          _summaryCard(context),
-          const SizedBox(
-            height: 20,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              _summaryCard(context),
+              const SizedBox(height: 20),
+              Text(
+                "Courses",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...agent.courses.map((course) => _courseCard(context, course)),
+            ],
           ),
-          Text(
-            "Courses",
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(
-            height: 12,
-          ),
-          ...agent.courses.map(
-                (course) => _courseCard(
-              context,
-              course,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

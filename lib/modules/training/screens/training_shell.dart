@@ -54,68 +54,73 @@ class TrainingShell extends StatelessWidget {
   Widget build(
       BuildContext context,
       ) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 1100;
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
 
-    if (isMobile) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final isMobile = constraints.maxWidth < 1100;
+
+      if (isMobile) {
+        return Scaffold(
+          backgroundColor: theme.colorScheme.surface,
+          appBar: AppBar(
+            backgroundColor: theme.colorScheme.surface,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: Icon(Icons.menu, color: theme.colorScheme.primary),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
+            title: Text(
+              l10n?.translate('training_portal') ?? 'Learning',
+              style: TextStyle(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            centerTitle: true,
+            actions: [
+              ValueListenableBuilder<ThemeMode>(
+                valueListenable: ThemeService.themeNotifier,
+                builder: (context, mode, _) {
+                  final isDark = mode == ThemeMode.dark;
+                  return IconButton(
+                    onPressed: ThemeService.toggleTheme,
+                    icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+                    color: theme.colorScheme.primary,
+                  );
+                },
+              ),
+            ],
+            shape: Border(
+              bottom: BorderSide(
+                color: theme.dividerColor,
+              ),
+            ),
+          ),
+          drawer: const Drawer(
+            width: _TrainingNavigation.width,
+            child: _TrainingNavigation(isDrawer: true),
+          ),
+          body: child,
+        );
+      }
+
       return Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        appBar: AppBar(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          leading: Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu, color: kTrainingBrandColor),
-              onPressed: () => Scaffold.of(context).openDrawer(),
+        backgroundColor: theme.colorScheme.surface,
+        body: Row(
+          children: [
+            const _TrainingNavigation(),
+            Expanded(
+              child: child,
             ),
-          ),
-          title: Text(
-            l10n?.translate('training_portal') ?? 'Learning',
-            style: const TextStyle(
-              color: kTrainingBrandColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          centerTitle: true,
-          shape: Border(
-            bottom: BorderSide(
-              color: Theme.of(context).dividerColor,
-            ),
-          ),
+          ],
         ),
-        drawer: const Drawer(
-          width: _TrainingNavigation.width,
-          child: _TrainingNavigation(isDrawer: true),
-        ),
-        body: child,
       );
-    }
-
-    return Scaffold(
-      backgroundColor:
-      Theme.of(context).colorScheme.surface,
-
-      body: Row(
-        children: [
-          // ========================================================
-          // LEFT NAVIGATION
-          // ========================================================
-
-          const _TrainingNavigation(),
-
-          // ========================================================
-          // MAIN CONTENT
-          // ========================================================
-
-          Expanded(
-            child: child,
-          ),
-        ],
-      ),
-    );
+    });
   }
 }
 

@@ -818,55 +818,33 @@ class _UserManagementState extends State<UserManagement> {
         // ======================================================
 
         Padding(
-          padding:
-          const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              const Spacer(),
+          padding: const EdgeInsets.all(20),
+          child: LayoutBuilder(builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 600;
 
-              // ------------------------------------------------
-              // ADD USER
-              // ------------------------------------------------
-
+            final headerActions = [
+              if (!isCompact) const Spacer(),
               ElevatedButton.icon(
-                onPressed:
-                _showAddDialog,
+                onPressed: _showAddDialog,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
                   foregroundColor: theme.colorScheme.onPrimary,
+                  minimumSize: const Size(140, 48),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: const Icon(
-                  Icons.add,
-                ),
-                label: const Text(
-                  "Add User",
-                ),
+                icon: const Icon(Icons.add),
+                label: const Text("Add User"),
               ),
-
-              const SizedBox(
-                width: 20,
-              ),
-
-              // ------------------------------------------------
-              // SEARCH
-              // ------------------------------------------------
-
+              if (isCompact) const SizedBox(height: 12) else const SizedBox(width: 20),
               SizedBox(
-                width: 250,
+                width: isCompact ? double.infinity : 250,
                 child: TextField(
-                  onChanged:
-                  _searchUsers,
-                  decoration:
-                  InputDecoration(
-                    hintText:
-                    "Search",
+                  onChanged: _searchUsers,
+                  decoration: InputDecoration(
+                    hintText: "Search",
                     filled: true,
                     fillColor: theme.cardTheme.color,
-                    prefixIcon:
-                    const Icon(
-                      Icons.search,
-                    ),
+                    prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(color: theme.dividerColor),
@@ -878,8 +856,15 @@ class _UserManagementState extends State<UserManagement> {
                   ),
                 ),
               ),
-            ],
-          ),
+            ];
+
+            return isCompact
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: headerActions,
+                  )
+                : Row(children: headerActions);
+          }),
         ),
 
         // ======================================================
@@ -988,165 +973,92 @@ class _UserManagementState extends State<UserManagement> {
         .toString()
         .trim();
 
-    // IMPORTANT:
-    // There is NEVER an "Unknown" fallback.
-    //
-    // If displayName is empty, email is always used.
-
-    final shownName =
-    displayName.isNotEmpty
-        ? displayName
-        : email;
-
-    // ----------------------------------------------------------
-    // Normalize legacy "agent" role for display/selection.
-    // ----------------------------------------------------------
-
-    final rawRole =
-    (user["role"] ?? "")
-        .toString();
-
-    final role =
-    _normalizeRole(rawRole);
+    final shownName = displayName.isNotEmpty ? displayName : email;
+    final rawRole = (user["role"] ?? "").toString();
+    final role = _normalizeRole(rawRole);
 
     return Card(
-      margin:
-      const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 6,
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       elevation: 0,
       color: theme.cardTheme.color,
-      shape:
-      RoundedRectangleBorder(
-        borderRadius:
-        BorderRadius.circular(12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: theme.dividerColor),
       ),
-      child: ListTile(
-        contentPadding:
-        const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 8,
-        ),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 650;
 
-        // ------------------------------------------------------
-        // AVATAR
-        // ------------------------------------------------------
-
-        leading: CircleAvatar(
-          radius: 23,
-          backgroundColor:
-          theme.colorScheme.primary.withValues(alpha: 0.1),
-          child: Text(
-            shownName.isNotEmpty
-                ? shownName[0]
-                .toUpperCase()
-                : "?",
-            style:
-            TextStyle(
-              color: theme.colorScheme.primary,
-              fontWeight:
-              FontWeight.bold,
-            ),
-          ),
-        ),
-
-        // ------------------------------------------------------
-        // NAME + EMAIL
-        // ------------------------------------------------------
-
-        title: Text(
-          shownName,
-          style:
-          const TextStyle(
-            fontWeight:
-            FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-
-        subtitle:
-        displayName.isNotEmpty
-            ? Text(email, style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))
-            : null,
-
-        // ------------------------------------------------------
-        // ACTIONS
-        // ------------------------------------------------------
-
-        trailing: Row(
-          mainAxisSize:
-          MainAxisSize.min,
+        final infoPart = Row(
           children: [
-            // --------------------------------------------------
-            // ROLE
-            // --------------------------------------------------
+            CircleAvatar(
+              radius: 23,
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+              child: Text(
+                shownName.isNotEmpty ? shownName[0].toUpperCase() : "?",
+                style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    shownName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  if (displayName.isNotEmpty)
+                    Text(
+                      email,
+                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
 
+        final actionsPart = Row(
+          mainAxisSize: isCompact ? MainAxisSize.max : MainAxisSize.min,
+          mainAxisAlignment: isCompact ? MainAxisAlignment.end : MainAxisAlignment.start,
+          children: [
             DropdownButton<String>(
               dropdownColor: theme.cardTheme.color,
               underline: const SizedBox(),
               style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
-              value: _roles().any(
-                    (item) =>
-                item.value ==
-                    role,
-              )
-                  ? role
-                  : onboardingAgentRole,
+              value: _roles().any((item) => item.value == role) ? role : onboardingAgentRole,
               items: _roles(),
-              onChanged:
-                  (value) {
-                if (value != null) {
-                  _updateRole(
-                    user["uid"],
-                    value,
-                  );
-                }
+              onChanged: (value) {
+                if (value != null) _updateRole(user["uid"], value);
               },
             ),
-
-            const SizedBox(
-              width: 8,
-            ),
-
-            // --------------------------------------------------
-            // EDIT
-            // --------------------------------------------------
-
+            const SizedBox(width: 8),
             IconButton(
-              tooltip:
-              "Edit User",
-              icon: const Icon(
-                Icons.edit,
-              ),
-              onPressed: () {
-                _showEditDialog(
-                  user,
-                );
-              },
+              tooltip: "Edit User",
+              icon: const Icon(Icons.edit, size: 20),
+              onPressed: () => _showEditDialog(user),
             ),
-
-            // --------------------------------------------------
-            // DELETE
-            // --------------------------------------------------
-
             IconButton(
-              tooltip:
-              "Delete User",
-              icon: const Icon(
-                Icons.delete,
-                color: Colors.red,
-              ),
-              onPressed: () {
-                _confirmDelete(
-                  user,
-                );
-              },
+              tooltip: "Delete User",
+              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+              onPressed: () => _confirmDelete(user),
             ),
           ],
-        ),
-      ),
+        );
+
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: isCompact
+              ? Column(
+                  children: [
+                    infoPart,
+                    const Divider(height: 24),
+                    actionsPart,
+                  ],
+                )
+              : Row(children: [Expanded(child: infoPart), const SizedBox(width: 20), actionsPart]),
+        );
+      }),
     );
   }
 }

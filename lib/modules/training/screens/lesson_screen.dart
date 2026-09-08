@@ -418,20 +418,18 @@ class _LessonScreenState extends State<LessonScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(30),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ==================================================
-            // VIDEO
-            // ==================================================
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ==================================================
+                // VIDEO
+                // ==================================================
 
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 1100,
-                ),
-                child: Container(
+                Container(
                   decoration: BoxDecoration(
                     color: theme.cardTheme.color,
                     borderRadius: BorderRadius.circular(16),
@@ -444,127 +442,118 @@ class _LessonScreenState extends State<LessonScreen> {
                     ),
                   ),
                 ),
-              ),
-            ),
 
-            const SizedBox(
-              height: 20,
-            ),
+                const SizedBox(height: 20),
 
-            // ==================================================
-            // LESSON DESCRIPTION
-            // ==================================================
+                // ==================================================
+                // LESSON DESCRIPTION
+                // ==================================================
 
-            _buildDescriptionCard(context),
+                _buildDescriptionCard(context),
 
-            const SizedBox(
-              height: 20,
-            ),
+                const SizedBox(height: 20),
 
-            // ==================================================
-            // COMPLETION
-            // ==================================================
+                // ==================================================
+                // COMPLETION & PROGRESS (Responsive Layout)
+                // ==================================================
 
-            _buildCard(
-              context,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Lesson Completion",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
+                LayoutBuilder(builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 700;
 
-                  const SizedBox(
-                    height: 15,
-                  ),
-
-                  if (loadingProgress)
-                    CircularProgressIndicator(color: theme.colorScheme.primary)
-                  else
-                    SizedBox(
-                      height: 46,
-                      child: ElevatedButton.icon(
-                        onPressed: processingAction
-                            ? null
-                            : buttonAction,
-                        icon: processingAction
-                            ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                  final completionCard = _buildCard(
+                    context,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Lesson Completion",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
                           ),
-                        )
-                            : Icon(
-                          buttonIcon,
                         ),
-                        label: Text(
-                          processingAction
-                              ? "Updating..."
-                              : buttonText,
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                          theme.colorScheme.primary,
-                          foregroundColor: theme.colorScheme.onPrimary,
-                        ),
-                      ),
+                        const SizedBox(height: 15),
+                        if (loadingProgress)
+                          CircularProgressIndicator(color: theme.colorScheme.primary)
+                        else
+                          SizedBox(
+                            width: isCompact ? double.infinity : null,
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              onPressed: processingAction ? null : buttonAction,
+                              icon: processingAction
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Icon(buttonIcon),
+                              label: Text(processingAction ? "Updating..." : buttonText),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.colorScheme.primary,
+                                foregroundColor: theme.colorScheme.onPrimary,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                ],
-              ),
-            ),
+                  );
 
-            const SizedBox(
-              height: 20,
-            ),
-
-            // ==================================================
-            // PROGRESS
-            // ==================================================
-
-            _buildCard(
-              context,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Lesson Progress",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
+                  final progressCard = _buildCard(
+                    context,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Lesson Progress",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        LinearProgressIndicator(
+                          value: lessonProgress,
+                          minHeight: 8,
+                          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          progressText,
+                          style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                        ),
+                      ],
                     ),
-                  ),
+                  );
 
-                  const SizedBox(
-                    height: 15,
-                  ),
+                  if (isCompact) {
+                    return Column(
+                      children: [
+                        completionCard,
+                        const SizedBox(height: 20),
+                        progressCard,
+                      ],
+                    );
+                  }
 
-                  LinearProgressIndicator(
-                    value: lessonProgress,
-                    minHeight: 8,
-                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    color: theme.colorScheme.primary,
-                  ),
-
-                  const SizedBox(
-                    height: 10,
-                  ),
-
-                  Text(
-                    progressText,
-                    style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
-                  ),
-                ],
-              ),
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: completionCard),
+                      const SizedBox(width: 20),
+                      Expanded(child: progressCard),
+                    ],
+                  );
+                }),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

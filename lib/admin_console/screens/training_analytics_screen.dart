@@ -555,34 +555,34 @@ class _TrainingAnalyticsScreenState
       // DATA
       // ==============================================
 
-          : RefreshIndicator(
-        onRefresh:
-        _refreshAnalytics,
+          : LayoutBuilder(builder: (context, constraints) {
+              int columns;
+              if (constraints.maxWidth >= 1100) {
+                columns = 3;
+              } else if (constraints.maxWidth >= 700) {
+                columns = 2;
+              } else {
+                columns = 1;
+              }
 
-        child:
-        ListView.builder(
-          physics:
-          const AlwaysScrollableScrollPhysics(),
-
-          padding:
-          const EdgeInsets.all(
-            20,
-          ),
-
-          itemCount:
-          agents.length,
-
-          itemBuilder:
-              (
-              context,
-              index,
-              ) {
-            return _analyticsCard(
-              agents[index],
-            );
-          },
-        ),
-      ),
+              return RefreshIndicator(
+                onRefresh: _refreshAnalytics,
+                child: GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(24),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 20,
+                    mainAxisSpacing: 20,
+                    mainAxisExtent: 310,
+                  ),
+                  itemCount: agents.length,
+                  itemBuilder: (context, index) {
+                    return _analyticsCard(agents[index]);
+                  },
+                ),
+              );
+            }),
     );
   }
 }

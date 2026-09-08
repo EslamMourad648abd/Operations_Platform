@@ -458,179 +458,86 @@ class _TrainingCoursesScreenState
       ) {
     final theme = Theme.of(context);
 
-    return Row(
-      crossAxisAlignment:
-      CrossAxisAlignment.center,
+    return LayoutBuilder(builder: (context, constraints) {
+      final isCompact = constraints.maxWidth < 650;
 
-      children: [
+      final headerContent = [
         Expanded(
-          child:
-          Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-
+          flex: isCompact ? 0 : 1,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Courses',
-
-                style:
-                TextStyle(
-                  fontSize:
-                  30,
-
-                  fontWeight:
-                  FontWeight.w700,
-
-                  color:
-                  theme.colorScheme.onSurface,
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
-
-              const SizedBox(
-                height: 6,
-              ),
-
+              const SizedBox(height: 6),
               Text(
                 'Explore your available training courses and continue learning.',
-
-                style:
-                TextStyle(
-                  fontSize:
-                  15,
-
-                  color:
-                  theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
-
-              const SizedBox(
-                height: 14,
-              ),
-
+              const SizedBox(height: 14),
               Container(
-                padding:
-                const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 6,
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-
-                decoration:
-                BoxDecoration(
-                  color:
-                  theme.colorScheme.primary.withValues(
-                    alpha: 0.07,
-                  ),
-
-                  borderRadius:
-                  BorderRadius.circular(
-                    8,
-                  ),
-                ),
-
-                child:
-                Text(
+                child: Text(
                   '$courseCount ${courseCount == 1 ? 'Course' : 'Courses'} Available',
-
-                  style:
-                  TextStyle(
-                    fontSize:
-                    12,
-
-                    fontWeight:
-                    FontWeight.w600,
-
-                    color:
-                    theme.colorScheme.primary,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
               ),
             ],
           ),
         ),
-
-        const SizedBox(
-          width: 20,
-        ),
-
-        // ========================================================
-        // REFRESH
-        // ========================================================
-
+        if (isCompact) const SizedBox(height: 20) else const SizedBox(width: 20),
         Material(
-          color:
-          theme.cardTheme.color ?? theme.colorScheme.surface,
-
-          borderRadius:
-          BorderRadius.circular(
-            10,
-          ),
-          
-          child:
-          InkWell(
-            borderRadius:
-            BorderRadius.circular(
-              10,
-            ),
-
-            onTap:
-            _refreshing
-                ? null
-                : _refreshCourses,
-
-            child:
-            Container(
+          color: theme.cardTheme.color ?? theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: _refreshing ? null : _refreshCourses,
+            child: Container(
               decoration: BoxDecoration(
                 border: Border.all(color: theme.dividerColor),
                 borderRadius: BorderRadius.circular(10),
               ),
-              padding:
-              const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 10,
-              ),
-
-              child:
-              Row(
-                mainAxisSize:
-                MainAxisSize.min,
-
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   SizedBox(
                     width: 18,
                     height: 18,
-
-                    child:
-                    _refreshing
+                    child: _refreshing
                         ? CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color:
-                      theme.colorScheme.primary,
-                    )
+                            strokeWidth: 2,
+                            color: theme.colorScheme.primary,
+                          )
                         : Icon(
-                      Icons
-                          .refresh_rounded,
-                      size: 19,
-                      color:
-                      theme.colorScheme.primary,
-                    ),
+                            Icons.refresh_rounded,
+                            size: 19,
+                            color: theme.colorScheme.primary,
+                          ),
                   ),
-
-                  const SizedBox(
-                    width: 8,
-                  ),
-
-                  Text(
+                  const SizedBox(width: 8),
+                  const Text(
                     'Refresh',
-
-                    style:
-                    TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-
-                      fontWeight:
-                      FontWeight.w600,
-
-                      color:
-                      theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -638,8 +545,18 @@ class _TrainingCoursesScreenState
             ),
           ),
         ),
-      ],
-    );
+      ];
+
+      return isCompact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: headerContent,
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: headerContent,
+            );
+    });
   }
 
   // ============================================================

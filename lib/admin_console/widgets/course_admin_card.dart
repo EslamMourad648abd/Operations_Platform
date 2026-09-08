@@ -34,34 +34,49 @@ class CourseAdminCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             /// Title + Actions
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    course.title,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                    ),
+            LayoutBuilder(builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 450;
+
+              final titlePart = Expanded(
+                flex: isCompact ? 0 : 1,
+                child: Text(
+                  course.title,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.edit,
-                    color: Colors.blue,
+              );
+
+              final actionsPart = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: onEdit,
+                    tooltip: 'Edit Course',
                   ),
-                  onPressed: onEdit,
-                ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.delete,
-                    color: Colors.red,
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: onDelete,
+                    tooltip: 'Delete Course',
                   ),
-                  onPressed: onDelete,
-                ),
-              ],
-            ),
+                ],
+              );
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [titlePart]),
+                    actionsPart,
+                  ],
+                );
+              }
+
+              return Row(children: [titlePart, actionsPart]);
+            }),
 
             const SizedBox(height: 12),
 

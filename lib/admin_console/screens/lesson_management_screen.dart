@@ -409,226 +409,96 @@ class _LessonManagementScreenState
 
 
           return Card(
-
-
-            margin:
-            const EdgeInsets.only(
-              bottom: 16,
-            ),
-
-
+            margin: const EdgeInsets.only(bottom: 16),
             elevation: 0,
             color: theme.cardTheme.color,
-
-            shape:
-
-            RoundedRectangleBorder(
-
-              borderRadius:
-              BorderRadius.circular(
-                14,
-              ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
               side: BorderSide(color: theme.dividerColor),
             ),
+            child: LayoutBuilder(builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 650;
 
-
-
-            child: ListTile(
-
-
-              leading:
-
-              CircleAvatar(
-                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                child:
-
-                Text(
-
-                  lesson.order.toString(),
-                  style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
-                ),
-
-              ),
-
-
-
-              title:
-
-              Text(
-
-                lesson.title,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-
-
-
-              subtitle:
-
-              Column(
-
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-
-
+              final infoPart = Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
-
-                  const SizedBox(
-                    height: 6,
+                  CircleAvatar(
+                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    child: Text(
+                      lesson.order.toString(),
+                      style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                    ),
                   ),
-
-
-
-                  Text(
-                    lesson.description,
-                    style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          lesson.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          lesson.description,
+                          style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 16,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              "Duration: ${_formatDuration(lesson.duration)}",
+                              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                            ),
+                            Text(
+                              lesson.quizEnabled ? "Quiz Enabled" : "Quiz Disabled",
+                              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-
-
-
-                  const SizedBox(
-                    height: 8,
-                  ),
-
-
-
-                  Text(
-
-                    "Duration: ${_formatDuration(lesson.duration)}",
-                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-                  ),
-
-
-
-                  Text(
-
-                    lesson.quizEnabled
-
-                        ?
-
-                    "Quiz Enabled"
-
-                        :
-
-                    "Quiz Disabled",
-                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-                  ),
-
-
                 ],
+              );
 
-              ),
-
-
-
-
-
-              trailing:
-
-              Row(
-
-                mainAxisSize:
-                MainAxisSize.min,
-
-
+              final actionsPart = Row(
+                mainAxisSize: isCompact ? MainAxisSize.max : MainAxisSize.min,
+                mainAxisAlignment: isCompact ? MainAxisAlignment.end : MainAxisAlignment.start,
                 children: [
-
-
-
                   if (lesson.quizEnabled)
-
                     IconButton(
-
-                      icon:
-
-                      const Icon(
-
-                        Icons.quiz,
-
-                        color:
-                        Colors.green,
-
-                      ),
-
-
-                      tooltip:
-                      "Manage Quiz",
-
-
-                      onPressed:
-
-                          () =>
-                          _manageQuiz(
-                            lesson,
-                          ),
-
+                      icon: const Icon(Icons.quiz, color: Colors.green),
+                      tooltip: "Manage Quiz",
+                      onPressed: () => _manageQuiz(lesson),
                     ),
-
-
-
-
-
                   IconButton(
-
-                    icon:
-
-                    const Icon(
-
-                      Icons.edit,
-
-                      color:
-                      Colors.blue,
-
-                    ),
-
-
-
-                    onPressed:
-
-                        () =>
-                        _showEditDialog(
-                          lesson,
-                        ),
-
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: () => _showEditDialog(lesson),
                   ),
-
-
-
-
-
                   IconButton(
-
-                    icon:
-
-                    const Icon(
-
-                      Icons.delete,
-
-                      color:
-                      Colors.red,
-
-                    ),
-
-
-
-                    onPressed:
-
-                        () =>
-                        _deleteLesson(
-                          lesson,
-                        ),
-
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deleteLesson(lesson),
                   ),
-
-
                 ],
+              );
 
-              ),
-
-
-            ),
-
-
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: isCompact
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          infoPart,
+                          const Divider(height: 24),
+                          actionsPart,
+                        ],
+                      )
+                    : Row(children: [Expanded(child: infoPart), const SizedBox(width: 20), actionsPart]),
+              );
+            }),
           );
 
 

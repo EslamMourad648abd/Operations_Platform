@@ -239,134 +239,92 @@ class _PlatformAdminConsoleState
     // ADMIN CONSOLE
     // ==========================================================
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+    return LayoutBuilder(builder: (context, constraints) {
+      final isMobile = constraints.maxWidth < 800;
 
-      body: Row(
-        children: [
-          // ====================================================
-          // ADMIN NAVIGATION
-          // ====================================================
-
-          NavigationRail(
+      if (isMobile) {
+        return Scaffold(
+          backgroundColor: theme.colorScheme.surface,
+          appBar: AppBar(
             backgroundColor: theme.colorScheme.surface,
-            indicatorColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-            unselectedIconTheme: IconThemeData(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
-            selectedIconTheme: IconThemeData(color: theme.colorScheme.primary),
-            unselectedLabelTextStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 11),
-            selectedLabelTextStyle: TextStyle(color: theme.colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
-            selectedIndex:
-            selectedIndex,
-
-            labelType:
-            NavigationRailLabelType.all,
-
-            leading: Column(
-              children: [
-                const SizedBox(height: 16),
-                ValueListenableBuilder<ThemeMode>(
-                  valueListenable: ThemeService.themeNotifier,
-                  builder: (context, mode, _) {
-                    final isDarkNow = mode == ThemeMode.dark;
-                    return IconButton(
-                      onPressed: ThemeService.toggleTheme,
-                      icon: Icon(
-                        isDarkNow ? Icons.light_mode : Icons.dark_mode,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                      tooltip: isDarkNow ? 'Light Mode' : 'Dark Mode',
-                    );
-                  },
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-
-            onDestinationSelected:
-                (index) {
-              _navigateToSection(
-                context,
-                index,
-              );
-            },
-
-            destinations: const [
-              // =================================================
-              // USERS
-              // =================================================
-
-              NavigationRailDestination(
-                icon: Icon(
-                  Icons.people_outlined,
-                ),
-
-                selectedIcon: Icon(
-                  Icons.people,
-                ),
-
-                label: Text(
-                  'Users',
-                ),
-              ),
-
-              // =================================================
-              // TRAINING
-              // =================================================
-
-              NavigationRailDestination(
-                icon: Icon(
-                  Icons.school_outlined,
-                ),
-
-                selectedIcon: Icon(
-                  Icons.school,
-                ),
-
-                label: Text(
-                  'Training',
-                ),
-              ),
-
-              // =================================================
-              // TRAINING ANALYTICS
-              // =================================================
-
-              NavigationRailDestination(
-                icon: Icon(
-                  Icons.analytics_outlined,
-                ),
-
-                selectedIcon: Icon(
-                  Icons.analytics,
-                ),
-
-                label: Text(
-                  'Training Analytics',
-                ),
+            elevation: 0,
+            title: const Text('Admin Console', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            centerTitle: true,
+            actions: [
+              ValueListenableBuilder<ThemeMode>(
+                valueListenable: ThemeService.themeNotifier,
+                builder: (context, mode, _) {
+                  final isDarkNow = mode == ThemeMode.dark;
+                  return IconButton(
+                    onPressed: ThemeService.toggleTheme,
+                    icon: Icon(isDarkNow ? Icons.light_mode : Icons.dark_mode),
+                  );
+                },
               ),
             ],
+            shape: Border(bottom: BorderSide(color: theme.dividerColor)),
           ),
-
-          // ====================================================
-          // DIVIDER
-          // ====================================================
-
-          const VerticalDivider(
-            width: 1,
+          body: _buildCurrentPage(context),
+          bottomNavigationBar: NavigationBar(
+            backgroundColor: theme.colorScheme.surface,
+            selectedIndex: selectedIndex,
+            onDestinationSelected: (index) => _navigateToSection(context, index),
+            destinations: const [
+              NavigationDestination(icon: Icon(Icons.people_outlined), selectedIcon: Icon(Icons.people), label: 'Users'),
+              NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'Training'),
+              NavigationDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics), label: 'Analytics'),
+            ],
           ),
+        );
+      }
 
-          // ====================================================
-          // CONTENT
-          // ====================================================
-
-          Expanded(
-            child:
-            _buildCurrentPage(
-              context,
+      return Scaffold(
+        backgroundColor: theme.colorScheme.surface,
+        body: Row(
+          children: [
+            NavigationRail(
+              backgroundColor: theme.colorScheme.surface,
+              indicatorColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+              unselectedIconTheme: IconThemeData(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+              selectedIconTheme: IconThemeData(color: theme.colorScheme.primary),
+              unselectedLabelTextStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 11),
+              selectedLabelTextStyle: TextStyle(color: theme.colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
+              selectedIndex: selectedIndex,
+              labelType: NavigationRailLabelType.all,
+              leading: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  ValueListenableBuilder<ThemeMode>(
+                    valueListenable: ThemeService.themeNotifier,
+                    builder: (context, mode, _) {
+                      final isDarkNow = mode == ThemeMode.dark;
+                      return IconButton(
+                        onPressed: ThemeService.toggleTheme,
+                        icon: Icon(
+                          isDarkNow ? Icons.light_mode : Icons.dark_mode,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                        tooltip: isDarkNow ? 'Light Mode' : 'Dark Mode',
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+              onDestinationSelected: (index) {
+                _navigateToSection(context, index);
+              },
+              destinations: const [
+                NavigationRailDestination(icon: Icon(Icons.people_outlined), selectedIcon: Icon(Icons.people), label: Text('Users')),
+                NavigationRailDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: Text('Training')),
+                NavigationRailDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics), label: Text('Analytics')),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+            const VerticalDivider(width: 1),
+            Expanded(child: _buildCurrentPage(context)),
+          ],
+        ),
+      );
+    });
   }
 }

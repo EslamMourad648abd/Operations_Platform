@@ -25,11 +25,24 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
   String? _locallyCreatedTaskId;
   DateTime? _locallyCreatedAt;
 
+  // Keep one stable stream for the lifetime of this screen.
+  // Creating watchMyTasks() inside build() can recreate the StreamBuilder
+  // subscription whenever this State rebuilds, which can briefly put the
+  // StreamBuilder back into a loading state and cause the visible blink.
+  late final Stream<List<OnboardingTaskModel>> _tasksStream;
+
+  // Keep the last successful snapshot so the existing UI remains visible
+  // during any transient stream reconnect instead of being replaced by a
+  // loading spinner.
+  List<OnboardingTaskModel> _lastTasks = const [];
+  bool _hasReceivedTasks = false;
+
   @override
   void initState() {
     super.initState();
     _startDate = _dateOnly(DateTime.now());
     _endDate = _startDate;
+    _tasksStream = _repository.watchMyTasks();
   }
 
   @override
@@ -40,16 +53,29 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: StreamBuilder<List<OnboardingTaskModel>>(
-        stream: _repository.watchMyTasks(),
+        stream: _tasksStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.hasData) {
+            _lastTasks = snapshot.data!;
+            _hasReceivedTasks = true;
+          }
+
+          // Only show the initial loader. Once we have rendered task data,
+          // never replace the existing page with a spinner during a transient
+          // stream state/reconnect. This keeps create/finish actions smooth.
+          if (!_hasReceivedTasks &&
+              snapshot.connectionState == ConnectionState.waiting) {
             return Center(
               child: CircularProgressIndicator(
                 color: theme.colorScheme.primary,
               ),
             );
           }
-          if (snapshot.hasError) {
+
+          // If the stream temporarily reports an error after data has already
+          // been shown, keep the last rendered data on screen instead of
+          // flashing an error page. The listener can recover normally.
+          if (snapshot.hasError && !_hasReceivedTasks) {
             return _MessageState(
               icon: Icons.error_outline,
               title: l10n?.translate('error') ?? 'Error',
@@ -58,18 +84,18 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
             );
           }
 
-          final tasks = snapshot.data ?? [];
+          final tasks = snapshot.data ?? _lastTasks;
           final activeTasks = tasks.where((t) => t.isActive).toList();
           final visibleTasks =
-              _showAll
-                  ? tasks.where((t) => !t.isActive).toList()
-                  : tasks.where((t) {
-                    if (t.isActive) return false;
-                    final d = _dateOnly(t.createdAt ?? DateTime.now());
-                    return _rangeMode
-                        ? (!d.isBefore(_startDate) && !d.isAfter(_endDate))
-                        : _isSameDay(d, _startDate);
-                  }).toList();
+          _showAll
+              ? tasks.where((t) => !t.isActive).toList()
+              : tasks.where((t) {
+            if (t.isActive) return false;
+            final d = _dateOnly(t.createdAt ?? DateTime.now());
+            return _rangeMode
+                ? (!d.isBefore(_startDate) && !d.isAfter(_endDate))
+                : _isSameDay(d, _startDate);
+          }).toList();
 
           final now = DateTime.now();
           final totalToday =
@@ -78,8 +104,8 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
               tasks
                   .where(
                     (t) =>
-                        t.status == 'Finished' && _isSameDay(t.finishedAt, now),
-                  )
+                t.status == 'Finished' && _isSameDay(t.finishedAt, now),
+              )
                   .length;
 
           return SingleChildScrollView(
@@ -108,15 +134,15 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                       ),
                       const SizedBox(height: 12),
                       ...activeTasks.map(
-                        (t) => Padding(
+                            (t) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _ActiveTaskCard(
                             key: ValueKey(t.id),
                             task: t,
                             displayStartAt:
-                                t.id == _locallyCreatedTaskId
-                                    ? _locallyCreatedAt
-                                    : null,
+                            t.id == _locallyCreatedTaskId
+                                ? _locallyCreatedAt
+                                : null,
                             onFinish: () => _finishTask(t.id),
                           ),
                         ),
@@ -137,10 +163,10 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
   }
 
   Widget _buildHistoryContent(
-    List<OnboardingTaskModel> tasks,
-    AppLocalizations? l10n,
-    ThemeData theme,
-  ) {
+      List<OnboardingTaskModel> tasks,
+      AppLocalizations? l10n,
+      ThemeData theme,
+      ) {
     if (tasks.isEmpty) return _EmptyTasks(showAll: _showAll);
     final grouped = <DateTime, List<OnboardingTaskModel>>{};
     for (final t in tasks) {
@@ -151,28 +177,28 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
 
     return Column(
       children:
-          sortedDates.map((d) {
-            final dayTasks =
-                grouped[d]!..sort(
-                  (a, b) => (b.createdAt ?? DateTime(0)).compareTo(
-                    a.createdAt ?? DateTime(0),
-                  ),
-                );
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildDateHeader(d, l10n, theme),
-                const SizedBox(height: 12),
-                ...dayTasks.map(
+      sortedDates.map((d) {
+        final dayTasks =
+        grouped[d]!..sort(
+              (a, b) => (b.createdAt ?? DateTime(0)).compareTo(
+            a.createdAt ?? DateTime(0),
+          ),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDateHeader(d, l10n, theme),
+            const SizedBox(height: 12),
+            ...dayTasks.map(
                   (t) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _TaskCard(task: t),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            );
-          }).toList(),
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _TaskCard(task: t),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        );
+      }).toList(),
     );
   }
 
@@ -291,9 +317,9 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                     selected: {_rangeMode},
                     onSelectionChanged:
                         (s) => setState(() {
-                          _rangeMode = s.first;
-                          if (!_rangeMode) _endDate = _startDate;
-                        }),
+                      _rangeMode = s.first;
+                      if (!_rangeMode) _endDate = _startDate;
+                    }),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -543,19 +569,19 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
                       labelText: l?.translate('task_type') ?? 'Type',
                     ),
                     items:
-                        kTaskTypes
-                            .map(
-                              (t) => DropdownMenuItem(
-                                value: t,
-                                child: Text(
-                                  l?.translate(
-                                        t.toLowerCase().replaceAll(' ', '_'),
-                                      ) ??
-                                      t,
-                                ),
-                              ),
-                            )
-                            .toList(),
+                    kTaskTypes
+                        .map(
+                          (t) => DropdownMenuItem(
+                        value: t,
+                        child: Text(
+                          l?.translate(
+                            t.toLowerCase().replaceAll(' ', '_'),
+                          ) ??
+                              t,
+                        ),
+                      ),
+                    )
+                        .toList(),
                     onChanged: (v) {
                       if (v != null)
                         setState(() {
@@ -579,43 +605,43 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
                     Autocomplete<ClientModel>(
                       displayStringForOption:
                           (cl) =>
-                              cl.companyName.isEmpty
-                                  ? cl.accNumber
-                                  : '${cl.companyName} — ${cl.accNumber}',
+                      cl.companyName.isEmpty
+                          ? cl.accNumber
+                          : '${cl.companyName} — ${cl.accNumber}',
                       optionsBuilder: (textEditingValue) {
                         if (textEditingValue.text.isEmpty)
                           return const Iterable<ClientModel>.empty();
                         return cls.where(
-                          (cl) =>
-                              cl.companyName.toLowerCase().contains(
-                                textEditingValue.text.toLowerCase(),
-                              ) ||
+                              (cl) =>
+                          cl.companyName.toLowerCase().contains(
+                            textEditingValue.text.toLowerCase(),
+                          ) ||
                               cl.accNumber.contains(textEditingValue.text),
                         );
                       },
                       onSelected: (cl) => setState(() => _cid = cl.id),
                       fieldViewBuilder: (
-                        context,
-                        controller,
-                        focusNode,
-                        onFieldSubmitted,
-                      ) {
+                          context,
+                          controller,
+                          focusNode,
+                          onFieldSubmitted,
+                          ) {
                         return TextFormField(
                           controller: controller,
                           focusNode: focusNode,
                           decoration: InputDecoration(
                             labelText: l?.translate('client') ?? 'Client',
                             hintText:
-                                l?.translate('select_client') ??
+                            l?.translate('select_client') ??
                                 'Search by name or ACC...',
                             suffixIcon: const Icon(Icons.search, size: 20),
                           ),
                           validator:
                               (v) =>
-                                  _needsClient && _cid == null
-                                      ? (l?.translate('client_required') ??
-                                          'Required')
-                                      : null,
+                          _needsClient && _cid == null
+                              ? (l?.translate('client_required') ??
+                              'Required')
+                              : null,
                         );
                       },
                     )
@@ -626,19 +652,19 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
                         labelText: l?.translate('department'),
                       ),
                       items:
-                          kInternalDepartments
-                              .map(
-                                (d) => DropdownMenuItem(
-                                  value: d,
-                                  child: Text(
-                                    l?.translate(
-                                          d.toLowerCase().replaceAll(' ', '_'),
-                                        ) ??
-                                        d,
-                                  ),
-                                ),
-                              )
-                              .toList(),
+                      kInternalDepartments
+                          .map(
+                            (d) => DropdownMenuItem(
+                          value: d,
+                          child: Text(
+                            l?.translate(
+                              d.toLowerCase().replaceAll(' ', '_'),
+                            ) ??
+                                d,
+                          ),
+                        ),
+                      )
+                          .toList(),
                       onChanged: (v) => setState(() => _dep = v),
                     ),
                 ],
@@ -719,29 +745,29 @@ class _SummaryRow extends StatelessWidget {
         if (isCompact) {
           return Column(
             children:
-                items
-                    .map(
-                      (i) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: i,
-                      ),
-                    )
-                    .toList(),
+            items
+                .map(
+                  (i) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: i,
+              ),
+            )
+                .toList(),
           );
         }
 
         return Row(
           children:
-              items
-                  .map(
-                    (i) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: i,
-                      ),
-                    ),
-                  )
-                  .toList(),
+          items
+              .map(
+                (i) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: i,
+              ),
+            ),
+          )
+              .toList(),
         );
       },
     );
@@ -847,9 +873,9 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
     // reports continue to use the task's server timestamp.
     final displayStart = widget.displayStartAt ?? widget.task.startedAt;
     final elapsed =
-        displayStart == null
-            ? Duration.zero
-            : DateTime.now().difference(displayStart);
+    displayStart == null
+        ? Duration.zero
+        : DateTime.now().difference(displayStart);
     final safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;
     return Card(
       shape: RoundedRectangleBorder(
@@ -902,11 +928,11 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                                 const SizedBox(width: 8),
                                 _TypeChip(
                                   label:
-                                      l?.translate(
-                                        widget.task.taskType
-                                            .toLowerCase()
-                                            .replaceAll(' ', '_'),
-                                      ) ??
+                                  l?.translate(
+                                    widget.task.taskType
+                                        .toLowerCase()
+                                        .replaceAll(' ', '_'),
+                                  ) ??
                                       widget.task.taskType,
                                 ),
                               ],
@@ -991,12 +1017,12 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                           const SizedBox(width: 8),
                           _TypeChip(
                             label:
-                                l?.translate(
-                                  widget.task.taskType.toLowerCase().replaceAll(
-                                    ' ',
-                                    '_',
-                                  ),
-                                ) ??
+                            l?.translate(
+                              widget.task.taskType.toLowerCase().replaceAll(
+                                ' ',
+                                '_',
+                              ),
+                            ) ??
                                 widget.task.taskType,
                           ),
                         ],
@@ -1084,7 +1110,7 @@ class _TaskCard extends StatelessWidget {
                             ? Icons.check_circle
                             : Icons.radio_button_checked,
                         color:
-                            finished ? Colors.green : theme.colorScheme.primary,
+                        finished ? Colors.green : theme.colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -1105,9 +1131,9 @@ class _TaskCard extends StatelessWidget {
                       const SizedBox(width: 32),
                       _TypeChip(
                         label:
-                            l?.translate(
-                              task.taskType.toLowerCase().replaceAll(' ', '_'),
-                            ) ??
+                        l?.translate(
+                          task.taskType.toLowerCase().replaceAll(' ', '_'),
+                        ) ??
                             task.taskType,
                       ),
                       const Spacer(),
@@ -1169,9 +1195,9 @@ class _TaskCard extends StatelessWidget {
                 ),
                 _TypeChip(
                   label:
-                      l?.translate(
-                        task.taskType.toLowerCase().replaceAll(' ', '_'),
-                      ) ??
+                  l?.translate(
+                    task.taskType.toLowerCase().replaceAll(' ', '_'),
+                  ) ??
                       task.taskType,
                 ),
                 const SizedBox(width: 14),
@@ -1298,7 +1324,7 @@ String _taskContext(OnboardingTaskModel task, BuildContext context) {
     return task.department.isEmpty
         ? (l?.translate('internal') ?? 'Internal')
         : (l?.translate(task.department.toLowerCase().replaceAll(' ', '_')) ??
-            task.department);
+        task.department);
   if (task.clientName.isNotEmpty && task.accNumber.isNotEmpty)
     return '${task.clientName} • ${task.accNumber}';
   if (task.accNumber.isNotEmpty) return task.accNumber;

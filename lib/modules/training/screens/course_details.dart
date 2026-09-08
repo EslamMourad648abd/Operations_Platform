@@ -533,32 +533,29 @@ class _CourseDetailsState
                 height: 30,
               ),
 
-            Row(
-              children: [
+            LayoutBuilder(builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 500;
+              final infoCards = [
                 _InfoCard(
-                  icon:
-                  Icons.menu_book,
+                  icon: Icons.menu_book,
                   title: "Lessons",
-                  value:
-                  lessons.length
-                      .toString(),
+                  value: lessons.length.toString(),
+                  isCompact: isCompact,
                 ),
-
-                const SizedBox(
-                  width: 12,
-                ),
-
+                if (!isCompact) const SizedBox(width: 12),
+                if (isCompact) const SizedBox(height: 12),
                 _InfoCard(
-                  icon:
-                  Icons.timer,
+                  icon: Icons.timer,
                   title: "Duration",
-                  value:
-                  _formatDuration(
-                    totalDuration,
-                  ),
+                  value: _formatDuration(totalDuration),
+                  isCompact: isCompact,
                 ),
-              ],
-            ),
+              ];
+
+              return isCompact
+                  ? Column(children: infoCards)
+                  : Row(children: infoCards);
+            }),
 
             const SizedBox(
               height: 35,
@@ -1242,16 +1239,17 @@ class _CertificateDialogState
 // INFO CARD
 // ============================================================
 
-class _InfoCard
-    extends StatelessWidget {
+class _InfoCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
+  final bool isCompact;
 
   const _InfoCard({
     required this.icon,
     required this.title,
     required this.value,
+    this.isCompact = false,
   });
 
   @override
@@ -1259,45 +1257,34 @@ class _InfoCard
       BuildContext context,
       ) {
     final theme = Theme.of(context);
-    return Expanded(
-      child: Container(
-        padding:
-        const EdgeInsets.all(16),
-        decoration:
-        BoxDecoration(
-          color: theme.cardTheme.color,
-          borderRadius:
-          BorderRadius.circular(16),
-          border: Border.all(color: theme.dividerColor),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: theme.colorScheme.primary),
-            const SizedBox(
-              height: 8,
+    return Container(
+      width: isCompact ? double.infinity : null,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: theme.colorScheme.primary),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
-            Text(
-              title,
-              style:
-              TextStyle(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
             ),
-            const SizedBox(
-              height: 6,
-            ),
-            Text(
-              value,
-              style:
-              TextStyle(
-                fontSize: 18,
-                fontWeight:
-                FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
