@@ -1387,7 +1387,13 @@ class OnboardingRepository {
     required String taskId,
     String task = '',
     required String taskType,
-  }) async {
+    String? clientId,
+    String? clientName,
+    String? accNumber,
+    String? department,
+    DateTime? startedAt,
+  }) async
+  {
     final user = _auth.currentUser;
 
     if (user == null) {
@@ -1417,7 +1423,8 @@ class OnboardingRepository {
 
     final data = snapshot.data() ?? <String, dynamic>{};
 
-    final assignedTo = data['assignedTo']?.toString().trim() ?? '';
+    final assignedTo =
+        data['assignedTo']?.toString().trim() ?? '';
 
     if (assignedTo != user.uid) {
       throw Exception(
@@ -1425,34 +1432,56 @@ class OnboardingRepository {
       );
     }
 
-    // Keep the existing client/department validation consistent with
-    // task creation. Only the description and type are editable here.
-    final clientId = data['clientId']?.toString().trim() ?? '';
-    final department = data['department']?.toString().trim() ?? '';
+    final cleanClientId = clientId?.trim() ?? '';
+    final cleanClientName = clientName?.trim() ?? '';
+    final cleanAccNumber = accNumber?.trim() ?? '';
+    final cleanDepartment = department?.trim() ?? '';
 
-    if (cleanTaskType != 'Internal' && clientId.isEmpty) {
+    if (cleanTaskType != 'Internal' &&
+        cleanClientId.isEmpty) {
       throw Exception(
         'A client is required for this task type.',
       );
     }
 
-    if (cleanTaskType == 'Internal' && department.isEmpty) {
+    if (cleanTaskType == 'Internal' &&
+        cleanDepartment.isEmpty) {
       throw Exception(
         'A department is required for an internal task.',
       );
     }
 
-    // IMPORTANT:
-    // Do not modify status, assignedTo, createdBy, createdAt,
-    // startedAt, or finishedAt. This keeps the calculated duration
-    // exactly as originally recorded.
+    final existingFinishedAt = _taskDateTime(
+      data['finishedAt'],
+    );
+
+    if (startedAt != null) {
+      if (startedAt.isAfter(DateTime.now())) {
+        throw Exception(
+          'Task start time cannot be in the future.',
+        );
+      }
+
+      if (existingFinishedAt != null &&
+          !startedAt.isBefore(existingFinishedAt)) {
+        throw Exception(
+          'Task start time must be before the finish time.',
+        );
+      }
+    }
+
     await document.update({
       'task': cleanTask,
       'taskType': cleanTaskType,
+      'clientId': cleanClientId,
+      'clientName': cleanClientName,
+      'accNumber': cleanAccNumber,
+      'department': cleanDepartment,
+      if (startedAt != null)
+        'startedAt': Timestamp.fromDate(startedAt),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
-
   // ============================================================
   // DELETE TASK FROM CALCULATED TASK TIME ONLY
   // ============================================================

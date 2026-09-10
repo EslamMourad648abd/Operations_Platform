@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../models/client_model.dart';
 import '../models/onboarding_tasks_model.dart';
 import '../repositories/onboarding_repository.dart';
@@ -14,34 +16,35 @@ class OnboardingTasks extends StatefulWidget {
 
 class _OnboardingTasksState extends State<OnboardingTasks> {
   final OnboardingRepository _repository = OnboardingRepository();
+
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
-  bool _rangeMode = false, _showAll = false;
+
+  bool _rangeMode = false;
+  bool _showAll = false;
 
   // UI-only anchor for a task created from this screen.
   // This prevents the elapsed timer from appearing with the Firestore
-  // write/listener latency already included (for example, 32 seconds).
+  // write/listener latency already included.
   // Reporting and persisted task duration remain unchanged.
   String? _locallyCreatedTaskId;
   DateTime? _locallyCreatedAt;
 
   // Keep one stable stream for the lifetime of this screen.
-  // Creating watchMyTasks() inside build() can recreate the StreamBuilder
-  // subscription whenever this State rebuilds, which can briefly put the
-  // StreamBuilder back into a loading state and cause the visible blink.
   late final Stream<List<OnboardingTaskModel>> _tasksStream;
 
   // Keep the last successful snapshot so the existing UI remains visible
-  // during any transient stream reconnect instead of being replaced by a
-  // loading spinner.
+  // during any transient stream reconnect.
   List<OnboardingTaskModel> _lastTasks = const [];
   bool _hasReceivedTasks = false;
 
   @override
   void initState() {
     super.initState();
+
     _startDate = _dateOnly(DateTime.now());
     _endDate = _startDate;
+
     _tasksStream = _repository.watchMyTasks();
   }
 
@@ -60,9 +63,6 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
             _hasReceivedTasks = true;
           }
 
-          // Only show the initial loader. Once we have rendered task data,
-          // never replace the existing page with a spinner during a transient
-          // stream state/reconnect. This keeps create/finish actions smooth.
           if (!_hasReceivedTasks &&
               snapshot.connectionState == ConnectionState.waiting) {
             return Center(
@@ -72,9 +72,6 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
             );
           }
 
-          // If the stream temporarily reports an error after data has already
-          // been shown, keep the last rendered data on screen instead of
-          // flashing an error page. The listener can recover normally.
           if (snapshot.hasError && !_hasReceivedTasks) {
             return _MessageState(
               icon: Icons.error_outline,
@@ -85,28 +82,35 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
           }
 
           final tasks = snapshot.data ?? _lastTasks;
+
           final activeTasks = tasks.where((t) => t.isActive).toList();
-          final visibleTasks =
-          _showAll
+
+          final visibleTasks = _showAll
               ? tasks.where((t) => !t.isActive).toList()
               : tasks.where((t) {
             if (t.isActive) return false;
+
             final d = _dateOnly(t.createdAt ?? DateTime.now());
+
             return _rangeMode
-                ? (!d.isBefore(_startDate) && !d.isAfter(_endDate))
+                ? (!d.isBefore(_startDate) &&
+                !d.isAfter(_endDate))
                 : _isSameDay(d, _startDate);
           }).toList();
 
           final now = DateTime.now();
-          final totalToday =
-              tasks.where((t) => _isSameDay(t.createdAt, now)).length;
-          final completedToday =
-              tasks
-                  .where(
-                    (t) =>
-                t.status == 'Finished' && _isSameDay(t.finishedAt, now),
-              )
-                  .length;
+
+          final totalToday = tasks
+              .where((t) => _isSameDay(t.createdAt, now))
+              .length;
+
+          final completedToday = tasks
+              .where(
+                (t) =>
+            t.status == 'Finished' &&
+                _isSameDay(t.finishedAt, now),
+          )
+              .length;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(28),
@@ -126,7 +130,8 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                     if (activeTasks.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       Text(
-                        l10n?.translate('active_tasks_label') ?? 'Active Tasks',
+                        l10n?.translate('active_tasks_label') ??
+                            'Active Tasks',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -153,7 +158,11 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                     const SizedBox(height: 20),
                     _buildTaskListHeader(l10n, theme),
                     const SizedBox(height: 12),
-                    _buildHistoryContent(visibleTasks, l10n, theme),
+                    _buildHistoryContent(
+                      visibleTasks,
+                      l10n,
+                      theme,
+                    ),
                   ],
                 ),
               ),
@@ -169,23 +178,29 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
       AppLocalizations? l10n,
       ThemeData theme,
       ) {
-    if (tasks.isEmpty) return _EmptyTasks(showAll: _showAll);
+    if (tasks.isEmpty) {
+      return _EmptyTasks(showAll: _showAll);
+    }
+
     final grouped = <DateTime, List<OnboardingTaskModel>>{};
+
     for (final t in tasks) {
       final d = _dateOnly(t.createdAt ?? DateTime.now());
       grouped.putIfAbsent(d, () => []).add(t);
     }
-    final sortedDates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    final sortedDates = grouped.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
 
     return Column(
-      children:
-      sortedDates.map((d) {
-        final dayTasks =
-        grouped[d]!..sort(
-              (a, b) => (b.createdAt ?? DateTime(0)).compareTo(
-            a.createdAt ?? DateTime(0),
-          ),
-        );
+      children: sortedDates.map((d) {
+        final dayTasks = grouped[d]!
+          ..sort(
+                (a, b) => (b.createdAt ?? DateTime(0)).compareTo(
+              a.createdAt ?? DateTime(0),
+            ),
+          );
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -208,11 +223,18 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
     );
   }
 
-  Widget _buildDateHeader(DateTime d, AppLocalizations? l10n, ThemeData theme) {
+  Widget _buildDateHeader(
+      DateTime d,
+      AppLocalizations? l10n,
+      ThemeData theme,
+      ) {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 6,
+          ),
           decoration: BoxDecoration(
             color: theme.colorScheme.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
@@ -227,12 +249,17 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
           ),
         ),
         const SizedBox(width: 12),
-        Expanded(child: Divider(color: theme.dividerColor)),
+        Expanded(
+          child: Divider(color: theme.dividerColor),
+        ),
       ],
     );
   }
 
-  Widget _buildHeader(AppLocalizations? l10n, ThemeData theme) {
+  Widget _buildHeader(
+      AppLocalizations? l10n,
+      ThemeData theme,
+      ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -253,7 +280,8 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                     'Track daily occupancy.',
                 style: TextStyle(
                   fontSize: 14,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: theme.colorScheme.onSurface
+                      .withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -262,7 +290,9 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
         ElevatedButton.icon(
           onPressed: _showCreateTaskDialog,
           icon: const Icon(Icons.add),
-          label: Text(l10n?.translate('new_task') ?? 'New Task'),
+          label: Text(
+            l10n?.translate('new_task') ?? 'New Task',
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.colorScheme.primary,
             foregroundColor: theme.colorScheme.onPrimary,
@@ -272,7 +302,10 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
     );
   }
 
-  Widget _buildTaskListHeader(AppLocalizations? l10n, ThemeData theme) {
+  Widget _buildTaskListHeader(
+      AppLocalizations? l10n,
+      ThemeData theme,
+      ) {
     return Column(
       children: [
         Row(
@@ -290,15 +323,21 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
               segments: [
                 ButtonSegment(
                   value: false,
-                  label: Text(l10n?.translate('filter_by_date') ?? 'Filter'),
+                  label: Text(
+                    l10n?.translate('filter_by_date') ?? 'Filter',
+                  ),
                 ),
                 ButtonSegment(
                   value: true,
-                  label: Text(l10n?.translate('all_history') ?? 'All'),
+                  label: Text(
+                    l10n?.translate('all_history') ?? 'All',
+                  ),
                 ),
               ],
               selected: {_showAll},
-              onSelectionChanged: (s) => setState(() => _showAll = s.first),
+              onSelectionChanged: (s) {
+                setState(() => _showAll = s.first);
+              },
             ),
           ],
         ),
@@ -313,19 +352,27 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                     segments: [
                       ButtonSegment(
                         value: false,
-                        label: Text(l10n?.translate('day') ?? 'Day'),
+                        label: Text(
+                          l10n?.translate('day') ?? 'Day',
+                        ),
                       ),
                       ButtonSegment(
                         value: true,
-                        label: Text(l10n?.translate('range') ?? 'Range'),
+                        label: Text(
+                          l10n?.translate('range') ?? 'Range',
+                        ),
                       ),
                     ],
                     selected: {_rangeMode},
-                    onSelectionChanged:
-                        (s) => setState(() {
-                      _rangeMode = s.first;
-                      if (!_rangeMode) _endDate = _startDate;
-                    }),
+                    onSelectionChanged: (s) {
+                      setState(() {
+                        _rangeMode = s.first;
+
+                        if (!_rangeMode) {
+                          _endDate = _startDate;
+                        }
+                      });
+                    },
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -340,8 +387,13 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                         ),
                         OutlinedButton.icon(
                           onPressed: _pickStartDate,
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(_formatDate(_startDate)),
+                          icon: const Icon(
+                            Icons.calendar_today,
+                            size: 16,
+                          ),
+                          label: Text(
+                            _formatDate(_startDate),
+                          ),
                         ),
                         if (_rangeMode) ...[
                           const Icon(
@@ -351,8 +403,13 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                           ),
                           OutlinedButton.icon(
                             onPressed: _pickEndDate,
-                            icon: const Icon(Icons.event, size: 16),
-                            label: Text(_formatDate(_endDate)),
+                            icon: const Icon(
+                              Icons.event,
+                              size: 16,
+                            ),
+                            label: Text(
+                              _formatDate(_endDate),
+                            ),
                           ),
                         ],
                         IconButton(
@@ -378,11 +435,16 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
-    if (p != null)
+
+    if (p != null) {
       setState(() {
         _startDate = _dateOnly(p);
-        if (!_rangeMode || _endDate.isBefore(_startDate)) _endDate = _startDate;
+
+        if (!_rangeMode || _endDate.isBefore(_startDate)) {
+          _endDate = _startDate;
+        }
       });
+    }
   }
 
   Future<void> _pickEndDate() async {
@@ -392,23 +454,49 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
       firstDate: _startDate,
       lastDate: DateTime(2100),
     );
-    if (p != null) setState(() => _endDate = _dateOnly(p));
+
+    if (p != null) {
+      setState(() {
+        _endDate = _dateOnly(p);
+      });
+    }
   }
 
-  void _movePrevious() => setState(() {
-    final d = _rangeMode ? _endDate.difference(_startDate).inDays + 1 : 1;
-    _startDate = _startDate.subtract(Duration(days: d));
-    _endDate = _endDate.subtract(Duration(days: d));
-  });
+  void _movePrevious() {
+    setState(() {
+      final d = _rangeMode
+          ? _endDate.difference(_startDate).inDays + 1
+          : 1;
 
-  void _moveNext() => setState(() {
-    final d = _rangeMode ? _endDate.difference(_startDate).inDays + 1 : 1;
-    _startDate = _startDate.add(Duration(days: d));
-    _endDate = _endDate.add(Duration(days: d));
-  });
+      _startDate = _startDate.subtract(
+        Duration(days: d),
+      );
+
+      _endDate = _endDate.subtract(
+        Duration(days: d),
+      );
+    });
+  }
+
+  void _moveNext() {
+    setState(() {
+      final d = _rangeMode
+          ? _endDate.difference(_startDate).inDays + 1
+          : 1;
+
+      _startDate = _startDate.add(
+        Duration(days: d),
+      );
+
+      _endDate = _endDate.add(
+        Duration(days: d),
+      );
+    });
+  }
 
   Future<void> _finishTask(String id) async {
     final l = AppLocalizations.of(context);
+
     try {
       await _repository.finishTask(id);
 
@@ -422,7 +510,9 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l?.translate('task_finished_success') ?? 'Finished'),
+            content: Text(
+              l?.translate('task_finished_success') ?? 'Finished',
+            ),
           ),
         );
       }
@@ -439,12 +529,20 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
     }
   }
 
-  Future<void> _showEditTaskDialog(OnboardingTaskModel task) async {
+  Future<void> _showEditTaskDialog(
+      OnboardingTaskModel task,
+      ) async {
     final l = AppLocalizations.of(context);
+
     final res = await showDialog<_TaskEditDraft>(
       context: context,
       barrierDismissible: false,
-      builder: (c) => _EditTaskDialog(task: task),
+      builder: (c) {
+        return _EditTaskDialog(
+          task: task,
+          clientsStream: _repository.watchClients(),
+        );
+      },
     );
 
     if (res == null) return;
@@ -454,6 +552,14 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
         taskId: task.id,
         task: res.task,
         taskType: res.taskType,
+        clientId: res.client?.id,
+        clientName: res.client?.companyName,
+        accNumber: res.client?.accNumber,
+        department: res.department,
+
+        // Only the start timestamp is editable here.
+        // finishedAt remains unchanged.
+        startedAt: res.startedAt,
       );
 
       if (mounted) {
@@ -478,15 +584,20 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
     }
   }
 
-  Future<void> _deleteTask(OnboardingTaskModel task) async {
+  Future<void> _deleteTask(
+      OnboardingTaskModel task,
+      ) async {
     final l = AppLocalizations.of(context);
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (c) {
         final theme = Theme.of(c);
+
         return AlertDialog(
-          title: Text(l?.translate('delete_task') ?? 'Delete Task'),
+          title: Text(
+            l?.translate('delete_task') ?? 'Delete Task',
+          ),
           content: Text(
             l?.translate('delete_task_confirmation') ??
                 'Delete this task from calculated time? The activity history will remain unchanged.',
@@ -494,14 +605,18 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: Text(l?.translate('cancel') ?? 'Cancel'),
+              child: Text(
+                l?.translate('cancel') ?? 'Cancel',
+              ),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: theme.colorScheme.error,
               ),
               onPressed: () => Navigator.pop(c, true),
-              child: Text(l?.translate('delete') ?? 'Delete'),
+              child: Text(
+                l?.translate('delete') ?? 'Delete',
+              ),
             ),
           ],
         );
@@ -545,12 +660,17 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
 
   Future<void> _showCreateTaskDialog() async {
     final l = AppLocalizations.of(context);
+
     final res = await showDialog<_TaskDraft>(
       context: context,
       barrierDismissible: false,
-      builder:
-          (c) => _CreateTaskDialog(clientsStream: _repository.watchClients()),
+      builder: (c) {
+        return _CreateTaskDialog(
+          clientsStream: _repository.watchClients(),
+        );
+      },
     );
+
     if (res != null) {
       final localStart = DateTime.now();
 
@@ -572,7 +692,9 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(l?.translate('task_started_success') ?? 'Started'),
+              content: Text(
+                l?.translate('task_started_success') ?? 'Started',
+              ),
             ),
           );
         }
@@ -589,40 +711,11 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
       }
     }
   }
-
-  bool _isSameDay(DateTime? v, DateTime d) =>
-      v != null && v.year == d.year && v.month == d.month && v.day == d.day;
-
-  DateTime _dateOnly(DateTime v) => DateTime(v.year, v.month, v.day);
-
-  String _formatFullDate(DateTime d, AppLocalizations? l) {
-    final n = _dateOnly(DateTime.now()),
-        y = n.subtract(const Duration(days: 1));
-    if (d == n) return l?.translate('today') ?? 'Today';
-    if (d == y) return l?.translate('yesterday') ?? 'Yesterday';
-    final m = [
-      'jan',
-      'feb',
-      'mar',
-      'apr',
-      'may',
-      'jun',
-      'jul',
-      'aug',
-      'sep',
-      'oct',
-      'nov',
-      'dec',
-    ];
-    return '${d.day} ${l?.translate(m[d.month - 1]) ?? m[d.month - 1].toUpperCase()} ${d.year}';
-  }
-
-  String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 }
 
 class _TaskDraft {
-  final String task, taskType;
+  final String task;
+  final String taskType;
   final ClientModel? client;
   final String? department;
 
@@ -637,17 +730,27 @@ class _TaskDraft {
 class _TaskEditDraft {
   final String task;
   final String taskType;
+  final ClientModel? client;
+  final String? department;
+  final DateTime startedAt;
 
   const _TaskEditDraft({
     required this.task,
     required this.taskType,
+    required this.startedAt,
+    this.client,
+    this.department,
   });
 }
 
 class _EditTaskDialog extends StatefulWidget {
   final OnboardingTaskModel task;
+  final Stream<List<ClientModel>> clientsStream;
 
-  const _EditTaskDialog({required this.task});
+  const _EditTaskDialog({
+    required this.task,
+    required this.clientsStream,
+  });
 
   @override
   State<_EditTaskDialog> createState() => _EditTaskDialogState();
@@ -655,15 +758,42 @@ class _EditTaskDialog extends StatefulWidget {
 
 class _EditTaskDialogState extends State<_EditTaskDialog> {
   late final TextEditingController _tc;
+
   late String _tt;
+
+  String? _cid;
+  String? _dep;
+
+  late DateTime _startedAt;
+
+  List<ClientModel> _currentClients = [];
+
+  bool get _needsClient => _tt != 'Internal';
 
   @override
   void initState() {
     super.initState();
-    _tc = TextEditingController(text: widget.task.task);
+
+    _tc = TextEditingController(
+      text: widget.task.task,
+    );
+
     _tt = kTaskTypes.contains(widget.task.taskType)
         ? widget.task.taskType
         : kTaskTypes.first;
+
+    _cid = widget.task.clientId.isEmpty
+        ? null
+        : widget.task.clientId;
+
+    _dep = widget.task.department.isEmpty
+        ? null
+        : widget.task.department;
+
+    _startedAt =
+        widget.task.startedAt ??
+            widget.task.createdAt ??
+            DateTime.now();
   }
 
   @override
@@ -675,65 +805,564 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
 
     return AlertDialog(
-      title: Text(l?.translate('edit_task') ?? 'Edit Task'),
+      title: Text(
+        l?.translate('edit_task') ?? 'Edit Task',
+      ),
       content: SizedBox(
         width: 520,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButtonFormField<String>(
-              initialValue: _tt,
-              decoration: InputDecoration(
-                labelText: l?.translate('task_type') ?? 'Type',
-              ),
-              items: kTaskTypes
-                  .map(
-                    (t) => DropdownMenuItem(
-                  value: t,
-                  child: Text(
-                    l?.translate(
-                      t.toLowerCase().replaceAll(' ', '_'),
-                    ) ??
-                        t,
+        child: StreamBuilder<List<ClientModel>>(
+          stream: widget.clientsStream,
+          builder: (context, snapshot) {
+            _currentClients = snapshot.data ?? [];
+
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: _tt,
+                    decoration: InputDecoration(
+                      labelText:
+                      l?.translate('task_type') ?? 'Type',
+                    ),
+                    items: kTaskTypes
+                        .map(
+                          (t) => DropdownMenuItem<String>(
+                        value: t,
+                        child: Text(
+                          l?.translate(
+                            t
+                                .toLowerCase()
+                                .replaceAll(' ', '_'),
+                          ) ??
+                              t,
+                        ),
+                      ),
+                    )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+
+                      setState(() {
+                        _tt = v;
+                        _cid = null;
+                        _dep = null;
+                      });
+                    },
                   ),
-                ),
-              )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _tt = v);
-              },
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _tc,
-              autofocus: true,
-              maxLines: 4,
-              decoration: InputDecoration(
-                labelText: l?.translate('task') ?? 'Description',
-                hintText: l?.translate('what_working_on'),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _tc,
+                    autofocus: true,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText:
+                      '${l?.translate('task') ?? 'Description'} '
+                          '(${l?.translate('optional') ?? 'Optional'})',
+                      hintText:
+                      l?.translate('what_working_on') ??
+                          'Add a description if needed...',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Editable start timestamp.
+                  //
+                  // This is the only task timestamp that can be changed.
+                  // It supports correcting tasks that were actually started
+                  // earlier but were entered into the system later.
+                  _buildStartTimeSection(l, theme),
+
+                  const SizedBox(height: 16),
+
+                  // Finish timestamp remains read-only.
+                  _buildEndTimeSection(l, theme),
+
+                  const SizedBox(height: 16),
+
+                  if (_needsClient)
+                    Autocomplete<ClientModel>(
+                      displayStringForOption: (cl) {
+                        if (cl.companyName.isEmpty) {
+                          return cl.accNumber;
+                        }
+
+                        return '${cl.companyName} — ${cl.accNumber}';
+                      },
+                      initialValue: TextEditingValue(
+                        text: _existingClientDisplayValue(
+                          _currentClients,
+                        ),
+                      ),
+                      optionsBuilder: (textEditingValue) {
+                        final query =
+                        textEditingValue.text.trim().toLowerCase();
+
+                        if (query.isEmpty) {
+                          return const Iterable<ClientModel>.empty();
+                        }
+
+                        return _currentClients.where(
+                              (cl) =>
+                          cl.companyName
+                              .toLowerCase()
+                              .contains(query) ||
+                              cl.accNumber
+                                  .toLowerCase()
+                                  .contains(query),
+                        );
+                      },
+                      onSelected: (cl) {
+                        setState(() {
+                          _cid = cl.id;
+                        });
+                      },
+                      fieldViewBuilder: (
+                          context,
+                          controller,
+                          focusNode,
+                          onFieldSubmitted,
+                          ) {
+                        return TextFormField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: InputDecoration(
+                            labelText:
+                            l?.translate('client') ??
+                                'Client / ACC Number',
+                            hintText:
+                            l?.translate('select_client') ??
+                                'Search by name or ACC...',
+                            suffixIcon: const Icon(
+                              Icons.search,
+                              size: 20,
+                            ),
+                          ),
+                          onChanged: (value) {
+                            final selectedClient =
+                            _findClientById(_cid);
+
+                            if (selectedClient == null) {
+                              return;
+                            }
+
+                            final selectedDisplay =
+                            _clientDisplayValue(selectedClient);
+
+                            if (value.trim() !=
+                                selectedDisplay.trim()) {
+                              _cid = null;
+                            }
+                          },
+                        );
+                      },
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      initialValue:
+                      kInternalDepartments.contains(_dep)
+                          ? _dep
+                          : null,
+                      decoration: InputDecoration(
+                        labelText:
+                        l?.translate('department') ??
+                            'Department',
+                      ),
+                      items: kInternalDepartments
+                          .map(
+                            (d) => DropdownMenuItem<String>(
+                          value: d,
+                          child: Text(
+                            l?.translate(
+                              d
+                                  .toLowerCase()
+                                  .replaceAll(' ', '_'),
+                            ) ??
+                                d,
+                          ),
+                        ),
+                      )
+                          .toList(),
+                      onChanged: (v) {
+                        setState(() {
+                          _dep = v;
+                        });
+                      },
+                    ),
+                ],
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(l?.translate('cancel') ?? 'Cancel'),
+          child: Text(
+            l?.translate('cancel') ?? 'Cancel',
+          ),
         ),
         ElevatedButton(
-          onPressed: () {
-            final task = _tc.text.trim();
-            Navigator.pop(
-              context,
-              _TaskEditDraft(task: task, taskType: _tt),
-            );
-          },
-          child: Text(l?.translate('save') ?? 'Save'),
+          onPressed: _save,
+          child: Text(
+            l?.translate('save') ?? 'Save',
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStartTimeSection(
+      AppLocalizations? l,
+      ThemeData theme,
+      ) {
+    return _buildTimestampSection(
+      title: l?.translate('start_time') ?? 'Start Time',
+      date: _startedAt,
+      enabled: true,
+      icon: Icons.play_arrow_outlined,
+      theme: theme,
+      onDatePressed: _pickStartedDate,
+      onTimePressed: _pickStartedTime,
+    );
+  }
+
+  Widget _buildEndTimeSection(
+      AppLocalizations? l,
+      ThemeData theme,
+      ) {
+    final finishedAt = widget.task.finishedAt;
+
+    if (finishedAt == null) {
+      return _buildTimestampSection(
+        title: l?.translate('end_time') ?? 'End Time',
+        date: null,
+        enabled: false,
+        icon: Icons.stop_outlined,
+        theme: theme,
+      );
+    }
+
+    return _buildTimestampSection(
+      title: l?.translate('end_time') ?? 'End Time',
+      date: finishedAt,
+      enabled: false,
+      icon: Icons.stop_outlined,
+      theme: theme,
+    );
+  }
+
+  Widget _buildTimestampSection({
+    required String title,
+    required DateTime? date,
+    required bool enabled,
+    required IconData icon,
+    required ThemeData theme,
+    Future<void> Function()? onDatePressed,
+    Future<void> Function()? onTimePressed,
+  }) {
+    final l = AppLocalizations.of(context);
+
+    final textColor = enabled
+        ? theme.colorScheme.onSurface
+        : theme.colorScheme.onSurface.withValues(alpha: 0.55);
+
+    final borderColor = enabled
+        ? theme.colorScheme.primary.withValues(alpha: 0.35)
+        : theme.dividerColor;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(10),
+        color: enabled
+            ? theme.colorScheme.primary.withValues(alpha: 0.03)
+            : theme.colorScheme.onSurface.withValues(alpha: 0.02),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                size: 19,
+                color: enabled
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface
+                    .withValues(alpha: 0.45),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+              if (!enabled) ...[
+                const SizedBox(width: 8),
+                Text(
+                  l?.translate('read_only') ?? 'Read only',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurface
+                        .withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed:
+                  enabled ? onDatePressed : null,
+                  icon: const Icon(
+                    Icons.calendar_today_outlined,
+                    size: 16,
+                  ),
+                  label: Text(
+                    date == null
+                        ? '—'
+                        : _formatDate(date),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed:
+                  enabled ? onTimePressed : null,
+                  icon: const Icon(
+                    Icons.access_time_outlined,
+                    size: 17,
+                  ),
+                  label: Text(
+                    date == null
+                        ? '—'
+                        : _formatTime(date),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickStartedDate() async {
+    final now = DateTime.now();
+    final today = _dateOnly(now);
+
+    // Keep the picker bounds explicit.
+    final firstAllowedDate = DateTime(2020);
+
+    final startedDate = _dateOnly(_startedAt);
+
+    // IMPORTANT:
+    // showDatePicker requires initialDate to be inside the
+    // [firstDate, lastDate] range. A task could have an old
+    // startedAt before 2020, so simply checking for a future
+    // date is not enough.
+    final initialDate = startedDate.isBefore(firstAllowedDate)
+        ? firstAllowedDate
+        : startedDate.isAfter(today)
+        ? today
+        : startedDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstAllowedDate,
+      lastDate: today,
+    );
+
+    if (picked == null) return;
+
+    final candidate = DateTime(
+      picked.year,
+      picked.month,
+      picked.day,
+      _startedAt.hour,
+      _startedAt.minute,
+      _startedAt.second,
+    );
+
+    if (!_isValidStartedAt(candidate)) {
+      _showStartTimeValidationError();
+      return;
+    }
+
+    setState(() {
+      _startedAt = candidate;
+    });
+  }
+
+  Future<void> _pickStartedTime() async {
+    final now = DateTime.now();
+
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: _startedAt.hour,
+        minute: _startedAt.minute,
+      ),
+    );
+
+    if (picked == null) return;
+
+    final candidate = DateTime(
+      _startedAt.year,
+      _startedAt.month,
+      _startedAt.day,
+      picked.hour,
+      picked.minute,
+    );
+
+    if (candidate.isAfter(now)) {
+      _showStartTimeValidationError(
+        message:
+        'Start time cannot be in the future.',
+      );
+      return;
+    }
+
+    if (!_isValidStartedAt(candidate)) {
+      _showStartTimeValidationError();
+      return;
+    }
+
+    setState(() {
+      _startedAt = candidate;
+    });
+  }
+
+  bool _isValidStartedAt(DateTime candidate) {
+    final now = DateTime.now();
+
+    // Never allow a future start.
+    if (candidate.isAfter(now)) {
+      return false;
+    }
+
+    final finishedAt = widget.task.finishedAt;
+
+    // For completed tasks, preserve the existing finish time.
+    // Therefore the corrected start must remain strictly before it.
+    if (finishedAt != null &&
+        !candidate.isBefore(finishedAt)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  void _showStartTimeValidationError({
+    String message =
+    'Start time must be before the task end time.',
+  }) {
+    final l = AppLocalizations.of(context);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          l?.translate('invalid_task_start_time') ??
+              message,
+        ),
+      ),
+    );
+  }
+
+  ClientModel? _findClientById(String? id) {
+    if (id == null || id.isEmpty) {
+      return null;
+    }
+
+    for (final client in _currentClients) {
+      if (client.id == id) {
+        return client;
+      }
+    }
+
+    return null;
+  }
+
+  String _clientDisplayValue(ClientModel client) {
+    if (client.companyName.isEmpty) {
+      return client.accNumber;
+    }
+
+    return '${client.companyName} — ${client.accNumber}';
+  }
+
+  String _existingClientDisplayValue(
+      List<ClientModel> clients,
+      ) {
+    final existingClient = _findClientById(_cid);
+
+    if (existingClient != null) {
+      return _clientDisplayValue(existingClient);
+    }
+
+    if (widget.task.clientName.isNotEmpty &&
+        widget.task.accNumber.isNotEmpty) {
+      return '${widget.task.clientName} — '
+          '${widget.task.accNumber}';
+    }
+
+    if (widget.task.accNumber.isNotEmpty) {
+      return widget.task.accNumber;
+    }
+
+    return widget.task.clientName;
+  }
+
+  void _save() {
+    final description = _tc.text.trim();
+
+    // Description is intentionally optional.
+
+    if (!_isValidStartedAt(_startedAt)) {
+      _showStartTimeValidationError();
+      return;
+    }
+
+    if (_needsClient && _cid == null) {
+      return;
+    }
+
+    if (!_needsClient && _dep == null) {
+      return;
+    }
+
+    ClientModel? selectedClient;
+
+    if (_needsClient) {
+      selectedClient = _findClientById(_cid);
+
+      if (selectedClient == null) {
+        return;
+      }
+    }
+
+    Navigator.pop(
+      context,
+      _TaskEditDraft(
+        task: description,
+        taskType: _tt,
+        client: selectedClient,
+        department: _needsClient ? null : _dep,
+        startedAt: _startedAt,
+      ),
     );
   }
 }
@@ -741,7 +1370,9 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
 class _CreateTaskDialog extends StatefulWidget {
   final Stream<List<ClientModel>> clientsStream;
 
-  const _CreateTaskDialog({required this.clientsStream});
+  const _CreateTaskDialog({
+    required this.clientsStream,
+  });
 
   @override
   State<_CreateTaskDialog> createState() => _CreateTaskDialogState();
@@ -749,8 +1380,12 @@ class _CreateTaskDialog extends StatefulWidget {
 
 class _CreateTaskDialogState extends State<_CreateTaskDialog> {
   final _tc = TextEditingController();
+
   String _tt = kTaskTypes.first;
-  String? _cid, _dep;
+
+  String? _cid;
+  String? _dep;
+
   List<ClientModel> _currentClients = [];
 
   bool get _needsClient => _tt != 'Internal';
@@ -764,15 +1399,20 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+
     return AlertDialog(
-      title: Text(l?.translate('start_new_task') ?? 'New Task'),
+      title: Text(
+        l?.translate('start_new_task') ?? 'New Task',
+      ),
       content: SizedBox(
         width: 520,
         child: StreamBuilder<List<ClientModel>>(
           stream: widget.clientsStream,
           builder: (c, snapshot) {
             _currentClients = snapshot.data ?? [];
+
             final cls = _currentClients;
+
             return SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -780,16 +1420,18 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
                   DropdownButtonFormField<String>(
                     initialValue: _tt,
                     decoration: InputDecoration(
-                      labelText: l?.translate('task_type') ?? 'Type',
+                      labelText:
+                      l?.translate('task_type') ?? 'Type',
                     ),
-                    items:
-                    kTaskTypes
+                    items: kTaskTypes
                         .map(
                           (t) => DropdownMenuItem(
                         value: t,
                         child: Text(
                           l?.translate(
-                            t.toLowerCase().replaceAll(' ', '_'),
+                            t
+                                .toLowerCase()
+                                .replaceAll(' ', '_'),
                           ) ??
                               t,
                         ),
@@ -797,11 +1439,13 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
                     )
                         .toList(),
                     onChanged: (v) {
-                      if (v != null)
+                      if (v != null) {
                         setState(() {
                           _tt = v;
-                          _cid = _dep = null;
+                          _cid = null;
+                          _dep = null;
                         });
+                      }
                     },
                   ),
                   const SizedBox(height: 16),
@@ -810,30 +1454,47 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
                     autofocus: true,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      labelText: l?.translate('task') ?? 'Task',
-                      hintText: l?.translate('what_working_on'),
+                      labelText:
+                      '${l?.translate('task') ?? 'Description'} '
+                          '(${l?.translate('optional') ?? 'Optional'})',
+                      hintText:
+                      l?.translate('what_working_on') ??
+                          'Add a description if needed...',
                     ),
                   ),
                   const SizedBox(height: 16),
                   if (_needsClient)
                     Autocomplete<ClientModel>(
-                      displayStringForOption:
-                          (cl) =>
-                      cl.companyName.isEmpty
-                          ? cl.accNumber
-                          : '${cl.companyName} — ${cl.accNumber}',
+                      displayStringForOption: (cl) {
+                        if (cl.companyName.isEmpty) {
+                          return cl.accNumber;
+                        }
+
+                        return '${cl.companyName} — ${cl.accNumber}';
+                      },
                       optionsBuilder: (textEditingValue) {
-                        if (textEditingValue.text.isEmpty)
+                        if (textEditingValue.text.isEmpty) {
                           return const Iterable<ClientModel>.empty();
+                        }
+
+                        final query =
+                        textEditingValue.text.toLowerCase();
+
                         return cls.where(
                               (cl) =>
-                          cl.companyName.toLowerCase().contains(
-                            textEditingValue.text.toLowerCase(),
-                          ) ||
-                              cl.accNumber.contains(textEditingValue.text),
+                          cl.companyName
+                              .toLowerCase()
+                              .contains(query) ||
+                              cl.accNumber
+                                  .toLowerCase()
+                                  .contains(query),
                         );
                       },
-                      onSelected: (cl) => setState(() => _cid = cl.id),
+                      onSelected: (cl) {
+                        setState(() {
+                          _cid = cl.id;
+                        });
+                      },
                       fieldViewBuilder: (
                           context,
                           controller,
@@ -844,16 +1505,22 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
                           controller: controller,
                           focusNode: focusNode,
                           decoration: InputDecoration(
-                            labelText: l?.translate('client') ?? 'Client',
+                            labelText:
+                            l?.translate('client') ??
+                                'Client / ACC Number',
                             hintText:
                             l?.translate('select_client') ??
                                 'Search by name or ACC...',
-                            suffixIcon: const Icon(Icons.search, size: 20),
+                            suffixIcon: const Icon(
+                              Icons.search,
+                              size: 20,
+                            ),
                           ),
-                          validator:
-                              (v) =>
+                          validator: (v) =>
                           _needsClient && _cid == null
-                              ? (l?.translate('client_required') ??
+                              ? (l?.translate(
+                            'client_required',
+                          ) ??
                               'Required')
                               : null,
                         );
@@ -863,23 +1530,30 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
                     DropdownButtonFormField<String>(
                       initialValue: _dep,
                       decoration: InputDecoration(
-                        labelText: l?.translate('department'),
+                        labelText:
+                        l?.translate('department') ??
+                            'Department',
                       ),
-                      items:
-                      kInternalDepartments
+                      items: kInternalDepartments
                           .map(
                             (d) => DropdownMenuItem(
                           value: d,
                           child: Text(
                             l?.translate(
-                              d.toLowerCase().replaceAll(' ', '_'),
+                              d
+                                  .toLowerCase()
+                                  .replaceAll(' ', '_'),
                             ) ??
                                 d,
                           ),
                         ),
                       )
                           .toList(),
-                      onChanged: (v) => setState(() => _dep = v),
+                      onChanged: (v) {
+                        setState(() {
+                          _dep = v;
+                        });
+                      },
                     ),
                 ],
               ),
@@ -890,11 +1564,15 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(l?.translate('cancel') ?? 'Cancel'),
+          child: Text(
+            l?.translate('cancel') ?? 'Cancel',
+          ),
         ),
         ElevatedButton(
           onPressed: _save,
-          child: Text(l?.translate('start_task') ?? 'Start'),
+          child: Text(
+            l?.translate('start_task') ?? 'Start',
+          ),
         ),
       ],
     );
@@ -902,14 +1580,24 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
 
   void _save() {
     final t = _tc.text.trim();
-    // Task description is optional.
-    // Only the required context fields are validated.
-    if (_needsClient && _cid == null) return;
-    if (!_needsClient && _dep == null) return;
+
+    if (_needsClient && _cid == null) {
+      return;
+    }
+
+    if (!_needsClient && _dep == null) {
+      return;
+    }
 
     ClientModel? selectedClient;
+
     if (_needsClient && _cid != null) {
-      selectedClient = _currentClients.firstWhere((c) => c.id == _cid);
+      for (final client in _currentClients) {
+        if (client.id == _cid) {
+          selectedClient = client;
+          break;
+        }
+      }
     }
 
     Navigator.pop(
@@ -925,7 +1613,9 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
 }
 
 class _SummaryRow extends StatelessWidget {
-  final int totalToday, completedToday, activeTaskCount;
+  final int totalToday;
+  final int completedToday;
+  final int activeTaskCount;
 
   const _SummaryRow({
     required this.totalToday,
@@ -936,9 +1626,11 @@ class _SummaryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 700;
+
         final items = [
           _SummaryCard(
             icon: Icons.today_outlined,
@@ -952,15 +1644,15 @@ class _SummaryRow extends StatelessWidget {
           ),
           _SummaryCard(
             icon: Icons.layers_outlined,
-            label: l?.translate('active_tasks_label') ?? 'Active',
+            label:
+            l?.translate('active_tasks_label') ?? 'Active',
             value: '$activeTaskCount',
           ),
         ];
 
         if (isCompact) {
           return Column(
-            children:
-            items
+            children: items
                 .map(
                   (i) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -972,8 +1664,7 @@ class _SummaryRow extends StatelessWidget {
         }
 
         return Row(
-          children:
-          items
+          children: items
               .map(
                 (i) => Expanded(
               child: Padding(
@@ -991,7 +1682,8 @@ class _SummaryRow extends StatelessWidget {
 
 class _SummaryCard extends StatelessWidget {
   final IconData icon;
-  final String label, value;
+  final String label;
+  final String value;
 
   const _SummaryCard({
     required this.icon,
@@ -1002,6 +1694,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -1011,10 +1704,15 @@ class _SummaryCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: .1),
+                color: theme.colorScheme.primary
+                    .withValues(alpha: .1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: theme.colorScheme.primary, size: 21),
+              child: Icon(
+                icon,
+                color: theme.colorScheme.primary,
+                size: 21,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1025,7 +1723,8 @@ class _SummaryCard extends StatelessWidget {
                     label,
                     style: TextStyle(
                       fontSize: 12,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface
+                          .withValues(alpha: 0.6),
                     ),
                   ),
                   Text(
@@ -1071,9 +1770,15 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
+
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+          (_) {
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
   }
 
   @override
@@ -1086,16 +1791,17 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    // Prefer the local creation anchor only for a task created from this
-    // screen. This is display-only and prevents Firestore listener/write
-    // latency from appearing as already elapsed work. Persisted timing and
-    // reports continue to use the task's server timestamp.
-    final displayStart = widget.displayStartAt ?? widget.task.startedAt;
-    final elapsed =
-    displayStart == null
+
+    final displayStart =
+        widget.displayStartAt ?? widget.task.startedAt;
+
+    final elapsed = displayStart == null
         ? Duration.zero
         : DateTime.now().difference(displayStart);
-    final safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+
+    final safeElapsed =
+    elapsed.isNegative ? Duration.zero : elapsed;
+
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
@@ -1119,9 +1825,8 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: .1,
-                          ),
+                          color: theme.colorScheme.primary
+                              .withValues(alpha: .1),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -1132,22 +1837,24 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
                                 Text(
-                                  l?.translate('running') ?? 'RUNNING',
+                                  l?.translate('running') ??
+                                      'RUNNING',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.primary,
+                                    color:
+                                    theme.colorScheme.primary,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 _TypeChip(
-                                  label:
-                                  l?.translate(
+                                  label: l?.translate(
                                     widget.task.taskType
                                         .toLowerCase()
                                         .replaceAll(' ', '_'),
@@ -1156,13 +1863,14 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                                 ),
                               ],
                             ),
-                            Text(
-                              widget.task.task,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
+                            if (widget.task.task.trim().isNotEmpty)
+                              Text(
+                                widget.task.task,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -1170,10 +1878,12 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                   ),
                   const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment:
+                    MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment:
+                        CrossAxisAlignment.start,
                         children: [
                           Text(
                             _formatDuration(safeElapsed),
@@ -1187,9 +1897,8 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                             l?.translate('elapsed') ?? 'Elapsed',
                             style: TextStyle(
                               fontSize: 10,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.6,
-                              ),
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.6),
                             ),
                           ),
                         ],
@@ -1198,12 +1907,16 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            tooltip: l?.translate('edit') ?? 'Edit',
+                            tooltip:
+                            l?.translate('edit') ?? 'Edit',
                             onPressed: widget.onEdit,
-                            icon: const Icon(Icons.edit_outlined),
+                            icon: const Icon(
+                              Icons.edit_outlined,
+                            ),
                           ),
                           IconButton(
-                            tooltip: l?.translate('delete') ?? 'Delete',
+                            tooltip:
+                            l?.translate('delete') ?? 'Delete',
                             onPressed: widget.onDelete,
                             icon: Icon(
                               Icons.delete_outline,
@@ -1212,7 +1925,9 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                           ),
                           ElevatedButton(
                             onPressed: widget.onFinish,
-                            child: Text(l?.translate('finish') ?? 'Finish'),
+                            child: Text(
+                              l?.translate('finish') ?? 'Finish',
+                            ),
                           ),
                         ],
                       ),
@@ -1228,7 +1943,8 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: .1),
+                    color: theme.colorScheme.primary
+                        .withValues(alpha: .1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -1239,7 +1955,8 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -1253,31 +1970,29 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                           ),
                           const SizedBox(width: 8),
                           _TypeChip(
-                            label:
-                            l?.translate(
-                              widget.task.taskType.toLowerCase().replaceAll(
-                                ' ',
-                                '_',
-                              ),
+                            label: l?.translate(
+                              widget.task.taskType
+                                  .toLowerCase()
+                                  .replaceAll(' ', '_'),
                             ) ??
                                 widget.task.taskType,
                           ),
                         ],
                       ),
-                      Text(
-                        widget.task.task,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      if (widget.task.task.trim().isNotEmpty)
+                        Text(
+                          widget.task.task,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
                       Text(
                         _taskContext(widget.task, context),
                         style: TextStyle(
                           fontSize: 13,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -1287,7 +2002,7 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      _formatDuration(elapsed),
+                      _formatDuration(safeElapsed),
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -1298,9 +2013,8 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                       l?.translate('elapsed') ?? 'Elapsed',
                       style: TextStyle(
                         fontSize: 10,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -1322,7 +2036,9 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                 const SizedBox(width: 4),
                 ElevatedButton(
                   onPressed: widget.onFinish,
-                  child: Text(l?.translate('finish') ?? 'Finish'),
+                  child: Text(
+                    l?.translate('finish') ?? 'Finish',
+                  ),
                 ),
               ],
             );
@@ -1349,6 +2065,7 @@ class _TaskCard extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final finished = task.status == 'Finished';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1366,13 +2083,25 @@ class _TaskCard extends StatelessWidget {
                         finished
                             ? Icons.check_circle
                             : Icons.radio_button_checked,
-                        color:
-                        finished ? Colors.green : theme.colorScheme.primary,
+                        color: finished
+                            ? Colors.green
+                            : theme.colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
+                        child: task.task.trim().isEmpty
+                            ? Text(
+                          l?.translate('no_comment') ??
+                              'No comment',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontStyle: FontStyle.italic,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.5),
+                          ),
+                        )
+                            : Text(
                           task.task,
                           style: const TextStyle(
                             fontSize: 14,
@@ -1387,9 +2116,10 @@ class _TaskCard extends StatelessWidget {
                     children: [
                       const SizedBox(width: 32),
                       _TypeChip(
-                        label:
-                        l?.translate(
-                          task.taskType.toLowerCase().replaceAll(' ', '_'),
+                        label: l?.translate(
+                          task.taskType
+                              .toLowerCase()
+                              .replaceAll(' ', '_'),
                         ) ??
                             task.taskType,
                       ),
@@ -1398,16 +2128,17 @@ class _TaskCard extends StatelessWidget {
                         _formatTime(task.startedAt),
                         style: TextStyle(
                           fontSize: 11,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Text(
                         task.completedDuration == null
                             ? '—'
-                            : _formatDuration(task.completedDuration!),
+                            : _formatDuration(
+                          task.completedDuration!,
+                        ),
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -1417,10 +2148,14 @@ class _TaskCard extends StatelessWidget {
                       IconButton(
                         tooltip: l?.translate('edit') ?? 'Edit',
                         onPressed: onEdit,
-                        icon: const Icon(Icons.edit_outlined, size: 20),
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                          size: 20,
+                        ),
                       ),
                       IconButton(
-                        tooltip: l?.translate('delete') ?? 'Delete',
+                        tooltip:
+                        l?.translate('delete') ?? 'Delete',
                         onPressed: onDelete,
                         icon: Icon(
                           Icons.delete_outline,
@@ -1437,38 +2172,55 @@ class _TaskCard extends StatelessWidget {
             return Row(
               children: [
                 Icon(
-                  finished ? Icons.check_circle : Icons.radio_button_checked,
-                  color: finished ? Colors.green : theme.colorScheme.primary,
+                  finished
+                      ? Icons.check_circle
+                      : Icons.radio_button_checked,
+                  color: finished
+                      ? Colors.green
+                      : theme.colorScheme.primary,
                   size: 22,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        task.task,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                      if (task.task.trim().isNotEmpty)
+                        Text(
+                          task.task,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
+                      if (task.task.trim().isEmpty)
+                        Text(
+                          l?.translate('no_comment') ??
+                              'No comment',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.5),
+                          ),
+                        ),
                       Text(
                         _taskContext(task, context),
                         style: TextStyle(
                           fontSize: 12,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6),
                         ),
                       ),
                     ],
                   ),
                 ),
                 _TypeChip(
-                  label:
-                  l?.translate(
-                    task.taskType.toLowerCase().replaceAll(' ', '_'),
+                  label: l?.translate(
+                    task.taskType
+                        .toLowerCase()
+                        .replaceAll(' ', '_'),
                   ) ??
                       task.taskType,
                 ),
@@ -1477,14 +2229,17 @@ class _TaskCard extends StatelessWidget {
                   _formatTime(task.startedAt),
                   style: TextStyle(
                     fontSize: 12,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: theme.colorScheme.onSurface
+                        .withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(width: 14),
                 Text(
                   task.completedDuration == null
                       ? '—'
-                      : _formatDuration(task.completedDuration!),
+                      : _formatDuration(
+                    task.completedDuration!,
+                  ),
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -1494,7 +2249,10 @@ class _TaskCard extends StatelessWidget {
                 IconButton(
                   tooltip: l?.translate('edit') ?? 'Edit',
                   onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  icon: const Icon(
+                    Icons.edit_outlined,
+                    size: 20,
+                  ),
                 ),
                 IconButton(
                   tooltip: l?.translate('delete') ?? 'Delete',
@@ -1517,13 +2275,19 @@ class _TaskCard extends StatelessWidget {
 class _TypeChip extends StatelessWidget {
   final String label;
 
-  const _TypeChip({required this.label});
+  const _TypeChip({
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 5,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.primary.withValues(alpha: .1),
         borderRadius: BorderRadius.circular(20),
@@ -1543,11 +2307,14 @@ class _TypeChip extends StatelessWidget {
 class _EmptyTasks extends StatelessWidget {
   final bool showAll;
 
-  const _EmptyTasks({required this.showAll});
+  const _EmptyTasks({
+    required this.showAll,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 56),
@@ -1560,13 +2327,20 @@ class _EmptyTasks extends StatelessWidget {
             ),
             Text(
               showAll
-                  ? (l?.translate('no_task_history') ?? 'No history')
-                  : (l?.translate('no_tasks_day') ?? 'No tasks'),
-              style: const TextStyle(fontWeight: FontWeight.bold),
+                  ? (l?.translate('no_task_history') ??
+                  'No history')
+                  : (l?.translate('no_tasks_day') ??
+                  'No tasks'),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               l?.translate('start_task_desc') ?? 'Start a task.',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
             ),
           ],
         ),
@@ -1577,7 +2351,8 @@ class _EmptyTasks extends StatelessWidget {
 
 class _MessageState extends StatelessWidget {
   final IconData icon;
-  final String title, message;
+  final String title;
+  final String message;
   final bool isError;
 
   const _MessageState({
@@ -1593,47 +2368,133 @@ class _MessageState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 42, color: isError ? Colors.red : Colors.grey),
+          Icon(
+            icon,
+            size: 42,
+            color: isError ? Colors.red : Colors.grey,
+          ),
           Text(
             title,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          Text(message, textAlign: TextAlign.center),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
   }
 }
 
-String _taskContext(OnboardingTaskModel task, BuildContext context) {
+String _taskContext(
+    OnboardingTaskModel task,
+    BuildContext context,
+    ) {
   final l = AppLocalizations.of(context);
-  if (task.taskType == 'Internal')
+
+  if (task.taskType == 'Internal') {
     return task.department.isEmpty
         ? (l?.translate('internal') ?? 'Internal')
-        : (l?.translate(task.department.toLowerCase().replaceAll(' ', '_')) ??
+        : (l?.translate(
+      task.department
+          .toLowerCase()
+          .replaceAll(' ', '_'),
+    ) ??
         task.department);
-  if (task.clientName.isNotEmpty && task.accNumber.isNotEmpty)
+  }
+
+  if (task.clientName.isNotEmpty &&
+      task.accNumber.isNotEmpty) {
     return '${task.clientName} • ${task.accNumber}';
-  if (task.accNumber.isNotEmpty) return task.accNumber;
+  }
+
+  if (task.accNumber.isNotEmpty) {
+    return task.accNumber;
+  }
+
   return task.clientName.isNotEmpty
       ? task.clientName
       : (l?.translate('client_task') ?? 'Client task');
 }
 
 String _formatDuration(Duration d) {
-  if (d.inHours > 0)
-    return '${d.inHours}h ${d.inMinutes.remainder(60).toString().padLeft(2, '0')}m';
-  if (d.inMinutes > 0)
-    return '${d.inMinutes}m ${d.inSeconds.remainder(60).toString().padLeft(2, '0')}s';
+  if (d.inHours > 0) {
+    return '${d.inHours}h '
+        '${d.inMinutes.remainder(60).toString().padLeft(2, '0')}m';
+  }
+
+  if (d.inMinutes > 0) {
+    return '${d.inMinutes}m '
+        '${d.inSeconds.remainder(60).toString().padLeft(2, '0')}s';
+  }
+
   return '${d.inSeconds}s';
 }
 
 String _formatTime(DateTime? v) {
   if (v == null) return '—';
-  final h = v.hour % 12 == 0 ? 12 : v.hour % 12,
-      m = v.minute.toString().padLeft(2, '0'),
-      s = v.hour >= 12 ? 'PM' : 'AM';
+
+  final h = v.hour % 12 == 0 ? 12 : v.hour % 12;
+
+  final m = v.minute.toString().padLeft(2, '0');
+
+  final s = v.hour >= 12 ? 'PM' : 'AM';
+
   return '$h:$m $s';
+}
+
+DateTime _dateOnly(DateTime v) {
+  return DateTime(v.year, v.month, v.day);
+}
+
+String _formatDate(DateTime d) {
+  return '${d.day.toString().padLeft(2, '0')}/'
+      '${d.month.toString().padLeft(2, '0')}/'
+      '${d.year}';
+}
+
+String _formatFullDate(
+    DateTime d,
+    AppLocalizations? l,
+    ) {
+  final n = _dateOnly(DateTime.now());
+  final y = n.subtract(const Duration(days: 1));
+
+  if (d == n) {
+    return l?.translate('today') ?? 'Today';
+  }
+
+  if (d == y) {
+    return l?.translate('yesterday') ?? 'Yesterday';
+  }
+
+  final m = [
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jun',
+    'jul',
+    'aug',
+    'sep',
+    'oct',
+    'nov',
+    'dec',
+  ];
+
+  return '${d.day} ${l?.translate(m[d.month - 1]) ?? m[d.month - 1].toUpperCase()} ${d.year}';
+}
+
+bool _isSameDay(DateTime? v, DateTime d) {
+  return v != null &&
+      v.year == d.year &&
+      v.month == d.month &&
+      v.day == d.day;
 }
 
 const List<String> kTaskTypes = [
@@ -1646,10 +2507,10 @@ const List<String> kTaskTypes = [
   'Meeting',
   'Ticket',
 ];
+
 const List<String> kInternalDepartments = [
   'Business Chat',
   'Account Manager',
   'Sales',
   'VoIP',
 ];
-
