@@ -41,6 +41,8 @@ class _OnboardingClientsScreenState
 
   String _search = '';
   List<ClientModel>? _displayedClients;
+  List<ClientModel> _latestClients = const [];
+  _ClientFilterState _filters = _ClientFilterState();
 
   // ===========================================================================
   // EMBEDDED OPERATION PANEL
@@ -447,16 +449,7 @@ class _OnboardingClientsScreenState
               stream: _clientsStream,
               builder: (context, snapshot) {
                 final allClients = snapshot.data ?? [];
-                final q = _normalize(_search);
-                
-                final filteredCount = allClients.where((client) {
-                  if (q.isEmpty) return true;
-                  final assigneeName = _normalize(_agentNames[client.assignedTo] ?? '');
-                  return _normalize(client.companyName).contains(q) ||
-                         _normalize(client.accNumber).contains(q) ||
-                         _normalize(client.assignedTo).contains(q) ||
-                         assigneeName.contains(q);
-                }).length;
+                final filteredCount = _applyClientFilters(allClients).length;
 
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -674,6 +667,8 @@ class _OnboardingClientsScreenState
                           snapshot.data ??
                               [];
 
+                      _latestClients = streamedClients;
+
                       if (!_operationRunning) {
                         _displayedClients = streamedClients;
                       }
@@ -682,58 +677,13 @@ class _OnboardingClientsScreenState
                           ? (_displayedClients ?? streamedClients)
                           : streamedClients;
 
-                      final q =
-                      _normalize(
-                        _search,
-                      );
-
-                      final filtered =
-                      clients.where(
-                            (client) {
-                          if (q.isEmpty) {
-                            return true;
-                          }
-
-                          final assigneeName =
-                          _normalize(
-                            _agentNames[
-                            client
-                                .assignedTo] ??
-                                '',
-                          );
-
-                          return _normalize(
-                            client
-                                .companyName,
-                          )
-                              .contains(
-                            q,
-                          ) ||
-                              _normalize(
-                                client
-                                    .accNumber,
-                              ).contains(
-                                q,
-                              ) ||
-                              _normalize(
-                                client
-                                    .assignedTo,
-                              ).contains(
-                                q,
-                              ) ||
-                              assigneeName
-                                  .contains(
-                                q,
-                              );
-                        },
-                      ).toList();
+                      final filtered = _applyClientFilters(clients);
 
                       if (filtered
                           .isEmpty) {
                         return _EmptyClients(
-                          hasSearch: _search
-                              .trim()
-                              .isNotEmpty,
+                          hasSearch: _search.trim().isNotEmpty ||
+                              _filters.isActive,
                           onCreate:
                           _showCreateClientDialog,
                         );
@@ -1194,47 +1144,173 @@ class _OnboardingClientsScreenState
       AppLocalizations? l10n,
       ThemeData theme,
       ) {
-    return Card(
-      elevation: 0,
-      shape:
-      RoundedRectangleBorder(
-        borderRadius:
-        BorderRadius.circular(
-          12,
-        ),
-        side: BorderSide(
-          color:
-          theme.dividerColor,
-        ),
-      ),
-      child: TextField(
-        onChanged: (value) {
-          setState(() {
-            _search = value;
-          });
-        },
-        decoration:
-        InputDecoration(
-          hintText:
-          l10n?.translate(
-            'search_clients_hint',
-          ) ??
-              'Search by name, ACC or assignee...',
-          prefixIcon:
-          const Icon(
-            Icons.search,
-          ),
-          border:
-          InputBorder.none,
-          contentPadding:
-          const EdgeInsets
-              .symmetric(
-            horizontal: 16,
-            vertical: 14,
+    return Row(
+      children: [
+        Expanded(
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.dividerColor),
+            ),
+            child: TextField(
+              onChanged: (value) {
+                setState(() {
+                  _search = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText:
+                l10n?.translate('search_clients_hint') ??
+                    'Search by name, ACC or assignee...',
+                prefixIcon: const Icon(Icons.search),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+              ),
+            ),
           ),
         ),
-      ),
+        const SizedBox(width: 10),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              tooltip: 'Filters',
+              onPressed: _showFiltersDialog,
+              icon: const Icon(Icons.tune_outlined),
+              style: IconButton.styleFrom(
+                backgroundColor: theme.colorScheme.surface,
+                side: BorderSide(color: theme.dividerColor),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            if (_filters.activeCount > 0)
+              Positioned(
+                right: -2,
+                top: -4,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${_filters.activeCount}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
+  }
+
+  List<ClientModel> _applyClientFilters(List<ClientModel> clients) {
+    final q = _normalize(_search);
+
+    return clients.where((client) {
+      // Search remains an AND condition with the structured filters.
+      if (q.isNotEmpty) {
+        final assigneeName = _normalize(_agentNames[client.assignedTo] ?? '');
+        final matchesSearch =
+            _normalize(client.companyName).contains(q) ||
+                _normalize(client.accNumber).contains(q) ||
+                _normalize(client.assignedTo).contains(q) ||
+                assigneeName.contains(q);
+        if (!matchesSearch) return false;
+      }
+
+      final conditions = <bool>[];
+
+      if (_filters.creationDateRange != null) {
+        conditions.add(
+          _dateInRange(client.createdAt, _filters.creationDateRange!),
+        );
+      }
+
+      if (_filters.activationDateRange != null) {
+        conditions.add(
+          _dateInRange(client.activationDate, _filters.activationDateRange!),
+        );
+      }
+
+      if (_filters.assigneeIds.isNotEmpty) {
+        conditions.add(_filters.assigneeIds.contains(client.assignedTo));
+      }
+
+      if (_filters.activationStatuses.isNotEmpty) {
+        conditions.add(
+          _filters.activationStatuses.contains(client.activationStatus),
+        );
+      }
+
+      if (_filters.verificationStatuses.isNotEmpty) {
+        conditions.add(
+          _filters.verificationStatuses.contains(client.verificationStatus),
+        );
+      }
+
+      if (_filters.chatbotStatuses.isNotEmpty) {
+        conditions.add(
+          _filters.chatbotStatuses.contains(client.chatbotStatus),
+        );
+      }
+
+      if (_filters.groupStatuses.isNotEmpty) {
+        conditions.add(_filters.groupStatuses.contains(client.groupStatus));
+      }
+
+      if (conditions.isEmpty) return true;
+      return _filters.useAnd
+          ? conditions.every((value) => value)
+          : conditions.any((value) => value);
+    }).toList();
+  }
+
+  bool _dateInRange(DateTime? value, DateTimeRange range) {
+    if (value == null) return false;
+    final date = DateTime(value.year, value.month, value.day);
+    final start = DateTime(
+      range.start.year,
+      range.start.month,
+      range.start.day,
+    );
+    final end = DateTime(
+      range.end.year,
+      range.end.month,
+      range.end.day,
+    );
+    return !date.isBefore(start) && !date.isAfter(end);
+  }
+
+  Future<void> _showFiltersDialog() async {
+    final result = await showDialog<_ClientFilterState>(
+      context: context,
+      builder: (dialogContext) {
+        return _ClientFiltersDialog(
+          initial: _filters.copy(),
+          clients: _latestClients,
+          agentNames: _agentNames,
+        );
+      },
+    );
+
+    if (result == null || !mounted) return;
+    setState(() {
+      _filters = result;
+    });
   }
 
   // ===========================================================================
@@ -2652,6 +2728,365 @@ class _OnboardingClientsScreenState
 
     cc.dispose();
     ac.dispose();
+  }
+}
+
+
+class _ClientFilterState {
+  bool useAnd;
+  DateTimeRange? creationDateRange;
+  DateTimeRange? activationDateRange;
+  Set<String> assigneeIds;
+  Set<String> activationStatuses;
+  Set<String> verificationStatuses;
+  Set<String> chatbotStatuses;
+  Set<String> groupStatuses;
+
+  _ClientFilterState({
+    this.useAnd = true,
+    this.creationDateRange,
+    this.activationDateRange,
+    Set<String>? assigneeIds,
+    Set<String>? activationStatuses,
+    Set<String>? verificationStatuses,
+    Set<String>? chatbotStatuses,
+    Set<String>? groupStatuses,
+  }) : assigneeIds = assigneeIds ?? <String>{},
+        activationStatuses = activationStatuses ?? <String>{},
+        verificationStatuses = verificationStatuses ?? <String>{},
+        chatbotStatuses = chatbotStatuses ?? <String>{},
+        groupStatuses = groupStatuses ?? <String>{};
+
+  int get activeCount => [
+    creationDateRange,
+    activationDateRange,
+  ].where((value) => value != null).length +
+      [
+        assigneeIds,
+        activationStatuses,
+        verificationStatuses,
+        chatbotStatuses,
+        groupStatuses,
+      ].where((value) => value.isNotEmpty).length;
+
+  bool get isActive => activeCount > 0;
+
+  _ClientFilterState copy() {
+    return _ClientFilterState(
+      useAnd: useAnd,
+      creationDateRange: creationDateRange,
+      activationDateRange: activationDateRange,
+      assigneeIds: {...assigneeIds},
+      activationStatuses: {...activationStatuses},
+      verificationStatuses: {...verificationStatuses},
+      chatbotStatuses: {...chatbotStatuses},
+      groupStatuses: {...groupStatuses},
+    );
+  }
+}
+
+class _ClientFiltersDialog extends StatefulWidget {
+  final _ClientFilterState initial;
+  final List<ClientModel> clients;
+  final Map<String, String> agentNames;
+
+  const _ClientFiltersDialog({
+    required this.initial,
+    required this.clients,
+    required this.agentNames,
+  });
+
+  @override
+  State<_ClientFiltersDialog> createState() => _ClientFiltersDialogState();
+}
+
+class _ClientFiltersDialogState extends State<_ClientFiltersDialog> {
+  late _ClientFilterState _filters;
+
+  @override
+  void initState() {
+    super.initState();
+    _filters = widget.initial.copy();
+  }
+
+  List<String> _statusValues(String Function(ClientModel) getter) {
+    final values = <String>{};
+    for (final client in widget.clients) {
+      final value = getter(client).trim();
+      if (value.isNotEmpty) values.add(value);
+    }
+    final result = values.toList();
+    result.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return result;
+  }
+
+  List<MapEntry<String, String>> _assignees() {
+    final values = <String, String>{};
+    for (final client in widget.clients) {
+      final uid = client.assignedTo.trim();
+      if (uid.isEmpty) continue;
+      values[uid] = widget.agentNames[uid] ?? uid;
+    }
+    final result = values.entries.toList();
+    result.sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    return result;
+  }
+
+  Future<void> _pickDateRange({required bool creation}) async {
+    final current = creation
+        ? _filters.creationDateRange
+        : _filters.activationDateRange;
+    final initialStart = current?.start ?? DateTime.now();
+    final initialEnd = current?.end ?? initialStart;
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      initialDateRange: DateTimeRange(
+        start: initialStart,
+        end: initialEnd.isBefore(initialStart) ? initialStart : initialEnd,
+      ),
+    );
+
+    if (picked == null) return;
+    setState(() {
+      if (creation) {
+        _filters.creationDateRange = picked;
+      } else {
+        _filters.activationDateRange = picked;
+      }
+    });
+  }
+
+  String _formatRange(DateTimeRange? range) {
+    if (range == null) return 'Any date';
+    String f(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    if (range.start.year == range.end.year &&
+        range.start.month == range.end.month &&
+        range.start.day == range.end.day) {
+      return f(range.start);
+    }
+    return '${f(range.start)} → ${f(range.end)}';
+  }
+
+  Widget _dateFilter({
+    required String title,
+    required bool creation,
+  }) {
+    final range = creation
+        ? _filters.creationDateRange
+        : _filters.activationDateRange;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickDateRange(creation: creation),
+                icon: const Icon(Icons.calendar_today_outlined, size: 17),
+                label: Text(_formatRange(range)),
+              ),
+            ),
+            if (range != null) ...[
+              const SizedBox(width: 6),
+              IconButton(
+                tooltip: 'Clear',
+                onPressed: () => setState(() {
+                  if (creation) {
+                    _filters.creationDateRange = null;
+                  } else {
+                    _filters.activationDateRange = null;
+                  }
+                }),
+                icon: const Icon(Icons.clear),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _multiChoiceSection({
+    required String title,
+    required List<String> values,
+    required Set<String> selected,
+  }) {
+    if (values.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: values.map((value) {
+            final isSelected = selected.contains(value);
+            return FilterChip(
+              label: Text(value),
+              selected: isSelected,
+              onSelected: (selectedNow) {
+                setState(() {
+                  if (selectedNow) {
+                    selected.add(value);
+                  } else {
+                    selected.remove(value);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _assigneeSection() {
+    final assignees = _assignees();
+    if (assignees.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Assignee Name', style: TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: assignees.map((entry) {
+            final isSelected = _filters.assigneeIds.contains(entry.key);
+            return FilterChip(
+              label: Text(entry.value),
+              selected: isSelected,
+              onSelected: (selectedNow) {
+                setState(() {
+                  if (selectedNow) {
+                    _filters.assigneeIds.add(entry.key);
+                  } else {
+                    _filters.assigneeIds.remove(entry.key);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  void _clear() {
+    setState(() {
+      _filters = _ClientFilterState(useAnd: _filters.useAnd);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final activationStatuses =
+    _statusValues((client) => client.activationStatus);
+    final verificationStatuses =
+    _statusValues((client) => client.verificationStatus);
+    final chatbotStatuses =
+    _statusValues((client) => client.chatbotStatus);
+    final groupStatuses = _statusValues((client) => client.groupStatus);
+
+    return AlertDialog(
+      title: const Text('Filter Clients'),
+      content: SizedBox(
+        width: 650,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Filter logic',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment<bool>(
+                    value: true,
+                    label: Text('AND'),
+                    icon: Icon(Icons.join_full),
+                  ),
+                  ButtonSegment<bool>(
+                    value: false,
+                    label: Text('OR'),
+                    icon: Icon(Icons.alt_route),
+                  ),
+                ],
+                selected: {_filters.useAnd},
+                onSelectionChanged: (selection) {
+                  setState(() => _filters.useAnd = selection.first);
+                },
+              ),
+              const SizedBox(height: 20),
+              _dateFilter(title: 'Date of Creation', creation: true),
+              const SizedBox(height: 16),
+              _dateFilter(title: 'Date of Activation', creation: false),
+              const SizedBox(height: 16),
+              _assigneeSection(),
+              if (_assignees().isNotEmpty) const SizedBox(height: 16),
+              _multiChoiceSection(
+                title: 'Activation Status',
+                values: activationStatuses,
+                selected: _filters.activationStatuses,
+              ),
+              const SizedBox(height: 16),
+              _multiChoiceSection(
+                title: 'Verification Status',
+                values: verificationStatuses,
+                selected: _filters.verificationStatuses,
+              ),
+              const SizedBox(height: 16),
+              _multiChoiceSection(
+                title: 'Chatbot Status',
+                values: chatbotStatuses,
+                selected: _filters.chatbotStatuses,
+              ),
+              const SizedBox(height: 16),
+              _multiChoiceSection(
+                title: 'Group Status',
+                values: groupStatuses,
+                selected: _filters.groupStatuses,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Multiple values inside the same field use OR. The AND/OR selector controls how the different filter fields are combined.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.60),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _clear,
+          child: const Text('Clear All'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _filters),
+          child: const Text('Apply Filters'),
+        ),
+      ],
+    );
   }
 }
 
