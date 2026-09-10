@@ -1,3 +1,4 @@
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -1382,6 +1383,131 @@ class OnboardingRepository {
         // Task completion remains successful.
       }
     }
+  }
+
+  // ============================================================
+  // EDIT TASK
+  // ============================================================
+
+  Future<void> updateTask({
+    required String taskId,
+    required String task,
+    required String taskType,
+  }) async {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      throw Exception(
+        'You must be logged in to edit a task.',
+      );
+    }
+
+    final cleanTaskId = taskId.trim();
+    final cleanTask = task.trim();
+    final cleanTaskType = taskType.trim();
+
+    if (cleanTaskId.isEmpty) {
+      throw Exception('Task ID is required.');
+    }
+
+    if (cleanTask.isEmpty) {
+      throw Exception('Task description is required.');
+    }
+
+    if (cleanTaskType.isEmpty) {
+      throw Exception('Task type is required.');
+    }
+
+    final document = _tasks.doc(cleanTaskId);
+    final snapshot = await document.get();
+
+    if (!snapshot.exists) {
+      throw Exception('Task not found.');
+    }
+
+    final data = snapshot.data() ?? <String, dynamic>{};
+
+    final assignedTo = data['assignedTo']?.toString().trim() ?? '';
+
+    if (assignedTo != user.uid) {
+      throw Exception(
+        'You are not allowed to edit this task.',
+      );
+    }
+
+    // Keep the existing client/department validation consistent with
+    // task creation. Only the description and type are editable here.
+    final clientId = data['clientId']?.toString().trim() ?? '';
+    final department = data['department']?.toString().trim() ?? '';
+
+    if (cleanTaskType != 'Internal' && clientId.isEmpty) {
+      throw Exception(
+        'A client is required for this task type.',
+      );
+    }
+
+    if (cleanTaskType == 'Internal' && department.isEmpty) {
+      throw Exception(
+        'A department is required for an internal task.',
+      );
+    }
+
+    // IMPORTANT:
+    // Do not modify status, assignedTo, createdBy, createdAt,
+    // startedAt, or finishedAt. This keeps the calculated duration
+    // exactly as originally recorded.
+    await document.update({
+      'task': cleanTask,
+      'taskType': cleanTaskType,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ============================================================
+  // DELETE TASK FROM CALCULATED TASK TIME ONLY
+  // ============================================================
+
+  Future<void> deleteTask(String taskId) async {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      throw Exception(
+        'You must be logged in to delete a task.',
+      );
+    }
+
+    final cleanTaskId = taskId.trim();
+
+    if (cleanTaskId.isEmpty) {
+      throw Exception('Task ID is required.');
+    }
+
+    final document = _tasks.doc(cleanTaskId);
+    final snapshot = await document.get();
+
+    if (!snapshot.exists) {
+      throw Exception('Task not found.');
+    }
+
+    final data = snapshot.data() ?? <String, dynamic>{};
+
+    final assignedTo = data['assignedTo']?.toString().trim() ?? '';
+
+    if (assignedTo != user.uid) {
+      throw Exception(
+        'You are not allowed to delete this task.',
+      );
+    }
+
+    // Delete ONLY the onboarding_tasks document.
+    //
+    // We intentionally do NOT touch:
+    // clients/{clientId}/activity/*
+    //
+    // Therefore the task remains visible in the Activity tab as an
+    // audit/history event, while it is removed from all task-time
+    // calculations that read from onboarding_tasks.
+    await document.delete();
   }
 
   DateTime? _taskDateTime(dynamic value) {

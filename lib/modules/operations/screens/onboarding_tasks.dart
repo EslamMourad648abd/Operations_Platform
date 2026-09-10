@@ -144,6 +144,8 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                                 ? _locallyCreatedAt
                                 : null,
                             onFinish: () => _finishTask(t.id),
+                            onEdit: () => _showEditTaskDialog(t),
+                            onDelete: () => _deleteTask(t),
                           ),
                         ),
                       ),
@@ -192,7 +194,11 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
             ...dayTasks.map(
                   (t) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _TaskCard(task: t),
+                child: _TaskCard(
+                  task: t,
+                  onEdit: () => _showEditTaskDialog(t),
+                  onDelete: () => _deleteTask(t),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -433,6 +439,110 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
     }
   }
 
+  Future<void> _showEditTaskDialog(OnboardingTaskModel task) async {
+    final l = AppLocalizations.of(context);
+    final res = await showDialog<_TaskEditDraft>(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => _EditTaskDialog(task: task),
+    );
+
+    if (res == null) return;
+
+    try {
+      await _repository.updateTask(
+        taskId: task.id,
+        task: res.task,
+        taskType: res.taskType,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l?.translate('task_updated_success') ?? 'Task updated',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${l?.translate('failed_update_task') ?? 'Failed to update task'}: $e',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteTask(OnboardingTaskModel task) async {
+    final l = AppLocalizations.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) {
+        final theme = Theme.of(c);
+        return AlertDialog(
+          title: Text(l?.translate('delete_task') ?? 'Delete Task'),
+          content: Text(
+            l?.translate('delete_task_confirmation') ??
+                'Delete this task from calculated time? The activity history will remain unchanged.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: Text(l?.translate('cancel') ?? 'Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.error,
+              ),
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(l?.translate('delete') ?? 'Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _repository.deleteTask(task.id);
+
+      if (mounted) {
+        if (_locallyCreatedTaskId == task.id) {
+          setState(() {
+            _locallyCreatedTaskId = null;
+            _locallyCreatedAt = null;
+          });
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l?.translate('task_deleted_success') ??
+                  'Task removed from calculated time',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${l?.translate('failed_delete_task') ?? 'Failed to delete task'}: $e',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _showCreateTaskDialog() async {
     final l = AppLocalizations.of(context);
     final res = await showDialog<_TaskDraft>(
@@ -522,6 +632,111 @@ class _TaskDraft {
     this.client,
     this.department,
   });
+}
+
+class _TaskEditDraft {
+  final String task;
+  final String taskType;
+
+  const _TaskEditDraft({
+    required this.task,
+    required this.taskType,
+  });
+}
+
+class _EditTaskDialog extends StatefulWidget {
+  final OnboardingTaskModel task;
+
+  const _EditTaskDialog({required this.task});
+
+  @override
+  State<_EditTaskDialog> createState() => _EditTaskDialogState();
+}
+
+class _EditTaskDialogState extends State<_EditTaskDialog> {
+  late final TextEditingController _tc;
+  late String _tt;
+
+  @override
+  void initState() {
+    super.initState();
+    _tc = TextEditingController(text: widget.task.task);
+    _tt = kTaskTypes.contains(widget.task.taskType)
+        ? widget.task.taskType
+        : kTaskTypes.first;
+  }
+
+  @override
+  void dispose() {
+    _tc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+
+    return AlertDialog(
+      title: Text(l?.translate('edit_task') ?? 'Edit Task'),
+      content: SizedBox(
+        width: 520,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: _tt,
+              decoration: InputDecoration(
+                labelText: l?.translate('task_type') ?? 'Type',
+              ),
+              items: kTaskTypes
+                  .map(
+                    (t) => DropdownMenuItem(
+                  value: t,
+                  child: Text(
+                    l?.translate(
+                      t.toLowerCase().replaceAll(' ', '_'),
+                    ) ??
+                        t,
+                  ),
+                ),
+              )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _tt = v);
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _tc,
+              autofocus: true,
+              maxLines: 4,
+              decoration: InputDecoration(
+                labelText: l?.translate('task') ?? 'Description',
+                hintText: l?.translate('what_working_on'),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l?.translate('cancel') ?? 'Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final task = _tc.text.trim();
+            if (task.isEmpty) return;
+            Navigator.pop(
+              context,
+              _TaskEditDraft(task: task, taskType: _tt),
+            );
+          },
+          child: Text(l?.translate('save') ?? 'Save'),
+        ),
+      ],
+    );
+  }
 }
 
 class _CreateTaskDialog extends StatefulWidget {
@@ -834,12 +1049,16 @@ class _ActiveTaskCard extends StatefulWidget {
   final OnboardingTaskModel task;
   final DateTime? displayStartAt;
   final VoidCallback onFinish;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const _ActiveTaskCard({
     super.key,
     required this.task,
     required this.displayStartAt,
     required this.onFinish,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -975,9 +1194,27 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                           ),
                         ],
                       ),
-                      ElevatedButton(
-                        onPressed: widget.onFinish,
-                        child: Text(l?.translate('finish') ?? 'Finish'),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: l?.translate('edit') ?? 'Edit',
+                            onPressed: widget.onEdit,
+                            icon: const Icon(Icons.edit_outlined),
+                          ),
+                          IconButton(
+                            tooltip: l?.translate('delete') ?? 'Delete',
+                            onPressed: widget.onDelete,
+                            icon: Icon(
+                              Icons.delete_outline,
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: widget.onFinish,
+                            child: Text(l?.translate('finish') ?? 'Finish'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1068,7 +1305,21 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
                     ),
                   ],
                 ),
-                const SizedBox(width: 18),
+                const SizedBox(width: 10),
+                IconButton(
+                  tooltip: l?.translate('edit') ?? 'Edit',
+                  onPressed: widget.onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+                IconButton(
+                  tooltip: l?.translate('delete') ?? 'Delete',
+                  onPressed: widget.onDelete,
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                const SizedBox(width: 4),
                 ElevatedButton(
                   onPressed: widget.onFinish,
                   child: Text(l?.translate('finish') ?? 'Finish'),
@@ -1084,8 +1335,14 @@ class _ActiveTaskCardState extends State<_ActiveTaskCard> {
 
 class _TaskCard extends StatelessWidget {
   final OnboardingTaskModel task;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _TaskCard({required this.task});
+  const _TaskCard({
+    required this.task,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1156,6 +1413,21 @@ class _TaskCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        tooltip: l?.translate('edit') ?? 'Edit',
+                        onPressed: onEdit,
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                      ),
+                      IconButton(
+                        tooltip: l?.translate('delete') ?? 'Delete',
+                        onPressed: onDelete,
+                        icon: Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -1216,6 +1488,21 @@ class _TaskCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: l?.translate('edit') ?? 'Edit',
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                ),
+                IconButton(
+                  tooltip: l?.translate('delete') ?? 'Delete',
+                  onPressed: onDelete,
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 20,
+                    color: theme.colorScheme.error,
                   ),
                 ),
               ],
@@ -1365,3 +1652,4 @@ const List<String> kInternalDepartments = [
   'Sales',
   'VoIP',
 ];
+
