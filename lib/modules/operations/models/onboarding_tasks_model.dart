@@ -17,7 +17,7 @@ class OnboardingTaskModel {
 
   const OnboardingTaskModel({
     required this.id,
-    required this.task,
+    this.task = '',
     required this.taskType,
     required this.status,
     required this.assignedTo,

@@ -726,7 +726,6 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
         ElevatedButton(
           onPressed: () {
             final task = _tc.text.trim();
-            if (task.isEmpty) return;
             Navigator.pop(
               context,
               _TaskEditDraft(task: task, taskType: _tt),
@@ -903,7 +902,8 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
 
   void _save() {
     final t = _tc.text.trim();
-    if (t.isEmpty) return;
+    // Task description is optional.
+    // Only the required context fields are validated.
     if (_needsClient && _cid == null) return;
     if (!_needsClient && _dep == null) return;
 
@@ -1645,7 +1645,6 @@ const List<String> kTaskTypes = [
   'Call',
   'Meeting',
   'Ticket',
-  'Anydesk',
 ];
 const List<String> kInternalDepartments = [
   'Business Chat',

@@ -1190,7 +1190,7 @@ class OnboardingRepository {
   // ============================================================
 
   Future<String> createTask({
-    required String task,
+    String task = '',
     required String taskType,
     String? clientId,
     String? clientName,
@@ -1215,12 +1215,6 @@ class OnboardingRepository {
     // ============================================================
     // VALIDATION
     // ============================================================
-
-    if (cleanTask.isEmpty) {
-      throw Exception(
-        'Task description is required.',
-      );
-    }
 
     if (cleanTaskType.isEmpty) {
       throw Exception(
@@ -1391,7 +1385,7 @@ class OnboardingRepository {
 
   Future<void> updateTask({
     required String taskId,
-    required String task,
+    String task = '',
     required String taskType,
   }) async {
     final user = _auth.currentUser;
@@ -1408,10 +1402,6 @@ class OnboardingRepository {
 
     if (cleanTaskId.isEmpty) {
       throw Exception('Task ID is required.');
-    }
-
-    if (cleanTask.isEmpty) {
-      throw Exception('Task description is required.');
     }
 
     if (cleanTaskType.isEmpty) {
@@ -1600,3 +1590,4 @@ class OnboardingRepository {
     });
   }
 }
+
