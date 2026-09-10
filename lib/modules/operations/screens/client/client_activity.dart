@@ -18,12 +18,42 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
   String _categoryFilter = 'all';
   String _actionFilter = 'all';
   String _search = '';
+
   late final TextEditingController _searchController;
+  late final OnboardingRepository _repository;
+
+  // IMPORTANT:
+  // Keep these streams stable instead of creating them inside build().
+  // This prevents the Firestore streams from restarting whenever
+  // the user types into the search field.
+  late Stream<ClientModel?> _clientStream;
+  late Stream<List<ActivityModel>> _activityStream;
 
   @override
   void initState() {
     super.initState();
+
     _searchController = TextEditingController();
+    _repository = OnboardingRepository();
+
+    _clientStream = _repository.watchClient(widget.clientId);
+    _activityStream = _repository.watchClientActivity(widget.clientId);
+  }
+
+  @override
+  void didUpdateWidget(covariant ClientActivityScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.clientId != widget.clientId) {
+      _clientStream = _repository.watchClient(widget.clientId);
+      _activityStream =
+          _repository.watchClientActivity(widget.clientId);
+
+      _categoryFilter = 'all';
+      _actionFilter = 'all';
+      _search = '';
+      _searchController.clear();
+    }
   }
 
   @override
@@ -35,10 +65,10 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final repository = OnboardingRepository();
 
     return StreamBuilder<ClientModel?>(
-      stream: repository.watchClient(widget.clientId),
+      // Use the existing stream instead of creating a new one in build().
+      stream: _clientStream,
       builder: (context, clientSnap) {
         if (clientSnap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -57,7 +87,9 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
         final client = clientSnap.data!;
 
         return StreamBuilder<List<ActivityModel>>(
-          stream: repository.watchClientActivity(widget.clientId),
+          // Use the existing activity stream instead of recreating it
+          // every time the screen rebuilds.
+          stream: _activityStream,
           builder: (context, activitySnap) {
             if (activitySnap.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -69,7 +101,8 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
               );
             }
 
-            final allActivities = activitySnap.data ?? const <ActivityModel>[];
+            final allActivities =
+                activitySnap.data ?? const <ActivityModel>[];
             final filtered = _filterActivities(allActivities);
 
             return Container(
@@ -84,6 +117,7 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
                       children: [
                         LayoutBuilder(builder: (context, constraints) {
                           final isCompact = constraints.maxWidth < 600;
+
                           final content = [
                             Expanded(
                               flex: isCompact ? 0 : 1,
@@ -109,22 +143,26 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
                                 ],
                               ),
                             ),
-                            if (isCompact) const SizedBox(height: 16) else const SizedBox(width: 12),
+                            if (isCompact)
+                              const SizedBox(height: 16)
+                            else
+                              const SizedBox(width: 12),
                             _CountBadge(
                               count: filtered.length,
                               totalCount: allActivities.length,
-                              filtered: filtered.length != allActivities.length,
+                              filtered:
+                              filtered.length != allActivities.length,
                             ),
                           ];
 
                           return isCompact
                               ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: content,
-                                )
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: content,
+                          )
                               : Row(
-                                  children: content,
-                                );
+                            children: content,
+                          );
                         }),
                         const SizedBox(height: 28),
                         _SummaryCard(client: client),
@@ -143,6 +181,7 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
                               setState(() => _search = value),
                           onClear: () {
                             _searchController.clear();
+
                             setState(() {
                               _categoryFilter = 'all';
                               _actionFilter = 'all';
@@ -164,7 +203,9 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
     );
   }
 
-  List<ActivityModel> _filterActivities(List<ActivityModel> activities) {
+  List<ActivityModel> _filterActivities(
+      List<ActivityModel> activities,
+      ) {
     final query = _search.trim().toLowerCase();
 
     return activities.where((activity) {
@@ -187,7 +228,9 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
         activity.action,
         activity.actorName,
         activity.actorId,
-        _flattenMetadata(_meaningfulMetadata(activity.metadata)),
+        _flattenMetadata(
+          _meaningfulMetadata(activity.metadata),
+        ),
       ].join(' ').toLowerCase();
 
       return searchable.contains(query);
@@ -209,8 +252,16 @@ class _SummaryCard extends StatelessWidget {
           spacing: 32,
           runSpacing: 18,
           children: [
-            _SItem(l: 'Company', v: client.companyName, i: Icons.business),
-            _SItem(l: 'ACC', v: client.accNumber, i: Icons.badge),
+            _SItem(
+              l: 'Company',
+              v: client.companyName,
+              i: Icons.business,
+            ),
+            _SItem(
+              l: 'ACC',
+              v: client.accNumber,
+              i: Icons.badge,
+            ),
             _SItem(
               l: 'Activation',
               v: client.activationStatus,
@@ -221,8 +272,16 @@ class _SummaryCard extends StatelessWidget {
               v: client.verificationStatus,
               i: Icons.verified,
             ),
-            _SItem(l: 'Chatbot', v: client.chatbotStatus, i: Icons.smart_toy),
-            _SItem(l: 'Group', v: client.groupStatus, i: Icons.groups),
+            _SItem(
+              l: 'Chatbot',
+              v: client.chatbotStatus,
+              i: Icons.smart_toy,
+            ),
+            _SItem(
+              l: 'Group',
+              v: client.groupStatus,
+              i: Icons.groups,
+            ),
           ],
         ),
       ),
@@ -235,54 +294,67 @@ class _SItem extends StatelessWidget {
   final String v;
   final IconData i;
 
-  const _SItem({required this.l, required this.v, required this.i});
+  const _SItem({
+    required this.l,
+    required this.v,
+    required this.i,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return LayoutBuilder(builder: (context, constraints) {
-      final isCompact = constraints.maxWidth < 250;
-      return SizedBox(
-        width: isCompact ? double.infinity : 200,
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(9),
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 250;
+
+        return SizedBox(
+          width: isCompact ? double.infinity : 200,
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(
+                  i,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
               ),
-              child: Icon(i, size: 18, color: theme.colorScheme.primary),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.6),
+                      ),
                     ),
-                  ),
-                  Text(
-                    v.trim().isEmpty ? '—' : v,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                    Text(
+                      v.trim().isEmpty ? '—' : v,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      );
-    });
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -335,58 +407,75 @@ class _Filters extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(builder: (context, constraints) {
-          final isCompact = constraints.maxWidth < 600;
-          final itemWidth = isCompact ? double.infinity : 200.0;
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 600;
+            final itemWidth = isCompact ? double.infinity : 200.0;
 
-          return Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: isCompact ? double.infinity : 250,
-                child: TextField(
-                  controller: searchController,
-                  onChanged: onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: 'Search activity...',
-                    prefixIcon: const Icon(Icons.search, size: 19),
-                    suffixIcon: search.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear search',
-                            onPressed: onClear,
-                            icon: const Icon(Icons.clear, size: 18),
-                          ),
-                    isDense: true,
-                    border: const OutlineInputBorder(),
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: isCompact ? double.infinity : 250,
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Search activity...',
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        size: 19,
+                      ),
+                      suffixIcon: search.isEmpty
+                          ? null
+                          : IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: onClear,
+                        icon: const Icon(
+                          Icons.clear,
+                          size: 18,
+                        ),
+                      ),
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
                 ),
-              ),
-              _FilterDropdown(
-                label: 'Section',
-                width: itemWidth,
-                value: categories.contains(categoryFilter) ? categoryFilter : 'all',
-                values: categories,
-                onChanged: onCategoryChanged,
-              ),
-              _FilterDropdown(
-                label: 'Action',
-                width: itemWidth,
-                value: actions.contains(actionFilter) ? actionFilter : 'all',
-                values: actions,
-                onChanged: onActionChanged,
-              ),
-              if (categoryFilter != 'all' || actionFilter != 'all' || search.isNotEmpty)
-                TextButton.icon(
-                  onPressed: onClear,
-                  icon: const Icon(Icons.filter_alt_off, size: 17),
-                  label: const Text('Clear filters'),
+                _FilterDropdown(
+                  label: 'Section',
+                  width: itemWidth,
+                  value: categories.contains(categoryFilter)
+                      ? categoryFilter
+                      : 'all',
+                  values: categories,
+                  onChanged: onCategoryChanged,
                 ),
-            ],
-          );
-        }),
+                _FilterDropdown(
+                  label: 'Action',
+                  width: itemWidth,
+                  value: actions.contains(actionFilter)
+                      ? actionFilter
+                      : 'all',
+                  values: actions,
+                  onChanged: onActionChanged,
+                ),
+                if (categoryFilter != 'all' ||
+                    actionFilter != 'all' ||
+                    search.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: onClear,
+                    icon: const Icon(
+                      Icons.filter_alt_off,
+                      size: 17,
+                    ),
+                    label: const Text('Clear filters'),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -421,16 +510,18 @@ class _FilterDropdown extends StatelessWidget {
         items: values
             .map(
               (value) => DropdownMenuItem<String>(
-                value: value,
-                child: Text(
-                  _prettyLabel(value),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            )
+            value: value,
+            child: Text(
+              _prettyLabel(value),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        )
             .toList(),
         onChanged: (value) {
-          if (value != null) onChanged(value);
+          if (value != null) {
+            onChanged(value);
+          }
         },
       ),
     );
@@ -448,7 +539,11 @@ class _Timeline extends StatelessWidget {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(40),
-          child: Center(child: Text('No activity matches the current filters.')),
+          child: Center(
+            child: Text(
+              'No activity matches the current filters.',
+            ),
+          ),
         ),
       );
     }
@@ -461,7 +556,10 @@ class _Timeline extends StatelessWidget {
           children: [
             const Text(
               'Activity Timeline',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 20),
             ...List.generate(
@@ -482,7 +580,10 @@ class _Item extends StatelessWidget {
   final ActivityModel act;
   final bool last;
 
-  const _Item({required this.act, required this.last});
+  const _Item({
+    required this.act,
+    required this.last,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -503,7 +604,11 @@ class _Item extends StatelessWidget {
                   color: c.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(_icon(act.type), size: 17, color: c),
+                child: Icon(
+                  _icon(act.type),
+                  size: 17,
+                  color: c,
+                ),
               ),
               if (!last)
                 Container(
@@ -541,123 +646,150 @@ class _ActivityCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       elevation: 0,
       color: theme.colorScheme.surface.withValues(alpha: 0.35),
-      child: LayoutBuilder(builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 450;
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 450;
 
-        return ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          title: isCompact
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      act.title.trim().isEmpty ? 'Activity' : act.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _fDt(act.createdAt),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ],
-                )
-              : Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        act.title.trim().isEmpty ? 'Activity' : act.title,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      _fDt(act.createdAt),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ],
-                ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Column(
+          return ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 2,
+            ),
+            childrenPadding: const EdgeInsets.fromLTRB(
+              14,
+              0,
+              14,
+              14,
+            ),
+            title: isCompact
+                ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (act.action.trim().isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      _prettyLabel(act.action),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
+                Text(
+                  act.title.trim().isEmpty
+                      ? 'Activity'
+                      : act.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _fDt(act.createdAt),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurface
+                        .withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            )
+                : Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    act.title.trim().isEmpty
+                        ? 'Activity'
+                        : act.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                if (act.description.trim().isNotEmpty)
-                  Text(
-                    act.description,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  _fDt(act.createdAt),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurface
+                        .withValues(alpha: 0.5),
                   ),
-                const SizedBox(height: 5),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.person,
-                      size: 12,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      act.actorName.trim().isEmpty ? 'System' : act.actorName,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
-          ),
-          children: [
-            if (metadata.isEmpty)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'No additional details recorded.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (act.action.trim().isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _prettyLabel(act.action),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  if (act.description.trim().isNotEmpty)
+                    Text(
+                      act.description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.7),
+                      ),
+                    ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.person,
+                        size: 12,
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.4),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        act.actorName.trim().isEmpty
+                            ? 'System'
+                            : act.actorName,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              )
-            else
-              _MetadataDetails(metadata: metadata),
-          ],
-        );
-      }),
+                ],
+              ),
+            ),
+            children: [
+              if (metadata.isEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'No additional details recorded.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurface
+                          .withValues(alpha: 0.5),
+                    ),
+                  ),
+                )
+              else
+                _MetadataDetails(metadata: metadata),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -665,7 +797,9 @@ class _ActivityCard extends StatelessWidget {
 class _MetadataDetails extends StatelessWidget {
   final Map<String, dynamic> metadata;
 
-  const _MetadataDetails({required this.metadata});
+  const _MetadataDetails({
+    required this.metadata,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -686,7 +820,10 @@ class _MetadataDetails extends StatelessWidget {
         children: [
           const Text(
             'Change details',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 10),
           ...metadata.entries.map(
@@ -708,68 +845,77 @@ class _MetadataRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _MetadataRow({required this.label, required this.value});
+  const _MetadataRow({
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return LayoutBuilder(builder: (context, constraints) {
-      final isCompact = constraints.maxWidth < 450;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 450;
 
-      if (isCompact) {
-        return Column(
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface
+                      .withValues(alpha: 0.55),
+                ),
+              ),
+              const SizedBox(height: 4),
+              SelectableText(
+                value,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: theme.colorScheme.onSurface
+                      .withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          );
+        }
+
+        return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+            SizedBox(
+              width: 155,
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface
+                      .withValues(alpha: 0.55),
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            SelectableText(
-              value,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.35,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+            Expanded(
+              child: SelectableText(
+                value,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: theme.colorScheme.onSurface
+                      .withValues(alpha: 0.8),
+                ),
               ),
             ),
-            const SizedBox(height: 8),
           ],
         );
-      }
-
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 155,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
-              ),
-            ),
-          ),
-          Expanded(
-            child: SelectableText(
-              value,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.35,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-              ),
-            ),
-          ),
-        ],
-      );
-    });
+      },
+    );
   }
 }
 
@@ -789,18 +935,29 @@ class _CountBadge extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 8,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.dividerColor),
+        border: Border.all(
+          color: theme.dividerColor,
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.history, size: 16, color: theme.colorScheme.primary),
+          Icon(
+            Icons.history,
+            size: 16,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(width: 8),
           Text(
-            filtered ? '$count / $totalCount events' : '$count events',
+            filtered
+                ? '$count / $totalCount events'
+                : '$count events',
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -818,42 +975,64 @@ String _activityCategory(ActivityModel activity) {
   if (type == 'activation' || type.startsWith('activation_')) {
     return 'activation';
   }
-  if (type == 'verification' || type.startsWith('verification_')) {
+
+  if (type == 'verification' ||
+      type.startsWith('verification_')) {
     return 'verification';
   }
-  if (type == 'chatbot' || type.startsWith('chatbot_')) {
+
+  if (type == 'chatbot' ||
+      type.startsWith('chatbot_')) {
     return 'chatbot';
   }
-  if (type == 'channel' || type == 'channels' || type.startsWith('channel_')) {
+
+  if (type == 'channel' ||
+      type == 'channels' ||
+      type.startsWith('channel_')) {
     return 'channel';
   }
-  if (type == 'group' || type.startsWith('group_')) {
+
+  if (type == 'group' ||
+      type.startsWith('group_')) {
     return 'group';
   }
-  if (type == 'crm' || type.startsWith('crm_')) {
+
+  if (type == 'crm' ||
+      type.startsWith('crm_')) {
     return 'crm';
   }
-  if (type == 'assignment' || type.startsWith('assignment_')) {
+
+  if (type == 'assignment' ||
+      type.startsWith('assignment_')) {
     return 'assignment';
   }
-  if (type == 'task' || type.startsWith('task_')) {
+
+  if (type == 'task' ||
+      type.startsWith('task_')) {
     return 'task';
   }
-  if (type == 'client' || type.startsWith('client_')) {
+
+  if (type == 'client' ||
+      type.startsWith('client_')) {
     return 'client';
   }
 
   return type.isEmpty ? 'client' : type;
 }
 
-Map<String, dynamic> _meaningfulMetadata(Map<String, dynamic> source) {
+Map<String, dynamic> _meaningfulMetadata(
+    Map<String, dynamic> source,
+    ) {
   final result = <String, dynamic>{};
 
   // Prefer actual change data. Do not expose full before/after snapshots
   // when the activity already records the exact changed fields.
   final changedFields = source['changedFields'];
-  if (changedFields is Map && changedFields.isNotEmpty) {
-    result['changedFields'] = _removeEmptyValues(changedFields);
+
+  if (changedFields is Map &&
+      changedFields.isNotEmpty) {
+    result['changedFields'] =
+        _removeEmptyValues(changedFields);
   }
 
   final excluded = <String>{
@@ -868,6 +1047,7 @@ Map<String, dynamic> _meaningfulMetadata(Map<String, dynamic> source) {
     if (excluded.contains(entry.key)) continue;
 
     final cleaned = _cleanValue(entry.value);
+
     if (_hasMeaningfulValue(cleaned)) {
       result[entry.key] = cleaned;
     }
@@ -893,6 +1073,7 @@ dynamic _cleanValue(dynamic value) {
         .map(_cleanValue)
         .where(_hasMeaningfulValue)
         .toList();
+
     return list.isEmpty ? null : list;
   }
 
@@ -904,6 +1085,7 @@ Map<String, dynamic> _removeEmptyValues(Map value) {
 
   for (final entry in value.entries) {
     final cleaned = _cleanValue(entry.value);
+
     if (_hasMeaningfulValue(cleaned)) {
       result[entry.key.toString()] = cleaned;
     }
@@ -914,14 +1096,25 @@ Map<String, dynamic> _removeEmptyValues(Map value) {
 
 bool _hasMeaningfulValue(dynamic value) {
   if (value == null) return false;
-  if (value is String) return value.trim().isNotEmpty;
-  if (value is Map) return value.isNotEmpty;
-  if (value is Iterable) return value.isNotEmpty;
+
+  if (value is String) {
+    return value.trim().isNotEmpty;
+  }
+
+  if (value is Map) {
+    return value.isNotEmpty;
+  }
+
+  if (value is Iterable) {
+    return value.isNotEmpty;
+  }
+
   return true;
 }
 
 String _fDt(DateTime? d) {
   if (d == null) return '—';
+
   return '${d.day}/${d.month}/${d.year} '
       '${d.hour.toString().padLeft(2, '0')}:'
       '${d.minute.toString().padLeft(2, '0')}';
@@ -931,22 +1124,31 @@ IconData _icon(String type) {
   switch (_activityCategoryFromType(type)) {
     case 'client':
       return Icons.person_add;
+
     case 'assignment':
       return Icons.assignment_ind;
+
     case 'activation':
       return Icons.power_settings_new;
+
     case 'verification':
       return Icons.verified;
+
     case 'chatbot':
       return Icons.smart_toy;
+
     case 'channel':
       return Icons.hub;
+
     case 'group':
       return Icons.groups;
+
     case 'crm':
       return Icons.comment;
+
     case 'task':
       return Icons.task_alt;
+
     default:
       return Icons.history;
   }
@@ -956,22 +1158,31 @@ Color _color(String type) {
   switch (_activityCategoryFromType(type)) {
     case 'client':
       return Colors.green;
+
     case 'assignment':
       return Colors.indigo;
+
     case 'activation':
       return Colors.blue;
+
     case 'verification':
       return Colors.blue;
+
     case 'chatbot':
       return Colors.teal;
+
     case 'channel':
       return Colors.cyan;
+
     case 'group':
       return Colors.orange;
+
     case 'crm':
       return Colors.brown;
+
     case 'task':
       return Colors.deepPurple;
+
     default:
       return Colors.blueGrey;
   }
@@ -979,37 +1190,53 @@ Color _color(String type) {
 
 String _activityCategoryFromType(String type) {
   final normalized = type.trim().toLowerCase();
-  if (normalized == 'activation' || normalized.startsWith('activation_')) {
+
+  if (normalized == 'activation' ||
+      normalized.startsWith('activation_')) {
     return 'activation';
   }
+
   if (normalized == 'verification' ||
       normalized.startsWith('verification_')) {
     return 'verification';
   }
-  if (normalized == 'chatbot' || normalized.startsWith('chatbot_')) {
+
+  if (normalized == 'chatbot' ||
+      normalized.startsWith('chatbot_')) {
     return 'chatbot';
   }
+
   if (normalized == 'channel' ||
       normalized == 'channels' ||
       normalized.startsWith('channel_')) {
     return 'channel';
   }
-  if (normalized == 'group' || normalized.startsWith('group_')) {
+
+  if (normalized == 'group' ||
+      normalized.startsWith('group_')) {
     return 'group';
   }
-  if (normalized == 'crm' || normalized.startsWith('crm_')) {
+
+  if (normalized == 'crm' ||
+      normalized.startsWith('crm_')) {
     return 'crm';
   }
+
   if (normalized == 'assignment' ||
       normalized.startsWith('assignment_')) {
     return 'assignment';
   }
-  if (normalized == 'task' || normalized.startsWith('task_')) {
+
+  if (normalized == 'task' ||
+      normalized.startsWith('task_')) {
     return 'task';
   }
-  if (normalized == 'client' || normalized.startsWith('client_')) {
+
+  if (normalized == 'client' ||
+      normalized.startsWith('client_')) {
     return 'client';
   }
+
   return normalized;
 }
 
@@ -1017,18 +1244,25 @@ String _metadataLabel(String key) {
   return key
       .replaceAllMapped(
     RegExp(r'([a-z])([A-Z])'),
-        (match) => '${match.group(1)} ${match.group(2)}',
+        (match) =>
+    '${match.group(1)} ${match.group(2)}',
   )
       .replaceAll('_', ' ')
       .replaceFirstMapped(
     RegExp(r'^.'),
-        (match) => match.group(0)!.toUpperCase(),
+        (match) =>
+        match.group(0)!.toUpperCase(),
   );
 }
 
 String _formatMetadataValue(dynamic value) {
-  if (value is Timestamp) return _fDt(value.toDate());
-  if (value is DateTime) return _fDt(value);
+  if (value is Timestamp) {
+    return _fDt(value.toDate());
+  }
+
+  if (value is DateTime) {
+    return _fDt(value);
+  }
 
   if (value is Map) {
     return value.entries
@@ -1044,7 +1278,9 @@ String _formatMetadataValue(dynamic value) {
     return value.map(_formatMetadataValue).join('  |  ');
   }
 
-  if (value is bool) return value ? 'Yes' : 'No';
+  if (value is bool) {
+    return value ? 'Yes' : 'No';
+  }
 
   return value?.toString() ?? '';
 }
@@ -1056,18 +1292,27 @@ String _prettyLabel(String value) {
       .replaceAll('_', ' ')
       .replaceAllMapped(
     RegExp(r'([a-z])([A-Z])'),
-        (match) => '${match.group(1)} ${match.group(2)}',
+        (match) =>
+    '${match.group(1)} ${match.group(2)}',
   )
       .split(' ')
       .where((part) => part.isNotEmpty)
-      .map((part) => part[0].toUpperCase() + part.substring(1))
+      .map(
+        (part) =>
+    part[0].toUpperCase() +
+        part.substring(1),
+  )
       .join(' ');
 }
 
 String _flattenMetadata(dynamic value) {
   if (value is Map) {
     return value.entries
-        .map((entry) => '${entry.key} ${_flattenMetadata(entry.value)}')
+        .map(
+          (entry) =>
+      '${entry.key} '
+          '${_flattenMetadata(entry.value)}',
+    )
         .join(' ');
   }
 
