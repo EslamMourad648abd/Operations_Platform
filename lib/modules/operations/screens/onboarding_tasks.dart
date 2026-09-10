@@ -1645,6 +1645,7 @@ const List<String> kTaskTypes = [
   'Call',
   'Meeting',
   'Ticket',
+  'Anydesk',
 ];
 const List<String> kInternalDepartments = [
   'Business Chat',
