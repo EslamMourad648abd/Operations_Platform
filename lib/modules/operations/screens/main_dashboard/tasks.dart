@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../models/client_model.dart';
-import '../models/onboarding_tasks_model.dart';
-import '../repositories/onboarding_repository.dart';
-import '../../../../services/localization_service.dart';
+import '../../models/client_model.dart';
+import '../../models/onboarding_tasks_model.dart';
+import '../../repositories/onboarding_repository.dart';
+import '../../../../../services/localization_service.dart';
 
 class OnboardingTasks extends StatefulWidget {
   const OnboardingTasks({super.key});
@@ -805,11 +805,10 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
 
     return AlertDialog(
       title: Text(
-        l?.translate('edit_task') ?? 'Edit Task',
+        l?.translate('Edit Task') ?? 'Edit Task',
       ),
       content: SizedBox(
         width: 520,
@@ -868,21 +867,6 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Editable start timestamp.
-                  //
-                  // This is the only task timestamp that can be changed.
-                  // It supports correcting tasks that were actually started
-                  // earlier but were entered into the system later.
-                  _buildStartTimeSection(l, theme),
-
-                  const SizedBox(height: 16),
-
-                  // Finish timestamp remains read-only.
-                  _buildEndTimeSection(l, theme),
-
-                  const SizedBox(height: 16),
-
                   if (_needsClient)
                     Autocomplete<ClientModel>(
                       displayStringForOption: (cl) {
@@ -998,213 +982,44 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
           },
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(
+        20,
+        8,
+        20,
+        18,
+      ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            l?.translate('cancel') ?? 'Cancel',
-          ),
-        ),
-        ElevatedButton(
-          onPressed: _save,
-          child: Text(
-            l?.translate('save') ?? 'Save',
-          ),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: _pickStartedTime,
+              icon: const Icon(
+                Icons.access_time_outlined,
+                size: 17,
+              ),
+              label: Text(
+                '${l?.translate('Start Time') ?? 'Start Time'} '
+                    '${_formatTime(_startedAt)}',
+              ),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                l?.translate('cancel') ?? 'Cancel',
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: _save,
+              child: Text(
+                l?.translate('save') ?? 'Save',
+              ),
+            ),
+          ],
         ),
       ],
     );
-  }
-
-  Widget _buildStartTimeSection(
-      AppLocalizations? l,
-      ThemeData theme,
-      ) {
-    return _buildTimestampSection(
-      title: l?.translate('start_time') ?? 'Start Time',
-      date: _startedAt,
-      enabled: true,
-      icon: Icons.play_arrow_outlined,
-      theme: theme,
-      onDatePressed: _pickStartedDate,
-      onTimePressed: _pickStartedTime,
-    );
-  }
-
-  Widget _buildEndTimeSection(
-      AppLocalizations? l,
-      ThemeData theme,
-      ) {
-    final finishedAt = widget.task.finishedAt;
-
-    if (finishedAt == null) {
-      return _buildTimestampSection(
-        title: l?.translate('end_time') ?? 'End Time',
-        date: null,
-        enabled: false,
-        icon: Icons.stop_outlined,
-        theme: theme,
-      );
-    }
-
-    return _buildTimestampSection(
-      title: l?.translate('end_time') ?? 'End Time',
-      date: finishedAt,
-      enabled: false,
-      icon: Icons.stop_outlined,
-      theme: theme,
-    );
-  }
-
-  Widget _buildTimestampSection({
-    required String title,
-    required DateTime? date,
-    required bool enabled,
-    required IconData icon,
-    required ThemeData theme,
-    Future<void> Function()? onDatePressed,
-    Future<void> Function()? onTimePressed,
-  }) {
-    final l = AppLocalizations.of(context);
-
-    final textColor = enabled
-        ? theme.colorScheme.onSurface
-        : theme.colorScheme.onSurface.withValues(alpha: 0.55);
-
-    final borderColor = enabled
-        ? theme.colorScheme.primary.withValues(alpha: 0.35)
-        : theme.dividerColor;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(10),
-        color: enabled
-            ? theme.colorScheme.primary.withValues(alpha: 0.03)
-            : theme.colorScheme.onSurface.withValues(alpha: 0.02),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                size: 19,
-                color: enabled
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface
-                    .withValues(alpha: 0.45),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-              ),
-              if (!enabled) ...[
-                const SizedBox(width: 8),
-                Text(
-                  l?.translate('read_only') ?? 'Read only',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: theme.colorScheme.onSurface
-                        .withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed:
-                  enabled ? onDatePressed : null,
-                  icon: const Icon(
-                    Icons.calendar_today_outlined,
-                    size: 16,
-                  ),
-                  label: Text(
-                    date == null
-                        ? '—'
-                        : _formatDate(date),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed:
-                  enabled ? onTimePressed : null,
-                  icon: const Icon(
-                    Icons.access_time_outlined,
-                    size: 17,
-                  ),
-                  label: Text(
-                    date == null
-                        ? '—'
-                        : _formatTime(date),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _pickStartedDate() async {
-    final now = DateTime.now();
-    final today = _dateOnly(now);
-
-    // Keep the picker bounds explicit.
-    final firstAllowedDate = DateTime(2020);
-
-    final startedDate = _dateOnly(_startedAt);
-
-    // IMPORTANT:
-    // showDatePicker requires initialDate to be inside the
-    // [firstDate, lastDate] range. A task could have an old
-    // startedAt before 2020, so simply checking for a future
-    // date is not enough.
-    final initialDate = startedDate.isBefore(firstAllowedDate)
-        ? firstAllowedDate
-        : startedDate.isAfter(today)
-        ? today
-        : startedDate;
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: firstAllowedDate,
-      lastDate: today,
-    );
-
-    if (picked == null) return;
-
-    final candidate = DateTime(
-      picked.year,
-      picked.month,
-      picked.day,
-      _startedAt.hour,
-      _startedAt.minute,
-      _startedAt.second,
-    );
-
-    if (!_isValidStartedAt(candidate)) {
-      _showStartTimeValidationError();
-      return;
-    }
-
-    setState(() {
-      _startedAt = candidate;
-    });
   }
 
   Future<void> _pickStartedTime() async {
@@ -1220,24 +1035,31 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
 
     if (picked == null) return;
 
+    // Keep the existing task date internally.
+    // Only the time portion is changed.
     final candidate = DateTime(
       _startedAt.year,
       _startedAt.month,
       _startedAt.day,
       picked.hour,
       picked.minute,
+      0,
     );
 
     if (candidate.isAfter(now)) {
       _showStartTimeValidationError(
-        message:
-        'Start time cannot be in the future.',
+        message: 'Start time cannot be in the future.',
       );
       return;
     }
 
-    if (!_isValidStartedAt(candidate)) {
-      _showStartTimeValidationError();
+    final finishedAt = widget.task.finishedAt;
+
+    if (finishedAt != null &&
+        !candidate.isBefore(finishedAt)) {
+      _showStartTimeValidationError(
+        message: 'Start time must be before the task end time.',
+      );
       return;
     }
 
@@ -1246,29 +1068,8 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
     });
   }
 
-  bool _isValidStartedAt(DateTime candidate) {
-    final now = DateTime.now();
-
-    // Never allow a future start.
-    if (candidate.isAfter(now)) {
-      return false;
-    }
-
-    final finishedAt = widget.task.finishedAt;
-
-    // For completed tasks, preserve the existing finish time.
-    // Therefore the corrected start must remain strictly before it.
-    if (finishedAt != null &&
-        !candidate.isBefore(finishedAt)) {
-      return false;
-    }
-
-    return true;
-  }
-
   void _showStartTimeValidationError({
-    String message =
-    'Start time must be before the task end time.',
+    required String message,
   }) {
     final l = AppLocalizations.of(context);
 
@@ -1331,8 +1132,22 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
 
     // Description is intentionally optional.
 
-    if (!_isValidStartedAt(_startedAt)) {
-      _showStartTimeValidationError();
+    final now = DateTime.now();
+
+    if (_startedAt.isAfter(now)) {
+      _showStartTimeValidationError(
+        message: 'Start time cannot be in the future.',
+      );
+      return;
+    }
+
+    final finishedAt = widget.task.finishedAt;
+
+    if (finishedAt != null &&
+        !_startedAt.isBefore(finishedAt)) {
+      _showStartTimeValidationError(
+        message: 'Start time must be before the task end time.',
+      );
       return;
     }
 

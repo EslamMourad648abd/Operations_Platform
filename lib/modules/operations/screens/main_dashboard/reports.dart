@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../../services/auth_service.dart';
-import '../../../../services/localization_service.dart';
-import '../models/client_model.dart';
-import '../models/onboarding_tasks_model.dart';
-import '../repositories/onboarding_repository.dart';
+import '../../../../../services/auth_service.dart';
+import '../../../../../services/localization_service.dart';
+import '../../models/client_model.dart';
+import '../../models/onboarding_tasks_model.dart';
+import '../../repositories/onboarding_repository.dart';
 
 class OnboardingReports extends StatefulWidget {
   const OnboardingReports({super.key});

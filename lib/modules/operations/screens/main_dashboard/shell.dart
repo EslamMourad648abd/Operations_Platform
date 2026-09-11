@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../router/app_router.dart';
-import '../../../../services/auth_service.dart';
-import '../../../../services/localization_service.dart';
-import '../../../../services/theme_service.dart';
+import '../../../../../router/app_router.dart';
+import '../../../../../services/auth_service.dart';
+import '../../../../../services/localization_service.dart';
+import '../../../../../services/theme_service.dart';
 
 const Color kOnboardingBrandColor =
 Color(0xff003366);

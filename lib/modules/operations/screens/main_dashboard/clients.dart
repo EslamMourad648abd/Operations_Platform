@@ -6,12 +6,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:universal_html/html.dart' as html;
 
-import '../models/client_model.dart';
-import '../repositories/onboarding_repository.dart';
-import '../widgets/client_card.dart';
-import '../../../../services/localization_service.dart';
-import '../../../../services/user_display_name_resolver.dart';
-import '../../../../services/auth_service.dart';
+import '../../models/client_model.dart';
+import '../../repositories/onboarding_repository.dart';
+import '../../widgets/client_card.dart';
+import '../../../../../services/localization_service.dart';
+import '../../../../../services/user_display_name_resolver.dart';
+import '../../../../../services/auth_service.dart';
 
 class OnboardingClientsScreen extends StatefulWidget {
   const OnboardingClientsScreen({super.key});

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../modules/operations/screens/client/client_activity.dart';
 import '../modules/operations/screens/client/client_overview.dart';
+import '../modules/operations/screens/main_dashboard/reports.dart';
+import '../modules/operations/screens/main_dashboard/tasks.dart';
 import '../modules/training/screens/training_certificates.dart';
 import '../modules/training/screens/training_courses_screen.dart';
 import '../services/auth_service.dart';
@@ -55,11 +57,9 @@ import '../admin_console/screens/super_admin_console.dart';
 import '../modules/operations/screens/client/client_channels.dart';
 import '../modules/operations/screens/client/client_activation.dart';
 
-import '../modules/operations/screens/onboarding_shell.dart';
-import '../modules/operations/screens/onboarding_dashboard.dart';
-import '../modules/operations/screens/clients.dart';
-import '../modules/operations/screens/onboarding_tasks.dart';
-import '../modules/operations/screens/onboarding_reports.dart';
+import '../modules/operations/screens/main_dashboard/shell.dart';
+import '../modules/operations/screens/main_dashboard/dashboard.dart';
+import '../modules/operations/screens/main_dashboard/clients.dart';
 
 // ============================================================
 // CLIENT WORKSPACE

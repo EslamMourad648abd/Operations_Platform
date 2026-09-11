@@ -1,11 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/client_model.dart';
-import '../models/onboarding_tasks_model.dart';
-import '../repositories/onboarding_repository.dart';
-import '../widgets/client_card.dart';
-import '../../../../services/localization_service.dart';
+import '../../models/client_model.dart';
+import '../../models/onboarding_tasks_model.dart';
+import '../../repositories/onboarding_repository.dart';
+import '../../widgets/client_card.dart';
+import '../../../../../services/localization_service.dart';
 
 class OnboardingDashboard extends StatelessWidget {
   const OnboardingDashboard({super.key});
