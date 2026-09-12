@@ -6,6 +6,7 @@ import '../../models/onboarding_tasks_model.dart';
 import '../../repositories/onboarding_repository.dart';
 import '../../widgets/client_card.dart';
 import '../../../../../services/localization_service.dart';
+import '../../../../../services/auth_service.dart';
 
 class OnboardingDashboard extends StatelessWidget {
   const OnboardingDashboard({super.key});
@@ -23,6 +24,7 @@ class _DashboardContent extends StatefulWidget {
 
 class _DashboardContentState extends State<_DashboardContent> {
   final Map<String, Future<String>> _userNameCache = {};
+  final OnboardingRepository _repository = OnboardingRepository();
 
   Future<String> _resolveUserName(String uid) {
     final normalizedUid = uid.trim();
@@ -56,7 +58,6 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   @override
   Widget build(BuildContext context) {
-    final repository = OnboardingRepository();
     final currentUser = FirebaseAuth.instance.currentUser;
     final theme = Theme.of(context);
 
@@ -72,7 +73,7 @@ class _DashboardContentState extends State<_DashboardContent> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: StreamBuilder<List<ClientModel>>(
-        stream: repository.watchClients(),
+        stream: _repository.watchClients(),
         builder: (context, clientSnapshot) {
           if (clientSnapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
@@ -80,11 +81,17 @@ class _DashboardContentState extends State<_DashboardContent> {
           if (clientSnapshot.hasError) {
             return _DashboardMessage(icon: Icons.error_outline, title: 'Unable to load clients', message: '${clientSnapshot.error}', isError: true);
           }
-          final myClients = (clientSnapshot.data ?? []).where((c) => c.assignedTo.trim() == currentUser.uid).toList();
+          final myClients = (clientSnapshot.data ?? []).where((c) {
+            final assigned = c.assignedTo.trim() == currentUser.uid;
+            if (AuthService.isSupportAgent) {
+              return assigned && _normalize(c.groupStatus) == 'closed';
+            }
+            return assigned;
+          }).toList();
           final allClients = clientSnapshot.data ?? [];
 
           return StreamBuilder<List<OnboardingTaskModel>>(
-            stream: repository.watchMyTasks(),
+            stream: _repository.watchMyTasks(),
             builder: (context, taskSnapshot) {
               if (taskSnapshot.connectionState == ConnectionState.waiting) {
                 return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
@@ -92,7 +99,12 @@ class _DashboardContentState extends State<_DashboardContent> {
               if (taskSnapshot.hasError) {
                 return _DashboardMessage(icon: Icons.error_outline, title: 'Unable to load tasks', message: '${taskSnapshot.error}', isError: true);
               }
-              return _DashboardBody(clients: myClients, allClients: allClients, tasks: taskSnapshot.data ?? [], resolveUserName: _resolveUserName);
+              return _DashboardBody(
+                clients: myClients, 
+                allClients: allClients, 
+                tasks: taskSnapshot.data ?? [], 
+                resolveUserName: _resolveUserName,
+              );
             },
           );
         },
@@ -115,7 +127,6 @@ class _DashboardBody extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     final totalClients = clients.length;
-    final totalPlatformAccounts = allClients.length;
     final activeClients = clients.where(_isClientActive).length;
     final pendingActivation = clients.where((c) => _normalize(c.activationStatus) != 'activated').length;
     final pendingVerification = clients.where((c) {
@@ -144,18 +155,22 @@ class _DashboardBody extends StatelessWidget {
             children: [
               _DashboardHeader(user: FirebaseAuth.instance.currentUser),
               const SizedBox(height: 28),
-              _SectionTitle(title: l10n?.translate('client_overview') ?? 'Client Overview', subtitle: 'Live status of the clients currently assigned to you.'),
-              const SizedBox(height: 14),
-              _MetricGrid(cards: [
-                _MetricData(title: l10n?.translate('total_accounts') ?? 'Total Accounts', value: '$totalPlatformAccounts', subtitle: 'Currently in system', icon: Icons.account_balance_outlined, tone: _MetricTone.teal),
-                _MetricData(title: l10n?.translate('my_clients') ?? 'My Clients', value: '$totalClients', subtitle: 'Assigned to you', icon: Icons.people_outline, tone: _MetricTone.brand),
-                _MetricData(title: l10n?.translate('in_progress') ?? 'In Progress', value: '$inProgressClients', subtitle: 'Onboarding underway', icon: Icons.pending_actions_outlined, tone: _MetricTone.blue),
-                _MetricData(title: l10n?.translate('completed') ?? 'Completed', value: '$completedClients', subtitle: 'All stages completed', icon: Icons.check_circle_outline, tone: _MetricTone.green),
-                _MetricData(title: l10n?.translate('pending_activation') ?? 'Pending Activation', value: '$pendingActivation', subtitle: 'Activation required', icon: Icons.power_settings_new_outlined, tone: _MetricTone.orange),
-              ]),
-              const SizedBox(height: 16),
-              _OperationalStatusCard(pendingVerification: pendingVerification, pendingChatbot: pendingChatbot, openedGroups: openedGroups, closedGroups: closedGroups, activeClients: activeClients),
-              const SizedBox(height: 28),
+              if (!AuthService.isSupportAgent) ...[
+                _SectionTitle(
+                  title: AuthService.isSuperAdmin ? 'Operations Overview' : 'Onboarding Overview', 
+                  subtitle: 'Live status of the clients currently assigned to you.'
+                ),
+                const SizedBox(height: 14),
+                _MetricGrid(cards: [
+                  _MetricData(title: l10n?.translate('my_clients') ?? 'My Clients', value: '$totalClients', subtitle: 'Assigned to you', icon: Icons.people_outline, tone: _MetricTone.brand),
+                  _MetricData(title: l10n?.translate('in_progress') ?? 'In Progress', value: '$inProgressClients', subtitle: 'Onboarding underway', icon: Icons.pending_actions_outlined, tone: _MetricTone.blue),
+                  _MetricData(title: l10n?.translate('completed') ?? 'Completed', value: '$completedClients', subtitle: 'All stages completed', icon: Icons.check_circle_outline, tone: _MetricTone.green),
+                  _MetricData(title: l10n?.translate('pending_activation') ?? 'Pending Activation', value: '$pendingActivation', subtitle: 'Activation required', icon: Icons.power_settings_new_outlined, tone: _MetricTone.orange),
+                ]),
+                const SizedBox(height: 16),
+                _OperationalStatusCard(pendingVerification: pendingVerification, pendingChatbot: pendingChatbot, openedGroups: openedGroups, closedGroups: closedGroups, activeClients: activeClients),
+                const SizedBox(height: 28),
+              ],
               _SectionTitle(title: l10n?.translate('task_overview') ?? 'Task Overview', subtitle: 'Your operational workload and activity.'),
               const SizedBox(height: 14),
               _MetricGrid(cards: [
@@ -166,6 +181,9 @@ class _DashboardBody extends StatelessWidget {
               ]),
               const SizedBox(height: 28),
               LayoutBuilder(builder: (context, constraints) {
+                if (AuthService.isSupportAgent) {
+                  return _ActiveTasksCard(tasks: activeTasks);
+                }
                 if (constraints.maxWidth < 900) {
                   return Column(children: [_RecentClientsCard(clients: clients, resolveUserName: resolveUserName), const SizedBox(height: 20), _ActiveTasksCard(tasks: activeTasks)]);
                 }
@@ -175,8 +193,6 @@ class _DashboardBody extends StatelessWidget {
                   Expanded(flex: 2, child: _ActiveTasksCard(tasks: activeTasks)),
                 ]);
               }),
-              const SizedBox(height: 28),
-              _StatusDistributionCard(clients: clients),
               const SizedBox(height: 28),
               _TaskTypeCard(tasks: tasks, clientTasks: clientTasks),
             ],
@@ -195,12 +211,16 @@ class _DashboardHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final name = _displayUserName(user);
     final l10n = AppLocalizations.of(context);
+    final label = AuthService.isSupportAgent 
+      ? 'Support' 
+      : (AuthService.isSuperAdmin ? 'Operations' : 'Onboarding');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('${l10n?.translate('welcome') ?? 'Welcome'}, $name', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         const SizedBox(height: 6),
-        Text(l10n?.translate('onboarding_dashboard_desc') ?? 'Here is your workload and client status.', style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+        Text('Here is your $label workload and client status.', style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
       ],
     );
   }
@@ -292,7 +312,8 @@ class _OperationalStatusCard extends StatelessWidget {
               _OperationalItem(label: l10n?.translate('active_clients') ?? 'Active Clients', value: activeClients, icon: Icons.bolt_outlined, color: Colors.blue),
               _OperationalItem(label: l10n?.translate('pending_verification') ?? 'Pending Verification', value: pendingVerification, icon: Icons.verified_user_outlined, color: Colors.orange),
               _OperationalItem(label: l10n?.translate('pending_chatbot') ?? 'Pending Chatbot', value: pendingChatbot, icon: Icons.smart_toy_outlined, color: Colors.teal),
-              _OperationalItem(label: l10n?.translate('opened_groups') ?? 'Opened Groups', value: openedGroups, icon: Icons.forum_outlined, color: Colors.green),
+              if (!AuthService.isSupportAgent)
+                _OperationalItem(label: l10n?.translate('opened_groups') ?? 'Opened Groups', value: openedGroups, icon: Icons.forum_outlined, color: Colors.green),
               _OperationalItem(label: l10n?.translate('closed_groups') ?? 'Closed Groups', value: closedGroups, icon: Icons.forum_outlined, color: Colors.grey),
             ];
             if (constraints.maxWidth < 800) {
@@ -398,69 +419,6 @@ class _ActiveTaskRow extends StatelessWidget {
         ])),
         const SizedBox(width: 8),
         _CompactStatusChip(label: task.taskType),
-      ]),
-    );
-  }
-}
-
-class _StatusDistributionCard extends StatelessWidget {
-  final List<ClientModel> clients;
-  const _StatusDistributionCard({required this.clients});
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final activation = <String, int>{}; final verification = <String, int>{}; final chatbot = <String, int>{}; final groups = <String, int>{};
-    for (final c in clients) {
-      _increment(activation, _displayStatus(c.activationStatus));
-      _increment(verification, _displayStatus(c.verificationStatus));
-      _increment(chatbot, _displayStatus(c.chatbotStatus));
-      _increment(groups, _displayStatus(c.groupStatus));
-    }
-    return _DashboardSectionCard(
-      title: l10n?.translate('client_status_breakdown') ?? 'Client Status Breakdown',
-      subtitle: l10n?.translate('client_status_desc') ?? 'Live distribution across each onboarding stage.',
-      icon: Icons.analytics_outlined,
-      child: LayoutBuilder(builder: (context, constraints) {
-        final compact = constraints.maxWidth < 850;
-        final children = [
-          _StatusBreakdown(title: l10n?.translate('activation') ?? 'Activation', data: activation, icon: Icons.power_settings_new_outlined),
-          _StatusBreakdown(title: l10n?.translate('verification') ?? 'Verification', data: verification, icon: Icons.verified_user_outlined),
-          _StatusBreakdown(title: l10n?.translate('chatbot') ?? 'Chatbot', data: chatbot, icon: Icons.smart_toy_outlined),
-          _StatusBreakdown(title: l10n?.translate('group') ?? 'Group', data: groups, icon: Icons.forum_outlined),
-        ];
-        if (compact) return Column(children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 16), child: c)).toList());
-        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList());
-      }),
-    );
-  }
-}
-
-class _StatusBreakdown extends StatelessWidget {
-  final String title; final Map<String, int> data; final IconData icon;
-  const _StatusBreakdown({required this.title, required this.data, required this.icon});
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final entries = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(icon, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 7),
-          Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-        ]),
-        const SizedBox(height: 12),
-        if (entries.isEmpty) Text('No data', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))
-        else ...entries.map((e) => Padding(padding: const EdgeInsets.only(bottom: 7), child: Row(children: [
-          Expanded(child: Text(e.key, style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))),
-          Text('${e.value}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-        ]))),
       ]),
     );
   }

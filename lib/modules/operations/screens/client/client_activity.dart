@@ -105,97 +105,101 @@ class _ClientActivityScreenState extends State<ClientActivityScreen> {
                 activitySnap.data ?? const <ActivityModel>[];
             final filtered = _filterActivities(allActivities);
 
-            return Container(
-              color: theme.colorScheme.surface,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1100),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        LayoutBuilder(builder: (context, constraints) {
-                          final isCompact = constraints.maxWidth < 600;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                return Container(
+                  color: theme.colorScheme.surface,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(constraints.maxWidth < 600 ? 16 : 32),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            LayoutBuilder(builder: (context, headerConstraints) {
+                              final isCompact = headerConstraints.maxWidth < 600;
 
-                          final content = [
-                            Expanded(
-                              flex: isCompact ? 0 : 1,
-                              child: Column(
+                              final content = [
+                                Expanded(
+                                  flex: isCompact ? 0 : 1,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Activity',
+                                        style: TextStyle(
+                                          fontSize: isCompact ? 22 : 26,
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Audit history for ${client.companyName}',
+                                        style: TextStyle(
+                                          fontSize: isCompact ? 12 : 14,
+                                          color: theme.colorScheme.onSurface
+                                              .withValues(alpha: 0.6),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isCompact)
+                                  const SizedBox(height: 16)
+                                else
+                                  const SizedBox(width: 12),
+                                _CountBadge(
+                                  count: filtered.length,
+                                  totalCount: allActivities.length,
+                                  filtered:
+                                  filtered.length != allActivities.length,
+                                ),
+                              ];
+
+                              return isCompact
+                                  ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Activity',
-                                    style: TextStyle(
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Audit history for ${client.companyName}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: theme.colorScheme.onSurface
-                                          .withValues(alpha: 0.6),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (isCompact)
-                              const SizedBox(height: 16)
-                            else
-                              const SizedBox(width: 12),
-                            _CountBadge(
-                              count: filtered.length,
-                              totalCount: allActivities.length,
-                              filtered:
-                              filtered.length != allActivities.length,
-                            ),
-                          ];
+                                children: content,
+                              )
+                                  : Row(
+                                children: content,
+                              );
+                            }),
+                            const SizedBox(height: 28),
+                            _SummaryCard(client: client),
+                            const SizedBox(height: 20),
+                            _Filters(
+                              activities: allActivities,
+                              categoryFilter: _categoryFilter,
+                              actionFilter: _actionFilter,
+                              search: _search,
+                              searchController: _searchController,
+                              onCategoryChanged: (value) =>
+                                  setState(() => _categoryFilter = value),
+                              onActionChanged: (value) =>
+                                  setState(() => _actionFilter = value),
+                              onSearchChanged: (value) =>
+                                  setState(() => _search = value),
+                              onClear: () {
+                                _searchController.clear();
 
-                          return isCompact
-                              ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: content,
-                          )
-                              : Row(
-                            children: content,
-                          );
-                        }),
-                        const SizedBox(height: 28),
-                        _SummaryCard(client: client),
-                        const SizedBox(height: 20),
-                        _Filters(
-                          activities: allActivities,
-                          categoryFilter: _categoryFilter,
-                          actionFilter: _actionFilter,
-                          search: _search,
-                          searchController: _searchController,
-                          onCategoryChanged: (value) =>
-                              setState(() => _categoryFilter = value),
-                          onActionChanged: (value) =>
-                              setState(() => _actionFilter = value),
-                          onSearchChanged: (value) =>
-                              setState(() => _search = value),
-                          onClear: () {
-                            _searchController.clear();
-
-                            setState(() {
-                              _categoryFilter = 'all';
-                              _actionFilter = 'all';
-                              _search = '';
-                            });
-                          },
+                                setState(() {
+                                  _categoryFilter = 'all';
+                                  _actionFilter = 'all';
+                                  _search = '';
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 20),
+                            _Timeline(activities: filtered),
+                          ],
                         ),
-                        const SizedBox(height: 20),
-                        _Timeline(activities: filtered),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              }
             );
           },
         );
@@ -245,46 +249,52 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Wrap(
-          spacing: 32,
-          runSpacing: 18,
-          children: [
-            _SItem(
-              l: 'Company',
-              v: client.companyName,
-              i: Icons.business,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        
+        return Card(
+          child: Padding(
+            padding: EdgeInsets.all(isMobile ? 16 : 22),
+            child: Wrap(
+              spacing: isMobile ? 16 : 32,
+              runSpacing: isMobile ? 12 : 18,
+              children: [
+                _SItem(
+                  l: 'Company',
+                  v: client.companyName,
+                  i: Icons.business,
+                ),
+                _SItem(
+                  l: 'ACC',
+                  v: client.accNumber,
+                  i: Icons.badge,
+                ),
+                _SItem(
+                  l: 'Activation',
+                  v: client.activationStatus,
+                  i: Icons.power_settings_new,
+                ),
+                _SItem(
+                  l: 'Verification',
+                  v: client.verificationStatus,
+                  i: Icons.verified,
+                ),
+                _SItem(
+                  l: 'Chatbot',
+                  v: client.chatbotStatus,
+                  i: Icons.smart_toy,
+                ),
+                _SItem(
+                  l: 'Group',
+                  v: client.groupStatus,
+                  i: Icons.groups,
+                ),
+              ],
             ),
-            _SItem(
-              l: 'ACC',
-              v: client.accNumber,
-              i: Icons.badge,
-            ),
-            _SItem(
-              l: 'Activation',
-              v: client.activationStatus,
-              i: Icons.power_settings_new,
-            ),
-            _SItem(
-              l: 'Verification',
-              v: client.verificationStatus,
-              i: Icons.verified,
-            ),
-            _SItem(
-              l: 'Chatbot',
-              v: client.chatbotStatus,
-              i: Icons.smart_toy,
-            ),
-            _SItem(
-              l: 'Group',
-              v: client.groupStatus,
-              i: Icons.groups,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      }
     );
   }
 }
@@ -306,51 +316,62 @@ class _SItem extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 250;
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
 
-        return SizedBox(
-          width: isCompact ? double.infinity : 200,
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(
-                  i,
-                  size: 18,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.6),
-                      ),
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: 140,
+            maxWidth: isMobile ? (screenWidth - 80) / 2 : 200,
+          ),
+          child: IntrinsicWidth(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(9),
                     ),
-                    Text(
-                      v.trim().isEmpty ? '—' : v,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: Icon(
+                      i,
+                      size: 16,
+                      color: theme.colorScheme.primary,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
+                        Text(
+                          v.trim().isEmpty ? '—' : v,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
@@ -409,16 +430,16 @@ class _Filters extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isCompact = constraints.maxWidth < 600;
-            final itemWidth = isCompact ? double.infinity : 200.0;
-
+            final isMobile = constraints.maxWidth < 600;
+            final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 900;
+            
             return Wrap(
               spacing: 12,
               runSpacing: 12,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 SizedBox(
-                  width: isCompact ? double.infinity : 250,
+                  width: isMobile ? double.infinity : (isTablet ? 300 : 250),
                   child: TextField(
                     controller: searchController,
                     onChanged: onSearchChanged,
@@ -445,7 +466,7 @@ class _Filters extends StatelessWidget {
                 ),
                 _FilterDropdown(
                   label: 'Section',
-                  width: itemWidth,
+                  width: isMobile ? double.infinity : (isTablet ? 200 : 180),
                   value: categories.contains(categoryFilter)
                       ? categoryFilter
                       : 'all',
@@ -454,7 +475,7 @@ class _Filters extends StatelessWidget {
                 ),
                 _FilterDropdown(
                   label: 'Action',
-                  width: itemWidth,
+                  width: isMobile ? double.infinity : (isTablet ? 200 : 180),
                   value: actions.contains(actionFilter)
                       ? actionFilter
                       : 'all',
@@ -464,13 +485,16 @@ class _Filters extends StatelessWidget {
                 if (categoryFilter != 'all' ||
                     actionFilter != 'all' ||
                     search.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: onClear,
-                    icon: const Icon(
-                      Icons.filter_alt_off,
-                      size: 17,
+                  Padding(
+                    padding: EdgeInsets.only(left: isMobile ? 0 : 8),
+                    child: TextButton.icon(
+                      onPressed: onClear,
+                      icon: const Icon(
+                        Icons.filter_alt_off,
+                        size: 17,
+                      ),
+                      label: const Text('Clear filters'),
                     ),
-                    label: const Text('Clear filters'),
                   ),
               ],
             );
@@ -503,6 +527,7 @@ class _FilterDropdown extends StatelessWidget {
       child: DropdownButtonFormField<String>(
         value: value,
         isDense: true,
+        isExpanded: true,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/client_model.dart';
 import '../../../../services/localization_service.dart';
+import '../../../../services/auth_service.dart';
 
 class ClientCard extends StatelessWidget {
   final ClientModel client;
@@ -70,7 +71,7 @@ class ClientCard extends StatelessWidget {
                     Text('${l10n?.translate('channels') ?? 'Channels'}: ${client.totalChannels}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   ],
                 ),
-                if (resolveUserName != null)
+                if (resolveUserName != null && !AuthService.isSupportAgent)
                   FutureBuilder<String>(
                     future: resolveUserName!(client.assignedTo),
                     builder: (context, snapshot) => Text(

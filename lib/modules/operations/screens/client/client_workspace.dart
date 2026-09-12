@@ -33,7 +33,7 @@ class _ClientWorkspaceState extends State<ClientWorkspace> {
           body: SafeArea(
             child: Column(children: [
               _ClientWorkspaceHeader(client: client),
-              _ClientWorkspaceTabs(clientId: widget.clientId, location: GoRouterState.of(context).uri.path),
+              _ClientWorkspaceTabs(clientId: widget.clientId, location: GoRouterState.of(context).uri.path, client: client),
               Expanded(child: widget.child),
             ]),
           ),
@@ -51,24 +51,73 @@ class _ClientWorkspaceHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
-      decoration: BoxDecoration(color: theme.colorScheme.surface, border: Border(bottom: BorderSide(color: theme.dividerColor))),
-      child: Row(children: [
-        IconButton(onPressed: () => context.go(AppRouter.onboardingClients), icon: const Icon(Icons.arrow_back)),
-        const SizedBox(width: 8),
-        Container(
-          width: 44, height: 44,
-          decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-          child: Icon(Icons.business_outlined, color: theme.colorScheme.primary, size: 23),
-        ),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(client.companyName.isEmpty ? (l10n?.translate('client_workspace') ?? 'Workspace') : client.companyName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          Text(client.accNumber.isEmpty ? 'ID: ${client.id}' : '${l10n?.translate('acc') ?? 'ACC'}: ${client.accNumber}', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
-        ])),
-        _ClientStatusBadge(status: client.activationStatus),
-      ]),
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 500;
+        
+        return Container(
+          padding: EdgeInsets.fromLTRB(isMobile ? 12 : 24, 18, isMobile ? 12 : 24, 18),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface, 
+            border: Border(bottom: BorderSide(color: theme.dividerColor)),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => context.go(AppRouter.onboardingClients), 
+                icon: const Icon(Icons.arrow_back, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 8),
+              if (!isMobile) ...[
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1), 
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.business_outlined, color: theme.colorScheme.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, 
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      client.companyName.isEmpty 
+                          ? (l10n?.translate('client_workspace') ?? 'Workspace') 
+                          : client.companyName, 
+                      style: TextStyle(
+                        fontSize: isMobile ? 15 : 18, 
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      client.accNumber.isEmpty 
+                          ? 'ID: ${client.id}' 
+                          : '${l10n?.translate('acc') ?? 'ACC'}: ${client.accNumber}', 
+                      style: TextStyle(
+                        fontSize: 11, 
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _ClientStatusBadge(status: client.activationStatus),
+            ],
+          ),
+        );
+      }
     );
   }
 }
@@ -88,33 +137,67 @@ class _ClientStatusBadge extends StatelessWidget {
       c = Colors.blue;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(color: c.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.circle, size: 8, color: c),
-        const SizedBox(width: 7),
-        Text(status.isEmpty ? 'Not Started' : status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: c)),
-      ]),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isVerySmall = screenWidth < 400;
+
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isVerySmall ? 8 : 12, 
+            vertical: isVerySmall ? 4 : 7,
+          ),
+          decoration: BoxDecoration(
+            color: c.withValues(alpha: 0.1), 
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min, 
+            children: [
+              Icon(Icons.circle, size: isVerySmall ? 6 : 8, color: c),
+              SizedBox(width: isVerySmall ? 4 : 7),
+              Text(
+                status.isEmpty ? 'Not Started' : status, 
+                style: TextStyle(
+                  fontSize: isVerySmall ? 10 : 12, 
+                  fontWeight: FontWeight.bold, 
+                  color: c,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
     );
   }
 }
 
 class _ClientWorkspaceTabs extends StatelessWidget {
-  const _ClientWorkspaceTabs({required this.clientId, required this.location});
+  const _ClientWorkspaceTabs({required this.clientId, required this.location, required this.client});
   final String clientId, location;
+  final ClientModel client;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+
+    final actStat = client.activationStatus.trim().toLowerCase();
+    final verStat = client.verificationStatus.trim().toLowerCase();
+    final chatStat = client.chatbotStatus.trim().toLowerCase();
+    final grpStat = client.groupStatus.trim().toLowerCase();
+
     final tabs = [
       _TabInfo(l10n?.translate('overview') ?? 'Overview', Icons.dashboard_outlined, Icons.dashboard, AppRouter.clientOverviewPath(clientId)),
-      _TabInfo(l10n?.translate('activation') ?? 'Activation', Icons.power_settings_new_outlined, Icons.power_settings_new, AppRouter.clientActivationPath(clientId)),
+      if (actStat != 'activated' && actStat != 'active')
+        _TabInfo(l10n?.translate('activation') ?? 'Activation', Icons.power_settings_new_outlined, Icons.power_settings_new, AppRouter.clientActivationPath(clientId)),
       _TabInfo(l10n?.translate('channels') ?? 'Channels', Icons.hub_outlined, Icons.hub, AppRouter.clientChannelsPath(clientId)),
-      _TabInfo(l10n?.translate('verification') ?? 'Verification', Icons.verified_outlined, Icons.verified, AppRouter.clientVerificationPath(clientId)),
-      _TabInfo(l10n?.translate('chatbot') ?? 'Chatbot', Icons.smart_toy_outlined, Icons.smart_toy, AppRouter.clientChatbotPath(clientId)),
-      _TabInfo(l10n?.translate('group') ?? 'Group', Icons.groups_outlined, Icons.groups, AppRouter.clientGroupPath(clientId)),
+      if (verStat != 'approved' && verStat != 'verified')
+        _TabInfo(l10n?.translate('verification') ?? 'Verification', Icons.verified_outlined, Icons.verified, AppRouter.clientVerificationPath(clientId)),
+      if (chatStat != 'activated' && chatStat != 'active')
+        _TabInfo(l10n?.translate('chatbot') ?? 'Chatbot', Icons.smart_toy_outlined, Icons.smart_toy, AppRouter.clientChatbotPath(clientId)),
+      if (grpStat != 'closed')
+        _TabInfo(l10n?.translate('group') ?? 'Group', Icons.groups_outlined, Icons.groups, AppRouter.clientGroupPath(clientId)),
       _TabInfo(l10n?.translate('activity') ?? 'Activity', Icons.history_outlined, Icons.history, AppRouter.clientActivityPath(clientId)),
     ];
 

@@ -1618,5 +1618,49 @@ class OnboardingRepository {
       FieldValue.serverTimestamp(),
     });
   }
+
+  // ============================================================
+  // UPDATE CHATBOT STATUS IN ZOHO
+  // ============================================================
+
+  Future<void> updateChatbotStatusInZoho({
+    required String accountNumber,
+    required String chatbotStatus,
+  }) async {
+    final cleanAccountNumber = accountNumber.trim();
+    final cleanChatbotStatus = chatbotStatus.trim();
+
+    if (cleanAccountNumber.isEmpty) {
+      throw Exception(
+        'Client ACC number is required to sync chatbot status with Zoho CRM.',
+      );
+    }
+
+    if (cleanChatbotStatus.isEmpty) {
+      throw Exception(
+        'Chatbot status is required to sync with Zoho CRM.',
+      );
+    }
+
+    final callable = _functions.httpsCallable(
+      'updateChatbotStatus',
+    );
+
+    try {
+      await callable.call({
+        'accountNumber': cleanAccountNumber,
+        'chatbotStatus': cleanChatbotStatus,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      final message = e.message?.trim().isNotEmpty == true
+          ? e.message!.trim()
+          : 'Unable to sync chatbot status with Zoho CRM.';
+      throw Exception(message);
+    } catch (e) {
+      throw Exception(
+        'Unable to sync chatbot status with Zoho CRM: $e',
+      );
+    }
+  }
 }
 

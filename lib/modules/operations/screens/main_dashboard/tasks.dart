@@ -6,6 +6,8 @@ import '../../models/client_model.dart';
 import '../../models/onboarding_tasks_model.dart';
 import '../../repositories/onboarding_repository.dart';
 import '../../../../../services/localization_service.dart';
+import '../../../../../services/auth_service.dart';
+import '../../../../../services/auth_service.dart';
 
 class OnboardingTasks extends StatefulWidget {
   const OnboardingTasks({super.key});
@@ -828,6 +830,12 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
                       l?.translate('task_type') ?? 'Type',
                     ),
                     items: kTaskTypes
+                        .where((t) {
+                      if (AuthService.isSupportAgent) {
+                        return t != 'Client Group Follow Up';
+                      }
+                      return true;
+                    })
                         .map(
                           (t) => DropdownMenuItem<String>(
                         value: t,
@@ -1239,6 +1247,12 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
                       l?.translate('task_type') ?? 'Type',
                     ),
                     items: kTaskTypes
+                        .where((t) {
+                      if (AuthService.isSupportAgent) {
+                        return t != 'Client Group Follow Up';
+                      }
+                      return true;
+                    })
                         .map(
                           (t) => DropdownMenuItem(
                         value: t,

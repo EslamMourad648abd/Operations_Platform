@@ -1366,7 +1366,7 @@ Future<void> _showChannelEditor(
                           decoration:
                           const InputDecoration(
                             labelText:
-                            'Phone Number ID',
+                            'Phone Number ID (Optional)',
                             border:
                             OutlineInputBorder(),
                           ),

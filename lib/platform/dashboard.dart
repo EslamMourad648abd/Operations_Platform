@@ -153,11 +153,15 @@ class _PlatformSidebar extends StatelessWidget {
                         context.go(AppRouter.training);
                       },
                     ),
-                  if (AuthService.isSuperAdmin || AuthService.isAgent)
+                  if (AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isSupportAgent)
                     _PlatformNavigationItem(
                       icon: Icons.business_center_outlined,
                       selectedIcon: Icons.business_center,
-                      title: l10n?.translate('onboarding') ?? 'Onboarding',
+                      title: AuthService.isSupportAgent
+                          ? (l10n?.translate('support') ?? 'Support')
+                          : AuthService.isSuperAdmin
+                              ? (l10n?.translate('operations') ?? 'Operations')
+                              : (l10n?.translate('onboarding') ?? 'Onboarding'),
                       selected: location == AppRouter.operations || location.startsWith('${AppRouter.operations}/'),
                       onTap: () {
                         if (isDrawer) Navigator.pop(context);
@@ -203,7 +207,11 @@ class _PlatformHeader extends StatelessWidget {
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                 ),
                 Text(
-                  l10n?.translate('operations_platform') ?? 'Operations Platform',
+                  AuthService.isSupportAgent
+                      ? (l10n?.translate('Support Platform') ?? 'Support Platform')
+                      : AuthService.isSuperAdmin
+                          ? (l10n?.translate('Operations Platform') ?? 'Operations Platform')
+                          : (l10n?.translate('Onboarding Platform') ?? 'Onboarding Platform'),
                   style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
               ],
@@ -373,8 +381,17 @@ class _PlatformDashboardContent extends StatelessWidget {
                       _PlatformOverviewCard(title: l10n?.translate('bbc_api_tool') ?? 'BBC API Tool', subtitle: 'API Testing', icon: Icons.api, status: l10n?.translate('available') ?? 'Available'),
                     if (AuthService.isSuperAdmin || AuthService.isTrainee)
                       _PlatformOverviewCard(title: l10n?.translate('training_portal') ?? 'Training Portal', subtitle: 'Learning', icon: Icons.school, status: l10n?.translate('available') ?? 'Available'),
-                    if (AuthService.isSuperAdmin || AuthService.isAgent)
-                      _PlatformOverviewCard(title: l10n?.translate('onboarding') ?? 'Onboarding platform', subtitle: 'Onboarding', icon: Icons.business_center, status: l10n?.translate('available') ?? 'Available'),
+                    if (AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isSupportAgent)
+                      _PlatformOverviewCard(
+                        title: AuthService.isSupportAgent
+                            ? (l10n?.translate('Support Platform') ?? 'Support Platform')
+                            : AuthService.isSuperAdmin
+                                ? (l10n?.translate('Operations platform') ?? 'Operations platform')
+                                : (l10n?.translate('Onboarding platform') ?? 'Onboarding platform'),
+                        subtitle: 'Client Management',
+                        icon: Icons.business_center,
+                        status: l10n?.translate('available') ?? 'Available',
+                      ),
                   ],
                 );
               }),

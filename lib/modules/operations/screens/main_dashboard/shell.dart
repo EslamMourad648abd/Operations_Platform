@@ -41,7 +41,13 @@ class OnboardingShell extends StatelessWidget {
               ),
             ),
             title: Text(
-              l10n?.translate('onboarding') ?? 'Onboarding',
+              AuthService.isSupportAgent
+                  ? (l10n?.translate('support') ?? 'Support')
+                  : AuthService.isSuperAdmin
+                      ? (l10n?.translate('operations') ?? 'Operations')
+                      : AuthService.isTrainee
+                          ? (l10n?.translate('trainee') ?? 'Trainee')
+                          : (l10n?.translate('onboarding') ?? 'Onboarding'),
               style: TextStyle(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
@@ -258,8 +264,9 @@ class _OnboardingNavigation
                       selectedIcon:
                       Icons.dashboard,
 
-                      title:
-                      l10n?.translate('dashboard') ?? 'Dashboard',
+                      title: AuthService.isSupportAgent 
+                        ? (l10n?.translate('Support Dashboard') ?? 'Support Dashboard')
+                        : (l10n?.translate('dashboard') ?? 'Dashboard'),
 
                       selected:
                       location ==
@@ -316,8 +323,9 @@ class _OnboardingNavigation
                       selectedIcon:
                       Icons.people,
 
-                      title:
-                      l10n?.translate('clients') ?? 'Clients',
+                      title: AuthService.isSupportAgent 
+                        ? (l10n?.translate('Support Clients') ?? 'Support Clients')
+                        : (l10n?.translate('clients') ?? 'Clients'),
 
                       selected:
                       location ==
@@ -451,10 +459,14 @@ class _OnboardingHeader
 
               children: [
                 Text(
-                  l10n?.translate('onboarding') ?? 'Onboarding',
-
-                  style:
-                  TextStyle(
+                  AuthService.isSupportAgent
+                      ? (l10n?.translate('support') ?? 'Support')
+                      : AuthService.isSuperAdmin
+                          ? (l10n?.translate('operations') ?? 'Operations')
+                          : AuthService.isTrainee
+                              ? (l10n?.translate('trainee') ?? 'Trainee')
+                              : (l10n?.translate('onboarding') ?? 'Onboarding'),
+                  style: TextStyle(
                     fontSize:
                     17,
 
@@ -471,16 +483,15 @@ class _OnboardingHeader
                   2,
                 ),
 
-                const Text(
-                  'Onboarding Platform',
-
-                  style:
-                  TextStyle(
-                    fontSize:
-                    12,
-
-                    color:
-                    Color(0xff7A8491),
+                Text(
+                  AuthService.isSupportAgent
+                      ? (l10n?.translate('Support Platform') ?? 'Support Platform')
+                      : AuthService.isSuperAdmin
+                          ? (l10n?.translate('Operations Platform') ?? 'Operations Platform')
+                          : (l10n?.translate('Onboarding Platform') ?? 'Onboarding Platform'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xff7A8491),
                   ),
                 ),
               ],
@@ -678,9 +689,17 @@ class _OnboardingNavigationFooter
       BuildContext context,
       ) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    
+    final footerLabel = AuthService.isSupportAgent 
+      ? (l10n?.translate('support_operations') ?? 'Support Operations')
+      : AuthService.isSuperAdmin
+        ? (l10n?.translate('operations') ?? 'Operations')
+        : (l10n?.translate('onboarding_operations') ?? 'Onboarding Operations');
+
     return Container(
       padding:
-      const EdgeInsets.fromLTRB(020, 12, 20, 20),
+      const EdgeInsets.fromLTRB(20, 12, 20, 20),
 
       decoration:
       BoxDecoration(
@@ -712,7 +731,7 @@ class _OnboardingNavigationFooter
           ),
 
           Text(
-            'Onboarding Operations',
+            footerLabel,
 
             style:
             TextStyle(

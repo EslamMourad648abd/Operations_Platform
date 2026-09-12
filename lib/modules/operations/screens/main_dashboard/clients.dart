@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:universal_html/html.dart' as html;
 
@@ -188,7 +187,7 @@ class _OnboardingClientsScreenState
     _operationCancelling = false;
 
     _operationPanel.value = _OperationPanelData(
-      title: _operationPanel.value.title,
+      title: title,
       processed: _operationPanel.value.processed,
       total: _operationPanel.value.total,
       progress: 1,
@@ -200,6 +199,40 @@ class _OnboardingClientsScreenState
     );
 
     setState(() {});
+
+    // Auto-clear notification after delay if it's just a message (not a bulk operation result)
+    if (_operationPanel.value.total == 0) {
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted && _operationPanel.value.resultMessage == message) {
+          _clearOperationPanel();
+        }
+      });
+    }
+  }
+
+  void _showNotification({
+    required String title,
+    required String message,
+    bool error = false,
+  }) {
+    _operationRunning = false;
+    _operationPanel.value = _OperationPanelData(
+      title: title,
+      processed: 0,
+      total: 0,
+      progress: 1,
+      cancelling: false,
+      status: '',
+      resultMessage: message,
+      error: error,
+    );
+    setState(() {});
+    
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted && _operationPanel.value.resultMessage == message) {
+        _clearOperationPanel();
+      }
+    });
   }
 
   void _clearOperationPanel() {
@@ -213,6 +246,251 @@ class _OnboardingClientsScreenState
     setState(() {});
   }
 
+  void _showSupportActionDialog(BuildContext context) {
+    final commentController = TextEditingController();
+    
+    ClientModel? selectedClient;
+    String? selectedStatus;
+    bool loading = false;
+    bool isStepTwo = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StreamBuilder<List<ClientModel>>(
+        stream: _clientsStream,
+        initialData: _latestClients,
+        builder: (context, snapshot) {
+          final allClients = snapshot.data ?? [];
+          
+          return StatefulBuilder(
+            builder: (context, setS) {
+              final theme = Theme.of(context);
+              final colors = theme.colorScheme;
+              final l10n = AppLocalizations.of(context);
+
+              Future<void> submit() async {
+                if (selectedClient == null || selectedStatus == null) return;
+                setS(() => loading = true);
+                try {
+                  final oldStatus = selectedClient!.verificationStatus;
+                  final comment = commentController.text.trim();
+                  
+                  if (oldStatus != selectedStatus) {
+                    await _repository.updateStatuses(
+                      clientId: selectedClient!.id, 
+                      verificationStatus: selectedStatus
+                    );
+                    await _repository.logStatusChange(
+                      clientId: selectedClient!.id, 
+                      type: 'verification', 
+                      field: 'verificationStatus', 
+                      oldValue: oldStatus, 
+                      newValue: selectedStatus!
+                    );
+                    
+                    // Sync with Zoho CRM
+                    try {
+                      await _repository.updateVerificationStatusInZoho(
+                        accountNumber: selectedClient!.accNumber,
+                        verificationStatus: selectedStatus!,
+                      );
+                    } catch (zohoError) {
+                      debugPrint('Zoho Sync Failed: $zohoError');
+                    }
+                  }
+                  
+                  if (comment.isNotEmpty) {
+                    await _repository.updateCrmComment(selectedClient!.id, comment);
+                  }
+                  
+                  if (!context.mounted) return;
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Client updated successfully.'))
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  setS(() => loading = false);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Update failed: $e'))
+                  );
+                }
+              }
+
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    Icon(Icons.support_agent_rounded, color: colors.primary),
+                    const SizedBox(width: 12),
+                    const Text('Support Action'),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 500,
+                  child: !isStepTwo 
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Search and select a client to update.', 
+                            style: TextStyle(fontSize: 13, color: Colors.grey)),
+                          const SizedBox(height: 20),
+                          Autocomplete<ClientModel>(
+                            displayStringForOption: (c) {
+                              if (c.companyName.isEmpty) {
+                                return c.accNumber;
+                              }
+                              return '${c.companyName} — ${c.accNumber}';
+                            },
+                            optionsBuilder: (textValue) {
+                              final query =
+                              textValue.text.trim().toLowerCase();
+
+                              if (query.isEmpty) {
+                                return const Iterable<ClientModel>.empty();
+                              }
+
+                              return allClients.where((c) => 
+                                c.companyName.toLowerCase().contains(query) || 
+                                c.accNumber.toLowerCase().contains(query)
+                              );
+                            },
+                            onSelected: (c) {
+                              setS(() {
+                                selectedClient = c;
+                              });
+                            },
+                            fieldViewBuilder: (context, ctrl, node, onSubmitted) {
+                              return TextFormField(
+                                controller: ctrl,
+                                focusNode: node,
+                                decoration: InputDecoration(
+                                  labelText: l10n?.translate('client') ?? 'Client / ACC Number',
+                                  hintText: l10n?.translate('select_client') ?? 'Search by name or ACC...',
+                                  suffixIcon: const Icon(Icons.search, size: 20),
+                                  border: const OutlineInputBorder(),
+                                ),
+                                onChanged: (value) {
+                                  if (selectedClient == null) return;
+                                  final display = selectedClient!.companyName.isEmpty 
+                                    ? selectedClient!.accNumber 
+                                    : '${selectedClient!.companyName} — ${selectedClient!.accNumber}';
+                                  if (value.trim() != display.trim()) {
+                                    setS(() {
+                                      selectedClient = null;
+                                    });
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                          if (selectedClient == null) ...[
+                            const SizedBox(height: 20),
+                            const Divider(),
+                            const SizedBox(height: 10),
+                            const Text("Can't find the client?", 
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            TextButton.icon(
+                              onPressed: () {
+                                Navigator.pop(dialogContext);
+                                _showCreateClientDialog();
+                              },
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text('Create New Client'),
+                            ),
+                          ]
+                        ],
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: colors.primary.withValues(alpha: 0.1)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.business_outlined, color: colors.primary, size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(selectedClient!.companyName, 
+                                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      Text('ACC: ${selectedClient!.accNumber}', 
+                                        style: TextStyle(fontSize: 12, color: colors.onSurface.withValues(alpha: 0.6))),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          DropdownButtonFormField<String>(
+                            value: selectedStatus,
+                            decoration: const InputDecoration(
+                              labelText: 'Verification Status',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: ['Not Started', 'In Progress', 'Pending', 'Approved', 'Rejected', 'Verified', 'With Support']
+                              .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                            onChanged: (v) => setS(() => selectedStatus = v),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: commentController,
+                            maxLines: 3,
+                            decoration: const InputDecoration(
+                              labelText: 'CRM Comment',
+                              hintText: 'Write a comment to send to CRM...',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ],
+                      ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: loading ? null : () => Navigator.pop(dialogContext), 
+                    child: const Text('Cancel')
+                  ),
+                  if (!isStepTwo)
+                    ElevatedButton(
+                      onPressed: selectedClient == null ? null : () {
+                        setS(() {
+                          isStepTwo = true;
+                          final allowed = ['Not Started', 'In Progress', 'Pending', 'Approved', 'Rejected', 'Verified', 'With Support'];
+                          final current = selectedClient!.verificationStatus.trim();
+                          selectedStatus = allowed.firstWhere(
+                            (s) => s.toLowerCase() == current.toLowerCase(),
+                            orElse: () => allowed.first,
+                          );
+                        });
+                      },
+                      child: const Text('Next'),
+                    )
+                  else
+                    ElevatedButton(
+                      onPressed: loading ? null : submit,
+                      child: loading 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Submit Updates'),
+                    ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   void _downloadSkippedCsv(List<List<String>> rows) {
     String csvContent = rows.map((row) {
       return row.map((field) {
@@ -224,7 +502,7 @@ class _OnboardingClientsScreenState
     final bytes = utf8.encode(csvContent);
     final blob = html.Blob([bytes], 'text/csv;charset=utf-8;');
     final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
+    html.AnchorElement(href: url)
       ..setAttribute('download', 'skipped_clients.csv')
       ..click();
     html.Url.revokeObjectUrl(url);
@@ -237,8 +515,7 @@ class _OnboardingClientsScreenState
         final theme = Theme.of(context);
         final colors = theme.colorScheme;
         final result = !_operationRunning && data.resultMessage != null;
-        final accent = data.error ? colors.error : colors.primary;
-        final percentage = (data.progress * 100).round();
+        final accent = data.error ? colors.error : (data.progress >= 1.0 ? Colors.green : colors.primary);
 
         final isDelete = data.title.toLowerCase().contains('delete');
         final headerIcon = isDelete ? Icons.delete_sweep_rounded : Icons.cloud_upload_rounded;
@@ -250,153 +527,52 @@ class _OnboardingClientsScreenState
         return Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 450),
-            child: Material(
-              elevation: 8,
-              color: colors.surface,
-              shadowColor: colors.shadow.withValues(alpha: 0.2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(
-                  color: data.error
-                      ? colors.error.withValues(alpha: 0.3)
-                      : colors.outlineVariant.withValues(alpha: 0.4),
-                ),
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: theme.brightness == Brightness.dark ? const Color(0xff1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 15, offset: const Offset(0, 5))],
+                border: Border.all(color: data.error ? colors.error.withValues(alpha: 0.3) : theme.dividerColor),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: result
-                    ? Row(
-                  children: [
-                    Icon(
-                      data.error
-                          ? Icons.error_outline_rounded
-                          : Icons.check_circle_outline_rounded,
-                      size: 20,
-                      color: accent,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        data.resultMessage!,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colors.onSurface,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    if (data.skippedRows != null && data.skippedRows!.isNotEmpty)
-                      Tooltip(
-                        message: 'Download Skipped Records',
-                        child: InkWell(
-                          onTap: () => _downloadSkippedCsv(data.skippedRows!),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: colors.primary.withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.download_rounded,
-                              size: 16,
-                              color: colors.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: _clearOperationPanel,
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: colors.onSurface.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 16,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-                    : Column(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            data.cancelling
-                                ? '${data.title} (Stopping...)'
-                                : '${data.title}  •  ${data.processed} / ${data.total}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: colors.onSurface,
-                              fontWeight: FontWeight.w600,
+                    if (_operationRunning) LinearProgressIndicator(value: data.progress, minHeight: 4, backgroundColor: accent.withValues(alpha: 0.1), color: accent),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38, height: 38,
+                            decoration: BoxDecoration(color: accent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                            child: Icon(result ? (data.error ? Icons.error_outline : Icons.check_circle_outline) : headerIcon, color: accent, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(data.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                if (result)
+                                  Text(data.resultMessage!, style: TextStyle(fontSize: 11, color: colors.onSurface.withValues(alpha: 0.7)))
+                                else
+                                  Text(data.status.isNotEmpty ? data.status : 'Processing ${data.processed} of ${data.total}...', style: TextStyle(fontSize: 11, color: colors.onSurface.withValues(alpha: 0.7))),
+                              ],
                             ),
                           ),
-                        ),
-                        InkWell(
-                          onTap: data.cancelling ? null : _requestOperationCancel,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close_rounded,
-                              size: 14,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Icon(
-                          headerIcon,
-                          size: 18,
-                          color: colors.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: data.progress,
-                              minHeight: 5,
-                              backgroundColor: colors.surfaceContainerHighest,
-                              color: accent,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 34,
-                          child: Text(
-                            '$percentage%',
-                            textAlign: TextAlign.right,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: accent,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
+                          if (_operationRunning && !data.cancelling)
+                            IconButton(onPressed: _requestOperationCancel, icon: const Icon(Icons.stop_circle_outlined, color: Colors.redAccent, size: 22), tooltip: 'Stop Operation'),
+                          if (result && data.skippedRows != null && data.skippedRows!.isNotEmpty)
+                            IconButton(onPressed: () => _downloadSkippedCsv(data.skippedRows!), icon: Icon(Icons.download_for_offline_outlined, color: colors.primary, size: 22), tooltip: 'Download Skipped'),
+                          if (result)
+                            IconButton(onPressed: _clearOperationPanel, icon: Icon(Icons.close_rounded, size: 20, color: colors.onSurface.withValues(alpha: 0.5))),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -430,10 +606,9 @@ class _OnboardingClientsScreenState
         title: Row(
           children: [
             Text(
-              l10n?.translate(
-                'clients',
-              ) ??
-                  'Clients',
+              AuthService.isSupportAgent 
+                ? (l10n?.translate('Support Clients') ?? 'Support Clients')
+                : (l10n?.translate('clients') ?? 'Clients'),
               style:
               const TextStyle(
                 fontWeight:
@@ -449,7 +624,11 @@ class _OnboardingClientsScreenState
               stream: _clientsStream,
               builder: (context, snapshot) {
                 final allClients = snapshot.data ?? [];
-                final filteredCount = _applyClientFilters(allClients).length;
+                var clients = allClients;
+                if (AuthService.isSupportAgent) {
+                  clients = allClients.where((c) => _normalize(c.groupStatus) == 'closed').toList();
+                }
+                final filteredCount = _applyClientFilters(clients).length;
 
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -471,6 +650,24 @@ class _OnboardingClientsScreenState
           ],
         ),
         actions: [
+          // =====================================================================
+          // SUPPORT ACTION
+          // =====================================================================
+
+          if (AuthService.isSupportAgent)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ElevatedButton.icon(
+                onPressed: () => _showSupportActionDialog(context),
+                icon: const Icon(Icons.support_agent_rounded, size: 18),
+                label: const Text('Support Action'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                ),
+              ),
+            ),
+
           // =====================================================================
           // BULK DELETE
           // =====================================================================
@@ -580,42 +777,43 @@ class _OnboardingClientsScreenState
           // CREATE CLIENT
           // =====================================================================
 
-          Padding(
-            padding:
-            const EdgeInsets
-                .only(
-              right: 16,
-            ),
-            child:
-            ElevatedButton
-                .icon(
-              onPressed:
-              _showCreateClientDialog,
-              icon:
-              const Icon(
-                Icons.add,
+          if (!AuthService.isSupportAgent)
+            Padding(
+              padding:
+              const EdgeInsets
+                  .only(
+                right: 16,
               ),
-              label:
-              Text(
-                l10n?.translate(
-                  'new_client',
-                ) ??
-                    'New Client',
-              ),
-              style:
+              child:
               ElevatedButton
-                  .styleFrom(
-                backgroundColor:
-                theme
-                    .colorScheme
-                    .primary,
-                foregroundColor:
-                theme
-                    .colorScheme
-                    .onPrimary,
+                  .icon(
+                onPressed:
+                _showCreateClientDialog,
+                icon:
+                const Icon(
+                  Icons.add,
+                ),
+                label:
+                Text(
+                  l10n?.translate(
+                    'new_client',
+                  ) ??
+                      'New Client',
+                ),
+                style:
+                ElevatedButton
+                    .styleFrom(
+                  backgroundColor:
+                  theme
+                      .colorScheme
+                      .primary,
+                  foregroundColor:
+                  theme
+                      .colorScheme
+                      .onPrimary,
+                ),
               ),
             ),
-          ),
         ],
       ),
       body: Stack(
@@ -673,9 +871,13 @@ class _OnboardingClientsScreenState
                         _displayedClients = streamedClients;
                       }
 
-                      final clients = _operationRunning
+                      var clients = _operationRunning
                           ? (_displayedClients ?? streamedClients)
                           : streamedClients;
+
+                      if (AuthService.isSupportAgent) {
+                        clients = clients.where((c) => _normalize(c.groupStatus) == 'closed').toList();
+                      }
 
                       final filtered = _applyClientFilters(clients);
 
@@ -1117,6 +1319,8 @@ class _OnboardingClientsScreenState
         },
       );
 
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -1418,6 +1622,7 @@ class _OnboardingClientsScreenState
                   );
 
                   if (rows.isEmpty) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger
                         .of(
                       context,
@@ -2634,22 +2839,25 @@ class _OnboardingClientsScreenState
                         'Cancel',
                   ),
                 ),
-                ElevatedButton(
-                  onPressed:
-                      () async {
-                    if (cc.text
-                        .trim()
-                        .isEmpty ||
-                        ac.text
-                            .trim()
-                            .isEmpty) {
-                      return;
-                    }
+                    ElevatedButton(
+                      onPressed:
+                          () async {
+                        final name = cc.text.trim();
+                        final acc = ac.text.trim();
+                        
+                        if (name.isEmpty || acc.isEmpty) {
+                          _showNotification(
+                            title: 'Validation Error',
+                            message: 'Company Name and ACC Number are required.',
+                            error: true,
+                          );
+                          return;
+                        }
 
-                    final navigator =
-                    Navigator.of(
-                      context,
-                    );
+                        final navigator =
+                        Navigator.of(
+                          context,
+                        );
 
                     final messenger =
                     ScaffoldMessenger
@@ -3035,8 +3243,12 @@ class _ClientFiltersDialogState extends State<_ClientFiltersDialog> {
               const SizedBox(height: 16),
               _dateFilter(title: 'Date of Activation', creation: false),
               const SizedBox(height: 16),
-              _assigneeSection(),
-              if (_assignees().isNotEmpty) const SizedBox(height: 16),
+              if (!AuthService.isSupportAgent) ...[
+                if (!AuthService.isSupportAgent) ...[
+                _assigneeSection(),
+                if (_assignees().isNotEmpty) const SizedBox(height: 16),
+              ],
+              ],
               _multiChoiceSection(
                 title: 'Activation Status',
                 values: activationStatuses,
@@ -3055,11 +3267,15 @@ class _ClientFiltersDialogState extends State<_ClientFiltersDialog> {
                 selected: _filters.chatbotStatuses,
               ),
               const SizedBox(height: 16),
-              _multiChoiceSection(
-                title: 'Group Status',
-                values: groupStatuses,
-                selected: _filters.groupStatuses,
-              ),
+              if (!AuthService.isSupportAgent) ...[
+                if (!AuthService.isSupportAgent) ...[
+                _multiChoiceSection(
+                  title: 'Group Status',
+                  values: groupStatuses,
+                  selected: _filters.groupStatuses,
+                ),
+              ],
+              ],
               const SizedBox(height: 4),
               Text(
                 'Multiple values inside the same field use OR. The AND/OR selector controls how the different filter fields are combined.',
