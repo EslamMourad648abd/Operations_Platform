@@ -10,6 +10,7 @@ import '../../router/app_router.dart';
 import 'training_management_screen.dart';
 import 'user_management_screen.dart';
 import 'training_analytics_screen.dart';
+import 'meta_whatsapp_business_screen.dart';
 
 class PlatformAdminConsole extends StatefulWidget {
   const PlatformAdminConsole({
@@ -90,6 +91,11 @@ class _PlatformAdminConsoleState
       return 2;
     }
 
+    if (path ==
+        AppRouter.adminMetaWhatsApp) {
+      return 3;
+    }
+
     // ----------------------------------------------------------
     // DEFAULT
     //
@@ -126,6 +132,12 @@ class _PlatformAdminConsoleState
       case 2:
         context.go(
           AppRouter.adminAnalytics,
+        );
+        break;
+
+      case 3:
+        context.go(
+          AppRouter.adminMetaWhatsApp,
         );
         break;
     }
@@ -176,6 +188,13 @@ class _PlatformAdminConsoleState
       return const TrainingAnalyticsScreen();
     }
 
+    if (path ==
+        AppRouter.adminMetaWhatsApp) {
+      return MetaWhatsAppBusinessScreen(
+        functions: _functions!,
+      );
+    }
+
     // ----------------------------------------------------------
     // FALLBACK
     // ----------------------------------------------------------
@@ -194,7 +213,6 @@ class _PlatformAdminConsoleState
       BuildContext context,
       ) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     // ==========================================================
     // LOADING
@@ -273,6 +291,7 @@ class _PlatformAdminConsoleState
               NavigationDestination(icon: Icon(Icons.people_outlined), selectedIcon: Icon(Icons.people), label: 'Users'),
               NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'Training'),
               NavigationDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics), label: 'Analytics'),
+              NavigationDestination(icon: Icon(Icons.business_outlined), selectedIcon: Icon(Icons.business), label: 'Meta'),
             ],
           ),
         );
@@ -318,6 +337,7 @@ class _PlatformAdminConsoleState
                 NavigationRailDestination(icon: Icon(Icons.people_outlined), selectedIcon: Icon(Icons.people), label: Text('Users')),
                 NavigationRailDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: Text('Training')),
                 NavigationRailDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics), label: Text('Analytics')),
+                NavigationRailDestination(icon: Icon(Icons.business_outlined), selectedIcon: Icon(Icons.business), label: Text('Meta')),
               ],
             ),
             const VerticalDivider(width: 1),

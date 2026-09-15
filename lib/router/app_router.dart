@@ -272,6 +272,9 @@ class AppRouter {
   static const adminAnalytics =
       '/admin-console/analytics';
 
+  static const adminMetaWhatsApp =
+      '/admin-console/meta-whatsapp';
+
   // ============================================================
   // ROUTER
   // ============================================================
@@ -340,7 +343,8 @@ class AppRouter {
       if (location == adminConsole ||
           location == adminUsers ||
           location == adminTrainingManagement ||
-          location == adminAnalytics) {
+          location == adminAnalytics ||
+          location == adminMetaWhatsApp) {
         if (AuthService.isSuperAdmin) {
           return null;
         }
@@ -384,7 +388,8 @@ class AppRouter {
       if (location == operations ||
           location.startsWith('$operations/')) {
         if (AuthService.isSuperAdmin ||
-            AuthService.isAgent) {
+            AuthService.isAgent ||
+            AuthService.isSupportAgent) {
           return null;
         }
 
@@ -800,6 +805,26 @@ class AppRouter {
           return const PlatformAdminConsole();
         },
       ),
+
+      // ========================================================
+      // ADMIN META WHATSAPP
+      // ========================================================
+
+      GoRoute(
+        path:
+        adminMetaWhatsApp,
+
+        name:
+        'admin-meta-whatsapp',
+
+        builder: (
+            context,
+            state,
+            ) {
+          return const PlatformAdminConsole();
+        },
+      ),
+
 
       // ========================================================
       // ONBOARDING SHELL
