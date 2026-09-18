@@ -6,6 +6,7 @@ import '../router/app_router.dart';
 import '../services/auth_service.dart';
 import '../services/localization_service.dart';
 import '../services/theme_service.dart';
+import '../services/platform_config.dart';
 
 class PlatformDashboard extends StatelessWidget {
   const PlatformDashboard({super.key});
@@ -105,6 +106,8 @@ class _PlatformSidebar extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
+    final config = PlatformConfig.current;
+
     return Container(
       width: width,
       decoration: BoxDecoration(
@@ -131,7 +134,8 @@ class _PlatformSidebar extends StatelessWidget {
                       context.go(AppRouter.home);
                     },
                   ),
-                  if (AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isTrainee)
+                  if ((AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isTrainee) && 
+                      (!config.isStandalone || config.type == PlatformType.apiTool))
                     _PlatformNavigationItem(
                       icon: Icons.api_outlined,
                       selectedIcon: Icons.api,
@@ -142,7 +146,8 @@ class _PlatformSidebar extends StatelessWidget {
                         context.go(AppRouter.bbcApi);
                       },
                     ),
-                  if (AuthService.isSuperAdmin || AuthService.isTrainee)
+                  if ((AuthService.isSuperAdmin || AuthService.isTrainee) && 
+                      (!config.isStandalone || config.type == PlatformType.trainee))
                     _PlatformNavigationItem(
                       icon: Icons.school_outlined,
                       selectedIcon: Icons.school,
@@ -153,7 +158,8 @@ class _PlatformSidebar extends StatelessWidget {
                         context.go(AppRouter.training);
                       },
                     ),
-                  if (AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isSupportAgent)
+                  if ((AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isSupportAgent) && 
+                      (!config.isStandalone || config.type == PlatformType.support || config.type == PlatformType.onboarding))
                     _PlatformNavigationItem(
                       icon: Icons.business_center_outlined,
                       selectedIcon: Icons.business_center,
@@ -372,19 +378,24 @@ class _PlatformDashboardContent extends StatelessWidget {
               const SizedBox(height: 18),
               LayoutBuilder(builder: (context, constraints) {
                 final columns = constraints.maxWidth >= 1000 ? 3 : constraints.maxWidth >= 650 ? 2 : 1;
+                final config = PlatformConfig.current;
+
                 return GridView.count(
                   shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
                   crossAxisCount: columns, crossAxisSpacing: 20, mainAxisSpacing: 20,
                   childAspectRatio: columns == 1 ? 3.5 : 1.7,
                   children: [
-                    if (AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isTrainee)
+                    if ((AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isTrainee) && 
+                        (!config.isStandalone || config.type == PlatformType.apiTool))
                       _PlatformOverviewCard(title: l10n?.translate('bbc_api_tool') ?? 'BBC API Tool', subtitle: 'API Testing', icon: Icons.api, status: l10n?.translate('available') ?? 'Available'),
-                    if (AuthService.isSuperAdmin || AuthService.isTrainee)
+                    if ((AuthService.isSuperAdmin || AuthService.isTrainee) && 
+                        (!config.isStandalone || config.type == PlatformType.trainee))
                       _PlatformOverviewCard(title: l10n?.translate('training_portal') ?? 'Training Portal', subtitle: 'Learning', icon: Icons.school, status: l10n?.translate('available') ?? 'Available'),
-                    if (AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isSupportAgent)
+                    if ((AuthService.isSuperAdmin || AuthService.isAgent || AuthService.isSupportAgent) && 
+                        (!config.isStandalone || config.type == PlatformType.support || config.type == PlatformType.onboarding))
                       _PlatformOverviewCard(
                         title: AuthService.isSupportAgent
-                            ? (l10n?.translate('Support Platform') ?? 'Support Platform')
+                            ? (l10n?.translate('support') ?? 'Support')
                             : AuthService.isSuperAdmin
                                 ? (l10n?.translate('Operations platform') ?? 'Operations platform')
                                 : (l10n?.translate('Onboarding platform') ?? 'Onboarding platform'),

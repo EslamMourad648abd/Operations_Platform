@@ -11,6 +11,7 @@ import 'training_management_screen.dart';
 import 'user_management_screen.dart';
 import 'training_analytics_screen.dart';
 import 'meta_whatsapp_business_screen.dart';
+import 'logs_screen.dart';
 
 class PlatformAdminConsole extends StatefulWidget {
   const PlatformAdminConsole({
@@ -25,9 +26,10 @@ class PlatformAdminConsole extends StatefulWidget {
 class _PlatformAdminConsoleState
     extends State<PlatformAdminConsole> {
   FirebaseFunctions? _functions;
+  int _selectedIndex = 0;
+  List<Widget>? _pages;
 
   bool loading = true;
-
   String? error;
 
   // ============================================================
@@ -56,6 +58,14 @@ class _PlatformAdminConsoleState
             region: 'us-central1',
           );
 
+      _pages = [
+        UserManagement(functions: _functions!),
+        TrainingManagement(functions: _functions!),
+        const TrainingAnalyticsScreen(),
+        MetaWhatsAppBusinessScreen(functions: _functions!),
+        const AdminLogsScreen(),
+      ];
+
       if (!mounted) return;
 
       setState(() {
@@ -72,43 +82,6 @@ class _PlatformAdminConsoleState
   }
 
   // ============================================================
-  // CURRENT ADMIN SECTION
-  // ============================================================
-
-  int _getSelectedIndex(
-      BuildContext context,
-      ) {
-    final path =
-        GoRouterState.of(context).uri.path;
-
-    if (path ==
-        AppRouter.adminTrainingManagement) {
-      return 1;
-    }
-
-    if (path ==
-        AppRouter.adminAnalytics) {
-      return 2;
-    }
-
-    if (path ==
-        AppRouter.adminMetaWhatsApp) {
-      return 3;
-    }
-
-    // ----------------------------------------------------------
-    // DEFAULT
-    //
-    // /admin-console
-    // /admin-console/users
-    //
-    // Both belong to Users.
-    // ----------------------------------------------------------
-
-    return 0;
-  }
-
-  // ============================================================
   // ADMIN NAVIGATION
   // ============================================================
 
@@ -116,92 +89,9 @@ class _PlatformAdminConsoleState
       BuildContext context,
       int index,
       ) {
-    switch (index) {
-      case 0:
-        context.go(
-          AppRouter.adminUsers,
-        );
-        break;
-
-      case 1:
-        context.go(
-          AppRouter.adminTrainingManagement,
-        );
-        break;
-
-      case 2:
-        context.go(
-          AppRouter.adminAnalytics,
-        );
-        break;
-
-      case 3:
-        context.go(
-          AppRouter.adminMetaWhatsApp,
-        );
-        break;
-    }
-  }
-
-  // ============================================================
-  // CURRENT PAGE
-  // ============================================================
-
-  Widget _buildCurrentPage(
-      BuildContext context,
-      ) {
-    if (_functions == null) {
-      return const SizedBox.shrink();
-    }
-
-    final path =
-        GoRouterState.of(context).uri.path;
-
-    // ----------------------------------------------------------
-    // USERS
-    // ----------------------------------------------------------
-
-    if (path == AppRouter.adminUsers ||
-        path == AppRouter.adminConsole) {
-      return UserManagement(
-        functions: _functions!,
-      );
-    }
-
-    // ----------------------------------------------------------
-    // TRAINING MANAGEMENT
-    // ----------------------------------------------------------
-
-    if (path ==
-        AppRouter.adminTrainingManagement) {
-      return TrainingManagement(
-        functions: _functions!,
-      );
-    }
-
-    // ----------------------------------------------------------
-    // TRAINING ANALYTICS
-    // ----------------------------------------------------------
-
-    if (path ==
-        AppRouter.adminAnalytics) {
-      return const TrainingAnalyticsScreen();
-    }
-
-    if (path ==
-        AppRouter.adminMetaWhatsApp) {
-      return MetaWhatsAppBusinessScreen(
-        functions: _functions!,
-      );
-    }
-
-    // ----------------------------------------------------------
-    // FALLBACK
-    // ----------------------------------------------------------
-
-    return UserManagement(
-      functions: _functions!,
-    );
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   // ============================================================
@@ -247,13 +137,6 @@ class _PlatformAdminConsoleState
     }
 
     // ==========================================================
-    // CURRENT SECTION
-    // ==========================================================
-
-    final selectedIndex =
-    _getSelectedIndex(context);
-
-    // ==========================================================
     // ADMIN CONSOLE
     // ==========================================================
 
@@ -282,16 +165,22 @@ class _PlatformAdminConsoleState
             ],
             shape: Border(bottom: BorderSide(color: theme.dividerColor)),
           ),
-          body: _buildCurrentPage(context),
+          body: _pages == null 
+            ? const SizedBox.shrink() 
+            : IndexedStack(
+                index: _selectedIndex,
+                children: _pages!,
+              ),
           bottomNavigationBar: NavigationBar(
             backgroundColor: theme.colorScheme.surface,
-            selectedIndex: selectedIndex,
+            selectedIndex: _selectedIndex,
             onDestinationSelected: (index) => _navigateToSection(context, index),
             destinations: const [
               NavigationDestination(icon: Icon(Icons.people_outlined), selectedIcon: Icon(Icons.people), label: 'Users'),
               NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'Training'),
               NavigationDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics), label: 'Analytics'),
               NavigationDestination(icon: Icon(Icons.business_outlined), selectedIcon: Icon(Icons.business), label: 'Meta'),
+              NavigationDestination(icon: Icon(Icons.terminal_outlined), selectedIcon: Icon(Icons.terminal), label: 'Logs'),
             ],
           ),
         );
@@ -308,7 +197,7 @@ class _PlatformAdminConsoleState
               selectedIconTheme: IconThemeData(color: theme.colorScheme.primary),
               unselectedLabelTextStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 11),
               selectedLabelTextStyle: TextStyle(color: theme.colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
-              selectedIndex: selectedIndex,
+              selectedIndex: _selectedIndex,
               labelType: NavigationRailLabelType.all,
               leading: Column(
                 children: [
@@ -338,10 +227,18 @@ class _PlatformAdminConsoleState
                 NavigationRailDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: Text('Training')),
                 NavigationRailDestination(icon: Icon(Icons.analytics_outlined), selectedIcon: Icon(Icons.analytics), label: Text('Analytics')),
                 NavigationRailDestination(icon: Icon(Icons.business_outlined), selectedIcon: Icon(Icons.business), label: Text('Meta')),
+                NavigationRailDestination(icon: Icon(Icons.terminal_outlined), selectedIcon: Icon(Icons.terminal), label: Text('Logs')),
               ],
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: _buildCurrentPage(context)),
+            Expanded(
+              child: _pages == null 
+                ? const SizedBox.shrink() 
+                : IndexedStack(
+                    index: _selectedIndex,
+                    children: _pages!,
+                  ),
+            ),
           ],
         ),
       );

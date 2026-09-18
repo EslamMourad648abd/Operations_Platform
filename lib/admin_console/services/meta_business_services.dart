@@ -24,6 +24,9 @@ class MetaBusinessService {
   Future<MetaWabaSnapshot> syncAccounts() async {
     final callable = functions.httpsCallable(
       'syncClientWhatsAppBusinessAccounts',
+      options: HttpsCallableOptions(
+        timeout: const Duration(minutes: 15),
+      ),
     );
 
     final result = await callable.call();

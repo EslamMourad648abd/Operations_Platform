@@ -5,6 +5,7 @@ import '../../../../../router/app_router.dart';
 import '../../../../../services/auth_service.dart';
 import '../../../../../services/localization_service.dart';
 import '../../../../../services/theme_service.dart';
+import '../../../../../services/platform_config.dart';
 
 const Color kOnboardingBrandColor =
 Color(0xff003366);
@@ -145,86 +146,87 @@ class _OnboardingNavigation
             // BACK TO PLATFORM
             // ==================================================
 
-            Padding(
-              padding:
-              const EdgeInsets.fromLTRB(
-                12,
-                12,
-                12,
-                4,
-              ),
-
-              child: Material(
-                color:
-                Colors.transparent,
-
-                borderRadius:
-                BorderRadius.circular(
-                  10,
+            if (!PlatformConfig.current.isStandalone)
+              Padding(
+                padding:
+                const EdgeInsets.fromLTRB(
+                  12,
+                  12,
+                  12,
+                  4,
                 ),
 
-                child: InkWell(
+                child: Material(
+                  color:
+                  Colors.transparent,
+
                   borderRadius:
                   BorderRadius.circular(
                     10,
                   ),
 
-                  onTap: () {
-                    context.go(
-                      AppRouter.home,
-                    );
-                  },
-
-                  child: Padding(
-                    padding:
-                    const EdgeInsets.symmetric(
-                      horizontal:
-                      10,
-                      vertical:
+                  child: InkWell(
+                    borderRadius:
+                    BorderRadius.circular(
                       10,
                     ),
 
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons
-                              .arrow_back_rounded,
+                    onTap: () {
+                      context.go(
+                        AppRouter.home,
+                      );
+                    },
 
-                          size:
-                          19,
+                    child: Padding(
+                      padding:
+                      const EdgeInsets.symmetric(
+                        horizontal:
+                        10,
+                        vertical:
+                        10,
+                      ),
 
-                          color:
-                          theme.colorScheme.primary,
-                        ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons
+                                .arrow_back_rounded,
 
-                        const SizedBox(
-                          width:
-                          9,
-                        ),
+                            size:
+                            19,
 
-                        Expanded(
-                          child: Text(
-                            l10n?.translate('back_to_platforms') ?? 'Back to Platforms',
+                            color:
+                            theme.colorScheme.primary,
+                          ),
 
-                            style:
-                            TextStyle(
-                              fontSize:
-                              13,
+                          const SizedBox(
+                            width:
+                            9,
+                          ),
 
-                              fontWeight:
-                              FontWeight.bold,
+                          Expanded(
+                            child: Text(
+                              l10n?.translate('back_to_platforms') ?? 'Back to Platforms',
 
-                              color:
-                              theme.colorScheme.primary,
+                              style:
+                              TextStyle(
+                                fontSize:
+                                13,
+
+                                fontWeight:
+                                FontWeight.bold,
+
+                                color:
+                                theme.colorScheme.primary,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
 
             // ==================================================
             // HEADER
@@ -345,7 +347,7 @@ class _OnboardingNavigation
                     // REPORTS
                     // ==================================================
 
-                    if (AuthService.isSuperAdmin)
+                    if (AuthService.isSuperAdmin && !PlatformConfig.current.isStandalone)
                       _NavigationItem(
                         icon:
                         Icons

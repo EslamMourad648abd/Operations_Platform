@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/auth_service.dart';
 import '../../services/localization_service.dart';
 import '../../services/theme_service.dart';
+import '../../services/platform_config.dart';
 
 class LoginPage extends StatefulWidget {
   static const routeName = '/login';
@@ -155,11 +156,24 @@ class _LoginPageState extends State<LoginPage> {
       await AuthService.loadUserRole();
 
       // ========================================================
+      // PLATFORM ROLE VALIDATION
+      // ========================================================
+      
+      final config = PlatformConfig.current;
+      if (!config.isRoleAllowed(AuthService.role)) {
+        await FirebaseAuth.instance.signOut();
+        throw FirebaseAuthException(
+          code: 'access-denied',
+          message: 'Your account does not have access to the ${config.title}.'
+        );
+      }
+
+      // ========================================================
       // NAVIGATION
       // ========================================================
 
       if (mounted) {
-        context.go('/home');
+        context.go(config.landingRoute);
       }
     } on FirebaseAuthException catch (e) {
       String message =
@@ -347,18 +361,27 @@ class _LoginPageState extends State<LoginPage> {
                           Column(
                             children: [
                               Image.asset(
-                                'assets/logo.png',
+                                PlatformConfig.current.logoAsset,
                                 height: isCompact ? 100 : 140,
                                 fit: BoxFit.contain,
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                l10n?.translate('sign_in_title') ?? 'Sign in to BBC Operations Platform',
+                                PlatformConfig.current.title,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: isCompact ? 19 : 22,
                                   fontWeight: FontWeight.bold,
                                   color: isDark ? const Color(0xff38BDF8) : const Color(0xFF1F5B8A),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                PlatformConfig.current.subtitle,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white54 : Colors.black45,
                                 ),
                               ),
                             ],

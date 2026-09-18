@@ -36,7 +36,6 @@ class _OnboardingClientsScreenState
 
   // Filtered list of agents for reassignment
   final Map<String, String> _onboardingAgentNames = {};
-  StreamSubscription? _onboardingAgentsSub;
 
   String _search = '';
   List<ClientModel>? _displayedClients;
@@ -60,35 +59,29 @@ class _OnboardingClientsScreenState
 
     _clientsStream = _repository.watchClients();
 
-    // 1. Fetch ALL agents for mapping names in UI and Search
-    _agentsSub =
-        _repository.watchAgents().listen((agents) {
-          if (!mounted) return;
+    // Fetch all agents and group them
+    _agentsSub = _repository.watchAllAgentsByRole().listen((grouped) {
+      if (!mounted) return;
 
-          setState(() {
-            _agentNames
-              ..clear()
-              ..addAll(agents);
-          });
-        });
+      setState(() {
+        _agentNames.clear();
+        _onboardingAgentNames.clear();
 
-    // 2. Fetch ONLY onboarding agents for the Reassign Dropdown
-    _onboardingAgentsSub =
-        _repository.watchAgents(role: 'onboarding_agent').listen((agents) {
-          if (!mounted) return;
+        // 1. Full list for mapping names
+        grouped.values.forEach(_agentNames.addAll);
 
-          setState(() {
-            _onboardingAgentNames
-              ..clear()
-              ..addAll(agents);
-          });
-        });
+        // 2. Onboarding agents for Reassign dropdown
+        final onboarding = grouped['onboarding_agent'];
+        if (onboarding != null) {
+          _onboardingAgentNames.addAll(onboarding);
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
     _agentsSub?.cancel();
-    _onboardingAgentsSub?.cancel();
     _operationPanel.dispose();
     super.dispose();
   }

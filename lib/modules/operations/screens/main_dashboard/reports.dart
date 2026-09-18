@@ -45,14 +45,8 @@ class _OnboardingReportsState extends State<OnboardingReports> {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      body: StreamBuilder<Map<String, String>>(
-        // ============================================================
-        // IMPORTANT:
-        // ONLY USERS WITH ROLE = onboarding_agent
-        // ============================================================
-        stream: _repository.watchAgents(
-          role: 'onboarding_agent',
-        ),
+      body: StreamBuilder<Map<String, Map<String, String>>>(
+        stream: _repository.watchAllAgentsByRole(),
         builder: (context, agentSnapshot) {
           if (agentSnapshot.hasError) {
             return _ReportsMessage(
@@ -63,7 +57,22 @@ class _OnboardingReportsState extends State<OnboardingReports> {
             );
           }
 
-          final agents = agentSnapshot.data ?? <String, String>{};
+    final groupedAgents = agentSnapshot.data ?? <String, Map<String, String>>{};
+          
+    // Build the grouped items list for validation
+    final List<String> validAgentNames = ['All'];
+    for (final team in groupedAgents.values) {
+      validAgentNames.addAll(team.values);
+    }
+
+    // Ensure the current filter is valid for the loaded data
+    if (!validAgentNames.contains(_agentFilter)) {
+      _agentFilter = 'All';
+    }
+
+    // Flatten for calculations
+    final allAgents = <String, String>{};
+    groupedAgents.values.forEach(allAgents.addAll);
 
           return StreamBuilder<List<ClientModel>>(
             stream: _repository.watchClients(),
@@ -112,7 +121,8 @@ class _OnboardingReportsState extends State<OnboardingReports> {
                   return _buildContent(
                     clients,
                     taskSnapshot.data ?? <OnboardingTaskModel>[],
-                    agents,
+                    groupedAgents,
+                    allAgents,
                   );
                 },
               );
@@ -130,17 +140,18 @@ class _OnboardingReportsState extends State<OnboardingReports> {
   Widget _buildContent(
       List<ClientModel> clients,
       List<OnboardingTaskModel> tasks,
-      Map<String, String> agents,
+      Map<String, Map<String, String>> groupedAgents,
+      Map<String, String> allAgents,
       ) {
     final filteredTasks = tasks
         .where(_taskMatchesDate)
         .where(_taskMatchesType)
-        .where((t) => _taskMatchesAgent(t, agents))
+        .where((t) => _taskMatchesAgent(t, allAgents))
         .toList();
 
     final filteredClients = clients
         .where(_clientMatchesStatus)
-        .where((c) => _clientMatchesAgent(c, agents))
+        .where((c) => _clientMatchesAgent(c, allAgents))
         .toList();
 
     final metrics = _ReportMetrics.fromData(
@@ -168,13 +179,13 @@ class _OnboardingReportsState extends State<OnboardingReports> {
 
               const SizedBox(height: 18),
 
-              _buildFilters(agents),
+              _buildFilters(groupedAgents),
 
               const SizedBox(height: 24),
 
               _buildAgentOccupancy(
                 filteredTasks,
-                agents,
+                allAgents,
               ),
 
               const SizedBox(height: 24),
@@ -406,16 +417,45 @@ class _OnboardingReportsState extends State<OnboardingReports> {
   // ============================================================
 
   Widget _buildFilters(
-      Map<String, String> agents,
+      Map<String, Map<String, String>> groupedAgents,
       ) {
     final l10n = AppLocalizations.of(context);
 
-    final sortedAgentNames = agents.values.toList()..sort();
-
-    final agentNames = [
-      'All',
-      ...sortedAgentNames,
+    // Build the grouped items list and keep track of valid values
+    final Set<String> validValues = {'All'};
+    final List<DropdownMenuItem<String>> dropdownItems = [
+      const DropdownMenuItem(value: 'All', child: Text('All Agents')),
     ];
+
+    // Helper to add group
+    void addTeamGroup(String role, String label, Color color) {
+      final team = groupedAgents[role] ?? {};
+      if (team.isNotEmpty) {
+        dropdownItems.add(DropdownMenuItem(
+          enabled: false, 
+          child: Text('-- $label --', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: color))
+        ));
+        final sortedNames = team.values.map((s) => s.trim()).toList()..sort();
+        for (final name in sortedNames) {
+          if (name.isNotEmpty) {
+            validValues.add(name);
+            dropdownItems.add(DropdownMenuItem(
+              value: name, 
+              child: Padding(padding: const EdgeInsets.only(left: 12), child: Text(name))
+            ));
+          }
+        }
+      }
+    }
+
+    addTeamGroup('onboarding_agent', 'ONBOARDING TEAM', Colors.blue);
+    addTeamGroup('support_agent', 'SUPPORT TEAM', Colors.green);
+
+    // CRITICAL: Validate selection against valid values before rendering
+    String currentSelection = _agentFilter.trim();
+    if (!validValues.contains(currentSelection)) {
+      currentSelection = 'All';
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -424,16 +464,20 @@ class _OnboardingReportsState extends State<OnboardingReports> {
         final content = [
           Expanded(
             flex: isCompact ? 0 : 1,
-            child: _FilterDropdown(
-              label:
-              l10n?.translate('onboarding_agent') ??
-                  'Onboarding Agent',
-              value: _agentFilter,
-              values: agentNames,
+            child: DropdownButtonFormField<String>(
+              value: currentSelection,
+              decoration: InputDecoration(
+                labelText: l10n?.translate('agent') ?? 'Filter by Agent',
+                filled: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              items: dropdownItems,
               onChanged: (value) {
-                setState(() {
-                  _agentFilter = value;
-                });
+                if (value != null) {
+                  setState(() {
+                    _agentFilter = value;
+                  });
+                }
               },
             ),
           ),

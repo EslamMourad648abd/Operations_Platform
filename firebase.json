@@ -1,68 +1,81 @@
 {
-  "hosting": {
-    "public": "build/web",
-    "rewrites": [
-      {
-        "source": "/api/**",
-        "function": "api"
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ],
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "headers": [
-      {
-        "source": "/index.html",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "**/*.@(js|css)",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache"
-          }
-        ]
-      }
-    ],
-    "predeploy": [
-      "node scripts/predeploy.js"
-    ]
-  },
-  "flutter": {
-    "platforms": {
-      "android": {
-        "default": {
-          "projectId": "bbc-api-tool",
-          "appId": "1:259169067995:android:9df42272f819de9e98fdfe",
-          "fileOutput": "android/app/google-services.json"
+  "hosting": [
+    {
+      "target": "master",
+      "public": "build/web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
         }
-      },
-      "dart": {
-        "lib/firebase_options.dart": {
-          "projectId": "bbc-api-tool",
-          "configurations": {
-            "android": "1:259169067995:android:9df42272f819de9e98fdfe",
-            "ios": "1:259169067995:ios:21039dda2d978e8e98fdfe",
-            "macos": "1:259169067995:ios:21039dda2d978e8e98fdfe",
-            "web": "1:259169067995:web:c46914fa0822888a98fdfe",
-            "windows": "1:259169067995:web:49b36decedc7584e98fdfe"
-          }
+      ]
+    },
+    {
+      "target": "support",
+      "public": "build/web_support",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
         }
-      }
+      ]
+    },
+    {
+      "target": "onboarding",
+      "public": "build/web_onboarding",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
+      "target": "training",
+      "public": "build/web_trainee",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
+      "target": "apitool",
+      "public": "build/web_api",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
     }
-  },
+  ],
   "functions": [
     {
       "source": "functions",

@@ -69,6 +69,7 @@ import '../modules/operations/screens/client/client_workspace.dart';
 import '../modules/operations/screens/client/client_verification.dart';
 import '../modules/operations/screens/client/client_chatbot.dart';
 import '../modules/operations/screens/client/client_group.dart';
+import '../services/platform_config.dart';
 // ============================================================
 // APP ROUTER
 // ============================================================
@@ -275,6 +276,9 @@ class AppRouter {
   static const adminMetaWhatsApp =
       '/admin-console/meta-whatsapp';
 
+  static const adminLogs =
+      '/admin-console/logs';
+
   // ============================================================
   // ROUTER
   // ============================================================
@@ -337,6 +341,31 @@ class AppRouter {
       }
 
       // --------------------------------------------------------
+      // PLATFORM ISOLATION
+      // --------------------------------------------------------
+      
+      final config = PlatformConfig.current;
+      if (config.isStandalone) {
+        // Block Admin Console for standalone platforms
+        if (location.startsWith(adminConsole)) return home;
+        
+        // Block other platforms
+        switch (config.type) {
+          case PlatformType.support:
+          case PlatformType.onboarding:
+            if (!location.startsWith(operations) && !location.startsWith(home)) return home;
+            break;
+          case PlatformType.trainee:
+            if (!location.startsWith(training) && !location.startsWith(home)) return home;
+            break;
+          case PlatformType.apiTool:
+            if (!location.startsWith(bbcApi) && !location.startsWith(home)) return home;
+            break;
+          default: break;
+        }
+      }
+
+      // --------------------------------------------------------
       // SUPER ADMIN CONSOLE
       // --------------------------------------------------------
 
@@ -344,7 +373,8 @@ class AppRouter {
           location == adminUsers ||
           location == adminTrainingManagement ||
           location == adminAnalytics ||
-          location == adminMetaWhatsApp) {
+          location == adminMetaWhatsApp ||
+          location == adminLogs) {
         if (AuthService.isSuperAdmin) {
           return null;
         }
@@ -816,6 +846,21 @@ class AppRouter {
 
         name:
         'admin-meta-whatsapp',
+
+        builder: (
+            context,
+            state,
+            ) {
+          return const PlatformAdminConsole();
+        },
+      ),
+
+      GoRoute(
+        path:
+        adminLogs,
+
+        name:
+        'admin-logs',
 
         builder: (
             context,

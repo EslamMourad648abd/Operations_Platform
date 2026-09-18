@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../router/app_router.dart';
 import '../../../services/theme_service.dart';
 import '../../../services/localization_service.dart';
+import '../../../services/platform_config.dart';
 
 // ============================================================
 // TRAINING BRAND
@@ -175,91 +176,92 @@ class _TrainingNavigation
             // BACK TO PLATFORM
             // ==================================================
 
-            Padding(
-              padding:
-              const EdgeInsets.fromLTRB(
-                12,
-                12,
-                12,
-                4,
-              ),
-
-              child:
-              Material(
-                color:
-                Colors.transparent,
-
-                borderRadius:
-                BorderRadius.circular(
-                  10,
+            if (!PlatformConfig.current.isStandalone)
+              Padding(
+                padding:
+                const EdgeInsets.fromLTRB(
+                  12,
+                  12,
+                  12,
+                  4,
                 ),
 
                 child:
-                InkWell(
+                Material(
+                  color:
+                  Colors.transparent,
+
                   borderRadius:
                   BorderRadius.circular(
                     10,
                   ),
 
-                  onTap: () {
-                    context.go(
-                      AppRouter.home,
-                    );
-                  },
-
                   child:
-                  Padding(
-                    padding:
-                    const EdgeInsets.symmetric(
-                      horizontal:
-                      10,
-                      vertical:
+                  InkWell(
+                    borderRadius:
+                    BorderRadius.circular(
                       10,
                     ),
 
+                    onTap: () {
+                      context.go(
+                        AppRouter.home,
+                      );
+                    },
+
                     child:
-                    Row(
-                      children: [
-                        Icon(
-                          Icons
-                              .arrow_back_rounded,
+                    Padding(
+                      padding:
+                      const EdgeInsets.symmetric(
+                        horizontal:
+                        10,
+                        vertical:
+                        10,
+                      ),
 
-                          size:
-                          19,
+                      child:
+                      Row(
+                        children: [
+                          Icon(
+                            Icons
+                                .arrow_back_rounded,
 
-                          color:
-                          theme.colorScheme.primary,
-                        ),
+                            size:
+                            19,
 
-                        const SizedBox(
-                          width:
-                          9,
-                        ),
+                            color:
+                            theme.colorScheme.primary,
+                          ),
 
-                        Expanded(
-                          child:
-                          Text(
-                            l10n?.translate('back_to_platforms') ?? 'Back to Platforms',
+                          const SizedBox(
+                            width:
+                            9,
+                          ),
 
-                            style:
-                            TextStyle(
-                              fontSize:
-                              13,
+                          Expanded(
+                            child:
+                            Text(
+                              l10n?.translate('back_to_platforms') ?? 'Back to Platforms',
 
-                              fontWeight:
-                              FontWeight.bold,
+                              style:
+                              TextStyle(
+                                fontSize:
+                                13,
 
-                              color:
-                              theme.colorScheme.primary,
+                                fontWeight:
+                                FontWeight.bold,
+
+                                color:
+                                theme.colorScheme.primary,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
 
             // ==================================================
             // HEADER

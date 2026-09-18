@@ -7,11 +7,13 @@ import '../models/activity_model.dart';
 import '../models/channel_model.dart';
 import '../models/client_model.dart';
 import '../models/onboarding_tasks_model.dart';
+import '../../../services/debug_log_service.dart';
 
 class OnboardingRepository {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final FirebaseFunctions _functions;
+  final _log = DebugLogService();
 
   OnboardingRepository({
     FirebaseFirestore? firestore,
@@ -328,6 +330,7 @@ class OnboardingRepository {
       String clientId,
       Map<String, dynamic> fields,
       ) async {
+    _log.ui('Updating client fields for $clientId: ${fields.keys.join(", ")}');
     if (fields.isEmpty) return;
 
     final safeFields = Map<String, dynamic>.from(fields);
@@ -357,6 +360,7 @@ class OnboardingRepository {
       String clientId,
       String comment,
       ) async {
+    _log.ui('Submitting CRM comment for client $clientId: $comment');
     final cleanClientId = clientId.trim();
     final newComment = comment.trim();
 
@@ -420,6 +424,7 @@ class OnboardingRepository {
     String? chatbotStatus,
     String? groupStatus,
   }) async {
+    _log.ui('Updating client statuses for $clientId: verification=$verificationStatus');
     final fields = <String, dynamic>{};
 
     if (activationStatus != null) {
@@ -1118,11 +1123,33 @@ class OnboardingRepository {
   // AGENTS
   // ============================================================
 
+  Stream<Map<String, Map<String, String>>> watchAllAgentsByRole() {
+    return _firestore.collection('users').where('role', isNotEqualTo: null).snapshots().map((snapshot) {
+      final result = <String, Map<String, String>>{
+        'onboarding_agent': {},
+        'support_agent': {},
+      };
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final role = data['role']?.toString().trim();
+        if (role != 'onboarding_agent' && role != 'support_agent') continue;
+
+        final name = data['displayName']?.toString() ??
+            data['username']?.toString() ??
+            data['email']?.toString() ??
+            doc.id;
+
+        result[role]![doc.id] = name;
+      }
+      return result;
+    });
+  }
+
   Stream<Map<String, String>> watchAgents({
     String? role,
   }) {
-    Query<Map<String, dynamic>> query =
-    _firestore.collection('users');
+    Query<Map<String, dynamic>> query = _firestore.collection('users');
 
     if (role != null) {
       query = query.where(
@@ -1142,11 +1169,10 @@ class OnboardingRepository {
       for (final doc in snapshot.docs) {
         final data = doc.data();
 
-        final name =
-            data['displayName']?.toString() ??
-                data['username']?.toString() ??
-                data['email']?.toString() ??
-                doc.id;
+        final name = data['displayName']?.toString() ??
+            data['username']?.toString() ??
+            data['email']?.toString() ??
+            doc.id;
 
         agents[doc.id] = name;
       }
@@ -1206,6 +1232,7 @@ class OnboardingRepository {
     }
 
     final cleanTask = task.trim();
+    _log.ui('Started task: $taskType ${cleanTask.isNotEmpty ? "($cleanTask)" : ""}');
     final cleanTaskType = taskType.trim();
     final cleanClientId = clientId?.trim() ?? '';
     final cleanClientName = clientName?.trim() ?? '';
@@ -1609,6 +1636,7 @@ class OnboardingRepository {
     required Map<String, bool> checklist,
     required String verificationStatus,
   }) async {
+    _log.ui('Updated verification checklist for $clientId');
     await _clients.doc(clientId).update({
       'verificationChecklist':
       Map<String, bool>.from(checklist),

@@ -6,13 +6,17 @@ import 'firebase_options.dart';
 import 'router/app_router.dart';
 import 'services/localization_service.dart';
 import 'services/theme_service.dart';
+import 'services/platform_config.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  await runAppWithConfig(PlatformConfig.master);
+}
 
-  // ============================================================
-  // INITIALIZE SERVICES
-  // ============================================================
+Future<void> runAppWithConfig(PlatformConfig config) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  PlatformConfig.current = config;
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -27,6 +31,8 @@ class ApiTesterApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final config = PlatformConfig.current;
+
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: ThemeService.themeNotifier,
       builder: (context, themeMode, _) {
@@ -34,18 +40,15 @@ class ApiTesterApp extends StatelessWidget {
           valueListenable: AppLocalizations.localeNotifier,
           builder: (context, locale, child) {
             return MaterialApp.router(
-              title: 'BBC Operations Platform',
+              title: config.title,
               debugShowCheckedModeBanner: false,
               themeMode: themeMode,
               
-              // ========================================================
-              // LIGHT THEME
-              // ========================================================
               theme: ThemeData(
                 useMaterial3: true,
                 brightness: Brightness.light,
                 colorScheme: ColorScheme.fromSeed(
-                  seedColor: const Color(0xff003366),
+                  seedColor: config.primaryColor,
                   brightness: Brightness.light,
                   surface: const Color(0xffF5F8FC),
                 ),
@@ -60,23 +63,20 @@ class ApiTesterApp extends StatelessWidget {
                 dividerColor: const Color(0xffE2E8EF),
               ),
 
-              // ========================================================
-              // DARK THEME (ENHANCED CONTRAST)
-              // ========================================================
               darkTheme: ThemeData(
                 useMaterial3: true,
                 brightness: Brightness.dark,
                 colorScheme: ColorScheme.fromSeed(
-                  seedColor: const Color(0xff003366),
+                  seedColor: config.primaryColor,
                   brightness: Brightness.dark,
-                  surface: const Color(0xff0F172A), // Deep navy surface
+                  surface: const Color(0xff0F172A),
                   onSurface: Colors.white,
-                  primary: const Color(0xff38BDF8), // Bright sky blue primary
+                  primary: config.primaryColor,
                   secondary: const Color(0xff818CF8),
                 ),
                 scaffoldBackgroundColor: const Color(0xff0F172A),
                 cardTheme: CardThemeData(
-                  color: const Color(0xff1E293B), // Slightly lighter than background
+                  color: const Color(0xff1E293B),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -123,10 +123,6 @@ class ApiTesterApp extends StatelessWidget {
     );
   }
 }
-
-// ============================================================
-// GLOBAL LANGUAGE SWITCH
-// ============================================================
 
 class GlobalLanguageSwitch extends StatelessWidget {
   const GlobalLanguageSwitch({super.key});
@@ -179,11 +175,6 @@ class GlobalLanguageSwitch extends StatelessWidget {
     );
   }
 }
-
-
-// ============================================================
-// GLOBAL APP WATERMARK
-// ============================================================
 
 class AppWatermark extends StatelessWidget {
   const AppWatermark({super.key});

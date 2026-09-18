@@ -262,6 +262,10 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
       AppLocalizations? l10n,
       ThemeData theme,
       ) {
+    final roleLabel = AuthService.isSupportAgent 
+      ? (l10n?.translate('support') ?? 'Support')
+      : (AuthService.isSuperAdmin ? (l10n?.translate('operations') ?? 'Operations') : (l10n?.translate('onboarding') ?? 'Onboarding'));
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -278,8 +282,8 @@ class _OnboardingTasksState extends State<OnboardingTasks> {
                 ),
               ),
               Text(
-                l10n?.translate('tasks_description') ??
-                    'Track daily occupancy.',
+                l10n?.translate('tasks_description', params: {'role': roleLabel}) ??
+                    'Track $roleLabel workload and daily occupancy.',
                 style: TextStyle(
                   fontSize: 14,
                   color: theme.colorScheme.onSurface
@@ -2143,6 +2147,9 @@ class _EmptyTasks extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final roleLabel = AuthService.isSupportAgent 
+      ? (l?.translate('support') ?? 'Support')
+      : (AuthService.isSuperAdmin ? (l?.translate('operations') ?? 'Operations') : (l?.translate('onboarding') ?? 'Onboarding'));
 
     return Center(
       child: Padding(
@@ -2165,7 +2172,7 @@ class _EmptyTasks extends StatelessWidget {
               ),
             ),
             Text(
-              l?.translate('start_task_desc') ?? 'Start a task.',
+              l?.translate('start_task_desc', params: {'role': roleLabel}) ?? 'Start a task.',
               style: const TextStyle(
                 fontSize: 12,
                 color: Colors.grey,
@@ -2335,6 +2342,7 @@ const List<String> kTaskTypes = [
   'Call',
   'Meeting',
   'Ticket',
+  'Anydesk',
 ];
 
 const List<String> kInternalDepartments = [
