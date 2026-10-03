@@ -1,112 +1,182 @@
 # BBC Operations Platform
 
-An internal operations platform built with Flutter and Firebase for managing onboarding workflows, operational activities, training, API tooling, and platform administration.
+> An internal operations platform built with Flutter and Firebase for managing client onboarding, operational workflows, support activities, training, API tooling, and platform administration.
+
+The **BBC Operations Platform** brings multiple internal workflows into a unified application with role-based access, modular feature areas, Firebase-backed services, and integrations with operational systems.
+
+It has evolved from the original BBC API Tool into a broader internal platform supporting **operations, onboarding, support, training, administration, and API tooling**.
+
+---
 
 ## Overview
 
-BBC Operations Platform brings multiple internal workflows into a unified platform while maintaining separate workspaces and access boundaries for different user roles.
+The platform provides a centralized workspace for teams that operate and support Bevatel Business Chat services.
 
-The platform currently provides five application surfaces:
+Rather than maintaining separate tools for individual operational processes, the platform combines them under a shared authentication, authorization, navigation, backend, and data architecture.
 
-* **BBC Operations Platform** — master workspace with combined dashboards and platform access
-* **BBC Support Platform** — dedicated workspace for support operations
-* **BBC Onboarding Platform** — client onboarding and activation workflows
-* **BEVATEL Training Portal** — courses, lessons, quizzes, progress, and certificates
-* **BBC API Tool** — internal API testing and documentation
+### Platform surfaces
 
-The application uses role-aware routing and platform-specific access controls to determine which areas each authenticated user can access.
+| Platform                    | Purpose                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| **BBC Operations Platform** | Master workspace providing access to the platform's operational modules            |
+| **BBC Onboarding Platform** | Client onboarding, activation, verification, channel, chatbot, and group workflows |
+| **BBC Support Platform**    | Support-oriented operational workspace                                             |
+| **BEVATEL Training Portal** | Courses, lessons, quizzes, progress tracking, and certificates                     |
+| **BBC API Tool**            | Internal API testing and operational API tooling                                   |
 
-## Platform Modules
+---
 
-### Operations & Onboarding
+## Core Capabilities
 
-The operations module provides a structured workspace for managing onboarding activities and client records.
+### Client & Onboarding Management
+
+The onboarding workspace provides a structured client lifecycle for operational teams.
 
 Capabilities include:
 
-* Operations dashboard
-* Client management
+* Client records and ownership
 * Client workspaces
-* Client overview
 * Activation management
 * Channel management
 * Verification workflows
 * Chatbot management
 * Group management
-* Client activity
-* User-level tasks
-* Operational reports
+* CRM-related information
+* Client activity history
+* Operational task management
+* Reporting
 
-The client workspace is organized into dedicated sections so that different parts of the onboarding lifecycle can be managed independently.
+The client workspace is organized into dedicated operational areas so that different parts of the onboarding process can be managed independently.
 
-### Support
+### Operational Workflows
 
-The Support Platform provides a dedicated platform surface for support-oriented workflows while sharing the same underlying authentication and platform infrastructure.
+The platform supports day-to-day operational activities through:
 
-Access is restricted according to the configured platform roles.
+* Role-aware dashboards
+* Client assignments
+* Operational tasks
+* Activity tracking
+* Status management
+* Client lifecycle workflows
+* Operational reporting
+* Administrative controls
 
-### Training Portal
+The goal is to keep operational state centralized and make workflow ownership explicit.
 
-The BEVATEL Training Portal provides an internal learning environment with:
+### Training & Certification
 
-* Training dashboard
-* Course catalog
+The Training Portal provides an integrated learning environment for internal users.
+
+It supports:
+
+* Training dashboards
+* Course catalogs
 * Course details
 * Lessons
+* Video-based learning
 * Quizzes
 * Quiz review
-* Training progress
-* Certificates
+* Progress tracking
+* Course completion
+* Certificate generation
 
-Training content and progress are integrated with the platform's Firebase-backed data layer.
+Training progress is associated with authenticated users and tracked independently from the operational modules.
 
-### BBC API Tool
+### API & Integration Tooling
 
-The BBC API Tool provides an internal workspace for API testing and documentation.
+The BBC API Tool provides internal tooling for working with platform APIs and integrations.
 
-It is available as both part of the master platform and as a standalone platform surface.
+It is designed to support operational and technical workflows such as:
 
-### Administration
+* API testing
+* Request/response inspection
+* Integration troubleshooting
+* API documentation
+* Internal operational utilities
 
-The Super Admin Console provides administrative functionality including:
+Sensitive API operations are handled through backend services where appropriate rather than exposing privileged credentials directly in the client application.
+
+### Administration & Analytics
+
+Administrative functionality provides centralized management of platform resources.
+
+Administrative areas include:
 
 * User management
+* Role management
 * Training management
 * Analytics
-* Meta / WhatsApp administration
-* Platform logs
+* Meta/WhatsApp administration
+* Platform logging
+* Administrative operations
 
-Administrative routes are protected by role-based access checks.
+Access to these areas is controlled through role-based authorization.
 
-## Authentication & Access Control
+---
 
-The platform uses Firebase Authentication and role-aware routing.
+## Platform Architecture
 
-Platform access is separated according to configured roles and platform types, including:
+The platform follows a modular Flutter architecture backed by Firebase services and server-side integrations.
 
-* `superadmin`
-* `onboarding_agent`
-* `support_agent`
-* `trainee`
-* `agent`
+### High-Level Architecture
 
-The master platform can expose the combined application experience, while standalone platform builds restrict navigation to the relevant workspace.
+```text
+                         ┌─────────────────────┐
+                         │       Users         │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                    ┌─────────────────────────────┐
+                    │      Flutter Application    │
+                    │                             │
+                    │  Operations │ Support      │
+                    │  Onboarding │ Training     │
+                    │  API Tool   │ Admin        │
+                    └─────────────┬───────────────┘
+                                  │
+                    ┌─────────────┼─────────────┐
+                    │             │             │
+                    ▼             ▼             ▼
+             ┌────────────┐ ┌────────────┐ ┌────────────┐
+             │   Firebase │ │  Firestore │ │  Storage   │
+             │    Auth    │ │            │ │            │
+             └────────────┘ └────────────┘ └────────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │ Cloud Functions │
+                         │   Backend Layer │
+                         └────────┬────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              ▼                   ▼                   ▼
+       ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+       │   Bevatel   │     │ Meta/WhatsApp│     │  Zoho CRM  │
+       │     API     │     │  Integrations │     │             │
+       └─────────────┘     └─────────────┘     └─────────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │ Google Services │
+                         │ & Other APIs    │
+                         └─────────────────┘
+```
 
-Protected routes are evaluated before navigation, and restricted areas redirect unauthorized users to an appropriate platform location.
+### Application Layer
 
-## Architecture
-
-The application is structured as a Flutter application with Firebase services providing the backend infrastructure.
-
-### Frontend
+The frontend is built with:
 
 * Flutter
 * Dart
 * Material UI
 * GoRouter
-* Modular feature-based structure
+* Feature-based module organization
 
-### Backend
+The application is structured around platform modules rather than treating the entire application as one large feature.
+
+### Backend Layer
+
+Firebase provides the primary backend infrastructure:
 
 * Firebase Authentication
 * Cloud Firestore
@@ -114,175 +184,295 @@ The application is structured as a Flutter application with Firebase services pr
 * Firebase Storage
 * Firebase Admin SDK
 
-### Integrations & Services
+Cloud Functions are used for backend-controlled operations, privileged workflows, integrations, and operations that should not be executed directly from the client.
 
-The backend contains integrations and service functionality for platform operations, including:
+### Integration Layer
 
-* Bevatel API communication
-* Meta / WhatsApp related operations
-* Zoho CRM integration
+The platform integrates with external systems where required by operational workflows, including:
+
+* Bevatel APIs
+* Meta / WhatsApp services
+* Zoho CRM
 * Google APIs
-* PDF generation
-* Server-side proxy functions
+* PDF generation services
+* Other backend-connected services
 
-Sensitive integration credentials and server-side operations are handled through the backend rather than being exposed directly to the Flutter client.
+Integration logic is kept behind the appropriate application/backend boundaries rather than exposing external credentials to the Flutter client.
 
-## Application Structure
+---
 
-The main application code is organized around platform-level services and functional modules.
+## Platform Model
+
+The application supports multiple platform surfaces while sharing the same underlying infrastructure.
+
+### Master Platform
+
+**BBC Operations Platform**
+
+The primary application surface.
+
+It provides access to the platform's available modules based on the authenticated user's role and permissions.
+
+### Onboarding Platform
+
+**BBC Onboarding Platform**
+
+Focused on client onboarding and operational activation workflows.
+
+Typical areas include:
+
+* Dashboard
+* Clients
+* Client workspace
+* Activation
+* Channels
+* Verification
+* Chatbot
+* Group
+* Activity
+* Tasks
+* Reports
+
+### Support Platform
+
+**BBC Support Platform**
+
+Provides a dedicated workspace for support-oriented workflows while using the same authentication and backend infrastructure.
+
+### Training Portal
+
+**BEVATEL Training Portal**
+
+Provides the internal training experience for courses, lessons, quizzes, progress tracking, and certificates.
+
+### API Tool
+
+**BBC API Tool**
+
+Provides internal API testing, documentation, and technical operational tooling.
+
+---
+
+## Access & Roles
+
+Access is controlled through authenticated user roles and platform-aware navigation.
+
+### Super Admin
+
+Provides the highest level of administrative access across the platform.
+
+Typical capabilities include:
+
+* User administration
+* Platform administration
+* Operational administration
+* Analytics and reporting
+* Training administration
+* Privileged configuration
+* Administrative integrations
+
+### Onboarding Agent
+
+Provides access to onboarding-related operational workflows according to the user's assigned permissions.
+
+Typical capabilities include:
+
+* Client management
+* Client onboarding
+* Activation workflows
+* Verification
+* Channel management
+* Chatbot and group workflows
+* Operational tasks
+* Client activity
+
+### Support Agent
+
+Provides access to support-oriented platform functionality and the API tooling available to the role.
+
+### Trainee
+
+Provides access to the training environment and its associated learning workflows.
+
+> Authorization is enforced through the application's authentication and role model. UI visibility should not be treated as the only security boundary; privileged operations are handled through backend authorization where required.
+
+---
+
+## Client Workspace
+
+The client workspace is the primary operational area of the onboarding platform.
+
+A client record can be managed through dedicated sections rather than a single large edit form.
+
+### Overview
+
+Provides a consolidated view of the client's current operational state.
+
+Includes areas such as:
+
+* Client information
+* Ownership
+* Status
+* Integration information
+* Group information
+* Channels
+* CRM information
+* Record metadata
+
+### Activation
+
+Manages activation-related information and workflow state.
+
+### Channels
+
+Provides channel-level operational information for the client.
+
+### Verification
+
+Supports verification workflows and their associated checklist/state.
+
+### Chatbot
+
+Provides operational management of chatbot-related configuration and status.
+
+### Group
+
+Tracks operational group information and lifecycle state.
+
+### Activity
+
+Provides visibility into relevant client activity and operational history.
+
+---
+
+## Authentication & Authorization
+
+Authentication is handled through **Firebase Authentication**.
+
+Authorization is implemented through application roles and backend-aware access control.
+
+The platform uses role-aware routing and platform configuration to determine which application areas are available to an authenticated user.
+
+The authorization model is designed around the principle that:
+
+```text
+Authentication
+      ↓
+Identify User
+      ↓
+Resolve Role
+      ↓
+Resolve Platform Access
+      ↓
+Resolve Route Access
+      ↓
+Perform Authorized Operation
+```
+
+Privileged operations should be executed through trusted backend services rather than relying exclusively on client-side restrictions.
+
+---
+
+## Technology Stack
+
+| Layer               | Technology                                    |
+| ------------------- | --------------------------------------------- |
+| Frontend            | Flutter / Dart                                |
+| UI                  | Flutter Material                              |
+| Navigation          | GoRouter                                      |
+| Authentication      | Firebase Authentication                       |
+| Database            | Cloud Firestore                               |
+| Backend             | Firebase Cloud Functions                      |
+| Storage             | Firebase Storage                              |
+| Server SDK          | Firebase Admin SDK                            |
+| External APIs       | Bevatel, Meta/WhatsApp, Zoho CRM, Google APIs |
+| Document Generation | PDF generation                                |
+| Web Hosting         | Firebase Hosting                              |
+
+---
+
+## Project Structure
+
+The main application is organized into feature-oriented modules.
 
 ```text
 lib/
 ├── admin_console/
+│   ├── analytics/
+│   ├── meta_admin/
+│   ├── training_management/
+│   └── users/
+│
+├── login/
+│
 ├── modules/
 │   ├── bbc_api_tool/
-│   ├── login/
 │   ├── operations/
-│   └── training/
+│   │   └── onboarding/
+│   └── ...
+│
 ├── platform/
+│   ├── configuration/
+│   └── ...
+│
 ├── router/
+│
 ├── services/
-└── ...
+│
+├── training/
+│
+└── functions/
 ```
 
-The backend is maintained separately under:
+Backend functionality is maintained separately under:
 
 ```text
 functions/
 ```
 
-with Firebase Cloud Functions providing server-side operations and integrations.
+Additional project-level directories contain platform targets, deployment configuration, scripts, Firebase configuration, assets, and supporting application resources.
 
-## Platform Configuration
+---
 
-The application supports multiple platform configurations from the same codebase.
+## Application Navigation
 
-```text
-Platform
-├── Master
-├── Support
-├── Onboarding
-├── Training
-└── API Tool
-```
+Navigation is handled through **GoRouter** with platform- and role-aware routing.
 
-Each platform configuration defines its:
+The application separates:
 
-* Platform type
-* Display title
-* Description
-* Allowed roles
-* Landing route
-* Primary visual configuration
+* Authentication routes
+* Platform entry points
+* Operational routes
+* Client workspace routes
+* Training routes
+* Administration routes
+* API tooling routes
 
-This allows the same application codebase to support multiple operational entry points while maintaining platform-specific navigation and access rules.
+Detailed route documentation should be maintained separately from this README as the application continues to evolve.
 
-## Routing
+This keeps the README focused on the platform architecture rather than turning it into a route reference.
 
-Navigation is managed through GoRouter.
+---
 
-The application includes protected route groups for:
-
-```text
-/login
-
-/home
-
-/bbc-api
-
-/training
-/training/courses
-/training/progress
-/training/certificates
-/training/course/:courseId
-/training/course/:courseId/lesson/:lessonId
-/training/course/:courseId/lesson/:lessonId/quiz
-
-/operations
-/operations/onboarding
-/operations/onboarding/clients
-/operations/onboarding/tasks
-/operations/onboarding/reports
-/operations/onboarding/client/:clientId
-/operations/onboarding/client/:clientId/overview
-/operations/onboarding/client/:clientId/activation
-/operations/onboarding/client/:clientId/channels
-/operations/onboarding/client/:clientId/verification
-/operations/onboarding/client/:clientId/chatbot
-/operations/onboarding/client/:clientId/group
-/operations/onboarding/client/:clientId/activity
-
-/admin-console
-/admin-console/users
-/admin-console/training-management
-/admin-console/analytics
-/admin-console/meta-whatsapp
-/admin-console/logs
-```
-
-Route guards verify authentication and platform/role access before allowing navigation.
-
-## Technology Stack
-
-| Layer               | Technology                                      |
-| ------------------- | ----------------------------------------------- |
-| Application         | Flutter                                         |
-| Language            | Dart                                            |
-| Navigation          | GoRouter                                        |
-| Authentication      | Firebase Authentication                         |
-| Database            | Cloud Firestore                                 |
-| Backend             | Firebase Cloud Functions                        |
-| Server SDK          | Firebase Admin SDK                              |
-| Storage             | Firebase Storage                                |
-| External APIs       | Bevatel, Meta / WhatsApp, Zoho CRM, Google APIs |
-| Document Generation | PDF generation through backend services         |
-
-## Project Structure
-
-```text
-Operations_Platform/
-│
-├── lib/
-│   ├── admin_console/
-│   ├── modules/
-│   │   ├── bbc_api_tool/
-│   │   ├── login/
-│   │   ├── operations/
-│   │   └── training/
-│   ├── platform/
-│   ├── router/
-│   └── services/
-│
-├── functions/
-│   └── Firebase Cloud Functions
-│
-├── assets/
-│
-├── android/
-├── ios/
-├── web/
-│
-├── firebase.json
-├── pubspec.yaml
-└── ...
-```
-
-## Development
+## Development Setup
 
 ### Prerequisites
 
-Install the required development tooling for:
+The development environment requires:
 
-* Flutter
-* Dart
+* Flutter SDK
+* Dart SDK
 * Node.js
+* npm
 * Firebase CLI
+* A configured Firebase project
+* Appropriate access to required external services
 
-The exact runtime versions should follow the versions defined by the project configuration and Firebase Functions package configuration.
+Flutter and Node.js versions should follow the versions configured by the project and its deployment environment.
 
 ### Flutter
 
-Install dependencies:
+Install Flutter dependencies:
 
 ```bash
 flutter pub get
@@ -302,12 +492,6 @@ flutter run -d chrome
 
 ### Firebase Functions
 
-The backend is located in:
-
-```text
-functions/
-```
-
 Install backend dependencies:
 
 ```bash
@@ -315,54 +499,228 @@ cd functions
 npm install
 ```
 
-Firebase deployment should be performed using the project's existing Firebase configuration and deployment scripts.
+Return to the project root when finished:
+
+```bash
+cd ..
+```
+
+### Local Development
+
+Before running the full platform locally, ensure that:
+
+1. Firebase configuration is available.
+2. Required authentication configuration is valid.
+3. Backend dependencies are installed.
+4. Required external integrations are configured.
+5. Local development credentials are not committed to source control.
+
+---
+
+## Configuration
+
+The platform depends on Firebase configuration and external service configuration.
+
+### Firebase
+
+Firebase is used for:
+
+* Authentication
+* Firestore
+* Cloud Functions
+* Storage
+* Hosting
+
+Project-specific Firebase configuration is maintained through the repository's Firebase configuration files.
+
+### Environment & Secrets
+
+Secrets and privileged credentials must remain outside the source-controlled application code.
+
+Examples include:
+
+* API credentials
+* Service account credentials
+* External integration secrets
+* Backend authentication tokens
+* Private configuration values
+
+Sensitive configuration should be supplied through the appropriate deployment/runtime configuration mechanism.
+
+### External Integrations
+
+External services should be configured independently from the Flutter application's public configuration whenever credentials or privileged access are involved.
+
+The Flutter client should not contain secrets that provide unrestricted access to external systems.
+
+---
 
 ## Deployment
 
-The repository contains deployment configuration for Firebase and separate platform builds.
+The project is configured for Firebase-based deployment and platform-specific web builds.
 
-The deployment setup supports platform-specific web builds for the different application surfaces rather than treating the entire system as a single undifferentiated frontend.
+Deployment may involve:
+
+1. Building the required Flutter platform surface.
+2. Applying the appropriate platform configuration.
+3. Deploying Firebase Hosting resources.
+4. Deploying Cloud Functions when backend changes are included.
+5. Verifying authentication, routing, integrations, and cache behavior after deployment.
+
+The repository contains deployment configuration and scripts used to support the platform's deployment workflow.
+
+### Deployment Considerations
 
 Before deploying changes, verify:
 
-1. Flutter dependencies
-2. Firebase configuration
-3. Cloud Functions dependencies
-4. Target platform/build configuration
-5. Authentication and authorization behavior
-6. Environment-specific configuration
+* Flutter build succeeds
+* Static analysis passes
+* Firebase configuration is correct
+* Cloud Functions compile successfully
+* Required backend configuration exists
+* Firestore/Storage rules are appropriate
+* Authentication and role-based access still behave correctly
+* Platform-specific routing works
+* External integrations remain functional
+
+---
 
 ## Security
 
-The platform handles authenticated internal workflows and integrates with external services.
+Security is treated as an architectural concern rather than only a UI concern.
 
-Security-sensitive operations should remain on the backend, including:
+### Authentication
 
-* API credentials
-* External service authentication
-* Privileged administrative operations
-* Server-side integrations
-* Protected API proxy functionality
+Firebase Authentication provides the identity layer for platform users.
 
-Client-side role checks are used for navigation and user experience, while privileged backend operations should be protected independently by server-side authorization.
+### Authorization
 
-Do not commit credentials, private keys, access tokens, or other secrets to the repository.
+Application access is controlled through user roles and platform permissions.
 
-## Current Status
+Sensitive backend operations should additionally validate authorization on the server.
 
-The platform is an actively developed internal system with multiple operational modules and platform-specific entry points.
+### Secrets & Credentials
 
-The repository currently combines functionality that originally existed around the BBC API Tool with newer operations, onboarding, training, and administrative capabilities.
+Credentials and privileged secrets must not be committed to the repository.
 
-As the platform continues to evolve, documentation and architecture should be kept aligned with the implemented application structure.
+Do not store:
 
-## Repository
+* API keys with privileged access
+* Service account files
+* Access tokens
+* Private certificates
+* External integration secrets
 
-**Operations Platform**
+in source-controlled files.
 
-GitHub:
-https://github.com/EslamMourad648abd/Operations_Platform
+### Backend Operations
 
-## License
+Operations involving privileged credentials or trusted external services should be routed through backend services where appropriate.
 
-This project is intended for internal use.
+This prevents the Flutter application from becoming the security boundary for operations that require trusted credentials.
+
+---
+
+## Engineering Practices
+
+The project follows several engineering principles intended to keep the platform maintainable as its scope grows.
+
+### Modular Architecture
+
+Major business areas are separated into feature modules rather than being implemented as one monolithic application layer.
+
+### Separation of Responsibilities
+
+UI, routing, platform configuration, services, backend functionality, and feature-specific workflows are maintained as separate concerns where practical.
+
+### Role-Aware Navigation
+
+Navigation and platform availability are derived from authenticated user context and role configuration.
+
+### Backend-First Sensitive Operations
+
+Privileged operations and external integrations should be handled through trusted backend services when client-side execution would expose credentials or bypass server-side authorization.
+
+### Reusable Platform Infrastructure
+
+Multiple platform surfaces share common infrastructure instead of maintaining completely independent applications.
+
+This allows authentication, backend services, data models, and shared services to evolve centrally.
+
+---
+
+## Current Platform Status
+
+The project is actively developed as an internal operations platform.
+
+It has evolved from the original **BBC API Tool** into a broader system covering:
+
+* Operations
+* Client onboarding
+* Support workflows
+* Training
+* API tooling
+* Administration
+* Analytics
+* External integrations
+
+The architecture continues to evolve as additional operational workflows are migrated into the platform.
+
+---
+
+## Documentation
+
+The README provides the high-level platform overview and development entry point.
+
+More detailed documentation can be maintained separately for areas such as:
+
+* Architecture decisions
+* Route reference
+* Data models
+* Firebase collections
+* Cloud Functions
+* External integrations
+* Deployment procedures
+* Operational workflows
+* Development standards
+
+This keeps the main README readable while allowing technical documentation to grow independently with the platform.
+
+---
+
+## Repository Structure
+
+At the repository level, the project contains the Flutter application, Firebase backend, deployment configuration, platform assets, scripts, and supporting project resources.
+
+The main areas include:
+
+```text
+.
+├── android/
+├── assets/
+├── functions/
+├── ios/
+├── lib/
+├── linux/
+├── macos/
+├── public/
+├── scripts/
+├── test/
+├── web/
+├── windows/
+│
+├── .firebaserc
+├── firebase.json
+├── pubspec.yaml
+├── package.json
+├── README.md
+└── ...
+```
+
+---
+
+## Internal Use
+
+This platform is intended for internal operational use.
+
+Access, deployment, credentials, integrations, and platform data should be managed according to the organization's internal security and operational policies.
