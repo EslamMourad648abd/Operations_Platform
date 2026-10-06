@@ -932,7 +932,7 @@ class _OnboardingClientsScreenState
                               ),
 
                               // SUPER ADMIN REASSIGN
-                              if (_isSuperAdmin) ...[
+                              if (_isSuperAdmin || AuthService.isOnboardingAgent) ...[
                                 const SizedBox(
                                   width: 8,
                                 ),
@@ -1172,7 +1172,7 @@ class _OnboardingClientsScreenState
   // ===========================================================================
 
   Future<void> _showReassignClientDialog(ClientModel client) async {
-    if (!_isSuperAdmin) return;
+    if (!_isSuperAdmin && !AuthService.isOnboardingAgent) return;
 
     // Use ONLY the onboarding agents list for the dropdown
     final agents = Map<String, String>.from(_onboardingAgentNames);
@@ -1332,6 +1332,7 @@ class _OnboardingClientsScreenState
       );
     }
   }
+
 
   // ===========================================================================
   // SEARCH
